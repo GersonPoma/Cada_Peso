@@ -1,0 +1,43 @@
+schema: spec-driven
+
+# Project context (optional)
+# Add only constraints that should guide OpenSpec artifacts and workflows.
+# Include constraints an agent cannot infer by reading the code.
+# Keep general project documentation and discoverable codebase facts out.
+context: |
+  Proyecto: clon de YNAB (presupuesto personal base cero). Monorepo con /backend
+  (Spring Boot 4 + Java 21 + Maven, packaging jar, configuración en .properties) y
+  /frontend (Angular standalone components + signals, sin NgModules, sin SSR).
+  Backend organizado por feature de negocio bajo com.presupuesto; infraestructura
+  transversal (EntidadBase, excepciones + ProblemDetail, SecurityConfig) en comun/.
+  Persistencia en PostgreSQL vía Hibernate (ddl-auto=update, sin Flyway/Liquibase).
+  Seguridad JWT con jjwt (io.jsonwebtoken), API stateless.
+  Todos los artefactos de OpenSpec (proposal, specs, design, tasks) se escriben en
+  español. Nomenclatura: dominio en español, sufijos técnicos en inglés, sin tildes
+  ni ñ en nombres de código. Dinero representado siempre como long en milésimas.
+  Límite de línea de 100 columnas en todo el monorepo vía .editorconfig (único, en
+  la raíz) y, en /frontend, Prettier (printWidth 100, singleQuote true). Commits
+  convencionales en español.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always state what is out of scope
+rules:
+  specs:
+    - Cada capacidad debe describirse con escenarios Dado/Cuando/Entonces.
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing

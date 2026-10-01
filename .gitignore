@@ -1,0 +1,28 @@
+# Java / Maven
+target/
+*.class
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+
+# Node / Angular
+node_modules/
+dist/
+.angular/
+coverage/
+npm-debug.log*
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+
+# Claude Code (configuración personal de permisos)
+.claude/settings.local.json
+
+# Entorno
+.env
+
+# Sistema operativo y logs
+Thumbs.db
+.DS_Store
+*.log
