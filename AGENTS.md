@@ -4,6 +4,10 @@ Convenciones del proyecto **presupuesto** (clon de YNAB, presupuesto personal ba
 Monorepo con `/backend` (Spring Boot 4 + Java 21 + Maven) y `/frontend` (Angular standalone +
 signals). Cualquier agente o desarrollador debe leer este archivo antes de tocar el código.
 
+El nombre del producto es **"Cada Peso"**: es el título de la pestaña del navegador
+(`frontend/src/index.html`) y el `spring.application.name=cada-peso` del backend. El paquete
+raíz (`com.presupuesto`) y la base de datos (`presupuesto`) conservan su nombre técnico.
+
 ## Nomenclatura
 
 - El **dominio** (entidades, paquetes de negocio, campos, mensajes de error) se nombra en
@@ -84,6 +88,40 @@ El dinero se representa siempre como `long` en **milésimas** (ej. 1.000 = 1 uni
 nunca como `double`/`float`/`BigDecimal`. Esta convención aplica desde la entidad hasta el DTO.
 En el frontend, el pipe de moneda de `shared/` es responsable de convertir milésimas a la
 representación visible para el usuario.
+
+## Fechas: `LocalDate` vs `Instant`
+
+- Las **fechas de negocio** sin hora (fecha de una transacción, mes del presupuesto) se modelan
+  como `LocalDate` y viajan en JSON como `yyyy-MM-dd`.
+- Los **momentos exactos** de auditoría (`fechaCreacion`, `fechaActualizacion`, etc.) se modelan
+  como `Instant` y viajan como ISO-8601 en UTC con sufijo `Z`.
+- La JVM del backend corre en UTC (`TimeZone.setDefault` en `main()`,
+  `hibernate.jdbc.time_zone=UTC` y `-Duser.timezone=UTC` en Surefire para los tests). Solo el
+  frontend convierte un `Instant` a la zona horaria del usuario, y únicamente al mostrarlo.
+
+## Formato regional (frontend)
+
+- La región de formato se detecta automáticamente con `regionUsuario()`
+  (`shared/formato/region-usuario.ts`), que lee `navigator.language` y usa `en-US` como
+  fallback si no hay valor o no es válido. El usuario nunca elige región a mano.
+- Todo monto o fecha visible para el usuario se formatea **obligatoriamente** con los pipes
+  propios de `shared/formato/`: `monto` (milésimas + código de moneda ISO 4217) y `fecha`
+  (`Instant` convertido a la hora local; `LocalDate` sin conversión de zona horaria, para que
+  nunca se corra un día). Ambos se basan en `Intl.NumberFormat`/`Intl.DateTimeFormat`.
+- Nunca se usan los pipes nativos `date`/`number`/`currency` de Angular, ni
+  `registerLocaleData`, ni un `LOCALE_ID` fijo.
+
+## Validación de formularios e idioma de los mensajes
+
+- Los formularios del frontend validan con `Validators` propios de Angular (nativos o funciones
+  custom) que replican las reglas de validación del `Request` del backend, y muestran sus
+  propios mensajes en español escritos a mano, sin depender de mensajes que vengan del backend.
+- El backend sigue validando con Jakarta Validation (`@Valid`, `@NotNull`, `@Size`, etc.) como
+  límite de seguridad autoritativo. Sus mensajes por defecto usan el idioma de la JVM de cada
+  máquina, sin configuración, y son solo un respaldo porque el frontend valida y muestra sus
+  propios mensajes en español.
+- Las excepciones de negocio propias (`NegocioException` y subclases, con su `CodigoError`)
+  mantienen sus mensajes en español.
 
 ## Seguridad: JWT
 
