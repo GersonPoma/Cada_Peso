@@ -5,8 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.presupuesto.comun.config.RelojDePrueba;
-import com.presupuesto.usuario.Rol;
-import com.presupuesto.usuario.Usuario;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.security.WeakKeyException;
@@ -21,22 +19,22 @@ class JwtServiceTest {
     private static final String SECRETO_POR_DEFECTO =
             "cada-peso-secreto-solo-para-desarrollo-local-no-usar-en-produccion";
     private static final Duration VEINTICUATRO_HORAS = Duration.ofHours(24);
+    private static final Long ID_USUARIO = 42L;
+    private static final Rol ROL_USUARIO = Rol.USUARIO;
 
     private RelojDePrueba reloj;
     private JwtService jwtService;
-    private Usuario usuario;
 
     @BeforeEach
     void preparar() {
         reloj = new RelojDePrueba();
         jwtService = new JwtService(
                 new JwtProperties(SECRETO_POR_DEFECTO, VEINTICUATRO_HORAS), reloj);
-        usuario = Usuario.builder().id(42L).email("ana@ejemplo.com").contrasena("hash").build();
     }
 
     @Test
     void unTokenRecienEmitidoSeValidaConSuIdYRol() {
-        TokenEmitido emitido = jwtService.emitir(usuario);
+        TokenEmitido emitido = jwtService.emitir(ID_USUARIO, ROL_USUARIO);
 
         UsuarioAutenticado autenticado = jwtService.validar(emitido.token());
 
@@ -48,7 +46,7 @@ class JwtServiceTest {
     @Test
     void elTokenSeFirmaConHs256AunqueElSecretoTenga66Bytes() {
         assertThat(SECRETO_POR_DEFECTO.getBytes(StandardCharsets.UTF_8)).hasSize(66);
-        String token = jwtService.emitir(usuario).token();
+        String token = jwtService.emitir(ID_USUARIO, ROL_USUARIO).token();
 
         String header = new String(
                 Base64.getUrlDecoder().decode(token.split("\\.")[0]), StandardCharsets.UTF_8);
@@ -58,7 +56,7 @@ class JwtServiceTest {
 
     @Test
     void unTokenAlteradoSeRechaza() {
-        String token = jwtService.emitir(usuario).token();
+        String token = jwtService.emitir(ID_USUARIO, ROL_USUARIO).token();
         String[] partes = token.split("\\.");
         char[] payload = partes[1].toCharArray();
         int medio = payload.length / 2;
@@ -70,7 +68,7 @@ class JwtServiceTest {
 
     @Test
     void unTokenSeRechazaTras24HorasYUnSegundo() {
-        String token = jwtService.emitir(usuario).token();
+        String token = jwtService.emitir(ID_USUARIO, ROL_USUARIO).token();
 
         reloj.avanzar(VEINTICUATRO_HORAS.plusSeconds(1));
 
@@ -90,7 +88,7 @@ class JwtServiceTest {
     void unSecretoDeExactamente32BytesSeAcepta() {
         JwtProperties propiedades = new JwtProperties("a".repeat(32), VEINTICUATRO_HORAS);
 
-        assertThatCode(() -> new JwtService(propiedades, reloj).emitir(usuario))
+        assertThatCode(() -> new JwtService(propiedades, reloj).emitir(ID_USUARIO, ROL_USUARIO))
                 .doesNotThrowAnyException();
     }
 }

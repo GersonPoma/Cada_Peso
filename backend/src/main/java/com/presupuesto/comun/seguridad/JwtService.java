@@ -1,7 +1,5 @@
 package com.presupuesto.comun.seguridad;
 
-import com.presupuesto.usuario.Rol;
-import com.presupuesto.usuario.Usuario;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.JwtParser;
@@ -42,13 +40,17 @@ public class JwtService {
                 .build();
     }
 
-    public TokenEmitido emitir(Usuario usuario) {
+    /**
+     * Recibe el id y el rol, no la entidad del usuario: {@code comun/} no depende de ninguna
+     * feature.
+     */
+    public TokenEmitido emitir(Long id, Rol rol) {
         // Los JWT guardan los instantes en segundos: se trunca para que expiraEn coincida con exp.
         Instant emision = clock.instant().truncatedTo(ChronoUnit.SECONDS);
         Instant expiraEn = emision.plus(expiracion);
         String token = Jwts.builder()
-                .subject(String.valueOf(usuario.getId()))
-                .claim(CLAIM_ROL, usuario.getRol().name())
+                .subject(String.valueOf(id))
+                .claim(CLAIM_ROL, rol.name())
                 .issuedAt(Date.from(emision))
                 .expiration(Date.from(expiraEn))
                 .signWith(clave, Jwts.SIG.HS256)

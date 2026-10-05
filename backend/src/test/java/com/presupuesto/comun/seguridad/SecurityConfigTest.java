@@ -10,7 +10,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.presupuesto.comun.config.RelojDePrueba;
 import com.presupuesto.comun.config.RelojDePruebaConfig;
 import com.presupuesto.comun.excepcion.NoAutenticadoException;
-import com.presupuesto.usuario.Usuario;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import org.junit.jupiter.api.AfterEach;
@@ -105,8 +104,7 @@ class SecurityConfigTest {
     }
 
     private String emitirToken() {
-        Usuario usuario = Usuario.builder().id(1L).email("ana@ejemplo.com").contrasena("x").build();
-        return jwtService.emitir(usuario).token();
+        return jwtService.emitir(1L, Rol.USUARIO).token();
     }
 
     private ResultActions esperarNoAutenticado(ResultActions resultado) throws Exception {
