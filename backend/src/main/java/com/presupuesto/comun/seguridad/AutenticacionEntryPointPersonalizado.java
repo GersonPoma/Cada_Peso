@@ -1,9 +1,11 @@
 package com.presupuesto.comun.seguridad;
 
 import com.presupuesto.comun.excepcion.CodigoError;
+import com.presupuesto.comun.excepcion.NoAutenticadoException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -27,12 +29,15 @@ public class AutenticacionEntryPointPersonalizado implements AuthenticationEntry
             AuthenticationException excepcionAutenticacion)
             throws IOException {
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
-                HttpStatus.UNAUTHORIZED, "Se requiere autenticación para acceder a este recurso");
+                HttpStatus.UNAUTHORIZED, NoAutenticadoException.MENSAJE_NO_AUTENTICADO);
         problemDetail.setProperty("codigo", CodigoError.NO_AUTENTICADO);
         problemDetail.setProperty("timestamp", Instant.now());
 
         response.setStatus(HttpStatus.UNAUTHORIZED.value());
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+        // Sin esto el contenedor usa ISO-8859-1 y el cliente, que lee JSON como UTF-8, rompe las
+        // tildes del detail.
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         objectMapper.writeValue(response.getWriter(), problemDetail);
     }
 }

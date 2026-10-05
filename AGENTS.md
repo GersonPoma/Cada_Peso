@@ -69,10 +69,30 @@ Las respuestas de error de la API siguen **RFC 9457** (`ProblemDetail`) de forma
 
 - Jerarquía de excepciones de negocio en `comun/excepcion`: `NegocioException` (abstracta),
   `RecursoNoEncontradoException` (404), `ConflictoException` (409), `ReglaNegocioException`
-  (422). Cada una lleva un `CodigoError`.
+  (422) y `NoAutenticadoException` (401). Cada una lleva un `CodigoError`; `ConflictoException`
+  y `NoAutenticadoException` lo reciben como parámetro para indicar el motivo concreto (ej.
+  `EMAIL_YA_REGISTRADO`, `CREDENCIALES_INVALIDAS`).
 - `ManejadorGlobalExcepciones` (`@RestControllerAdvice`) traduce esa jerarquía — y los errores de
-  validación (`MethodArgumentNotValidException`) — a `ProblemDetail`, con las propiedades
-  `codigo` (enum `CodigoError`) y `timestamp`, sin exponer stack traces.
+  validación (`MethodArgumentNotValidException`) y de cuerpo ilegible
+  (`HttpMessageNotReadableException`) — a `ProblemDetail`, con las propiedades `codigo` (enum
+  `CodigoError`) y `timestamp`, sin exponer stack traces.
+- Qué código usar:
+  - **400 `DATOS_INVALIDOS`**: la petición es inválida por sí misma. Incluye cualquier fallo de
+    Bean Validation (con el mapa `errores` campo → mensaje), también de anotaciones propias como
+    `@MayorDeEdad`, `@MaximoBytesUtf8` o `@MonedaValida`, y el cuerpo ilegible (JSON mal
+    formado, cuerpo vacío, tipo incorrecto, fecha imposible), sin `errores`.
+  - **422 `REGLA_NEGOCIO_VIOLADA`** (`ReglaNegocioException`): la petición es válida, pero el
+    negocio no la permite en el estado actual del sistema.
+  - **409** (`ConflictoException`): la petición choca con un recurso existente (ej. email ya
+    registrado).
+- El 400 por cuerpo ilegible usa siempre el mensaje fijo "El cuerpo de la petición no es
+  válido" y **nunca** expone el mensaje ni la causa de la excepción: el de Jackson incluye
+  clases internas, posiciones y fragmentos del cuerpo recibido.
+- Un 401 que decide un controller o service (ej. login con credenciales incorrectas) se lanza
+  como `NoAutenticadoException` y lo emite el `@RestControllerAdvice`. El 401 `NO_AUTENTICADO` de
+  una petición sin token válido a una ruta protegida lo sigue emitiendo el
+  `AuthenticationEntryPoint` (ver siguiente punto); ambos usan el mismo mensaje,
+  `NoAutenticadoException.MENSAJE_NO_AUTENTICADO`.
 - `SecurityConfig` **no** usa `ManejadorGlobalExcepciones` para los errores de autenticación y
   autorización, porque las excepciones de los filtros de seguridad se lanzan antes del
   dispatcher de Spring MVC y el `@RestControllerAdvice` nunca las ve. En su lugar, configura un
@@ -98,6 +118,12 @@ representación visible para el usuario.
 - La JVM del backend corre en UTC (`TimeZone.setDefault` en `main()`,
   `hibernate.jdbc.time_zone=UTC` y `-Duser.timezone=UTC` en Surefire para los tests). Solo el
   frontend convierte un `Instant` a la zona horaria del usuario, y únicamente al mostrarlo.
+- Cualquier "ahora" u "hoy" del backend se obtiene del bean `Clock` (`comun/config/RelojConfig`,
+  `Clock.systemUTC()`) inyectado, con `Instant.now(clock)` o `LocalDate.now(clock)`; **nunca** con
+  `LocalDate.now()`, `Instant.now()` ni equivalentes sin reloj. Así los tests fijan la fecha con
+  `RelojDePrueba` (`src/test`, registrado como `@Primary` vía `@Import(RelojDePruebaConfig.class)`)
+  en vez de depender del día en que se ejecutan. La única excepción es el `timestamp` informativo
+  de las respuestas de error (`ProblemDetail`), que no participa en ninguna regla.
 
 ## Formato regional (frontend)
 
@@ -127,26 +153,45 @@ representación visible para el usuario.
 
 - La API es **stateless** (`SessionCreationPolicy.STATELESS`, sin sesión, CSRF deshabilitado:
   no aplica a una API sin cookies de sesión).
-- La librería de JWT es `io.jsonwebtoken` (**jjwt**: `jjwt-api`, `jjwt-impl`, `jjwt-jackson`), no
-  Spring Security OAuth2 ni Spring Authorization Server.
-- `SecurityConfig` permite sin autenticación `/actuator/health` y `/api/v1/auth/**`, y exige
-  autenticación (`anyRequest().authenticated()`) en el resto. El filtro de validación de JWT y
-  los endpoints de login/registro se implementan en el change de `auth`; hasta entonces,
-  cualquier ruta protegida devuelve 401 (fail-closed, comportamiento esperado).
+- La librería de JWT es `io.jsonwebtoken` (**jjwt**: `jjwt-api`, `jjwt-impl`, `jjwt-gson`), no
+  Spring Security OAuth2 ni Spring Authorization Server. Se usa `jjwt-gson` y no `jjwt-jackson`
+  porque no existe un módulo de jjwt para Jackson 3 (el de Spring Boot 4, paquete
+  `tools.jackson`): `jjwt-jackson` solo soporta Jackson 2 y metería un segundo Jackson en el
+  classpath. La versión de Gson la gestiona Spring Boot.
+- `SecurityConfig` permite sin autenticación `/actuator/health`, `/api/v1/auth/**` (registro y
+  login) y `/error`, y exige autenticación (`anyRequest().authenticated()`) en el resto.
+- El token se envía en el header `Authorization: Bearer <token>`. Lo emite `JwtService`
+  (`comun/seguridad`) al registrarse o iniciar sesión: firmado con HS256, `sub` = id del usuario,
+  claim `rol`, 24 h de validez (`jwt.expiracion`) y **sin refresh token** (al expirar hay que
+  iniciar sesión de nuevo).
+- `FiltroAutenticacionJwt` (`comun/seguridad`) valida el token en cada petición y, si es válido,
+  autentica con el principal `UsuarioAutenticado(id, rol)` y la autoridad `ROLE_<rol>`, sin
+  consultar la base de datos. Si no hay token, o es inválido o expiró, no autentica: en una ruta
+  protegida responde el `AuthenticationEntryPoint` (401 `NO_AUTENTICADO`). **No es un bean**:
+  se crea con `new` dentro de `SecurityConfig`, porque Spring Boot registraría cualquier bean
+  `Filter` también como filtro de servlet, fuera de la cadena de seguridad.
+- Los controllers obtienen el usuario autenticado con
+  `@AuthenticationPrincipal UsuarioAutenticado usuario`, nunca leyendo el token a mano.
 
-## Variables de entorno de conexión a PostgreSQL
+## Variables de entorno
 
-`application.properties` lee la conexión vía estas cinco variables de entorno, las cinco con
-valor por defecto local (para que cualquier desarrollador con PostgreSQL local estándar levante
-el backend sin configuración adicional):
+`application.properties` lee la conexión a PostgreSQL y el secreto del JWT vía estas variables
+de entorno, todas con valor por defecto local (para que cualquier desarrollador con PostgreSQL
+local estándar levante el backend sin configuración adicional):
 
-| Variable       | Default        |
-|----------------|----------------|
-| `DB_HOST`      | `localhost`    |
-| `DB_PORT`      | `5432`         |
-| `DB_NAME`      | `presupuesto`  |
-| `DB_USER`      | `postgres`     |
-| `DB_PASSWORD`  | `admin`        |
+| Variable       | Default                                                               |
+|----------------|-----------------------------------------------------------------------|
+| `DB_HOST`      | `localhost`                                                           |
+| `DB_PORT`      | `5432`                                                                |
+| `DB_NAME`      | `presupuesto`                                                         |
+| `DB_USER`      | `postgres`                                                            |
+| `DB_PASSWORD`  | `admin`                                                               |
+| `JWT_SECRET`   | `cada-peso-secreto-solo-para-desarrollo-local-no-usar-en-produccion`  |
+
+El valor por defecto de `JWT_SECRET` es **solo para desarrollo local**: es público (está en el
+repositorio), así que cualquier otro entorno debe definir `JWT_SECRET` con un secreto propio. Debe
+tener **al menos 32 bytes** en UTF-8 (256 bits, el mínimo que jjwt exige para HS256); con un
+secreto más corto la aplicación no arranca.
 
 El esquema lo gestiona Hibernate (`spring.jpa.hibernate.ddl-auto=update`), sin Flyway/Liquibase
 por ahora; `spring.jpa.open-in-view=false`. Cualquier entorno distinto del local (y los changes
