@@ -1,8 +1,8 @@
 package com.presupuesto.auth.controller;
 
-import com.presupuesto.auth.dto.LoginRequest;
-import com.presupuesto.auth.dto.RegistroRequest;
-import com.presupuesto.auth.dto.TokenResponse;
+import com.presupuesto.auth.dto.request.LoginRequest;
+import com.presupuesto.auth.dto.request.RegistroRequest;
+import com.presupuesto.auth.dto.response.TokenResponse;
 import com.presupuesto.auth.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

@@ -13,8 +13,8 @@ raíz (`com.presupuesto`) y la base de datos (`presupuesto`) conservan su nombre
 - El **dominio** (entidades, paquetes de negocio, campos, mensajes de error) se nombra en
   **español**: `Cuenta`, `Categoria`, `Transaccion`, `fechaCreacion`, `saldoActual`.
 - Los **sufijos técnicos** (patrones, roles arquitectónicos) se mantienen en **inglés**, pegados
-  al nombre en español: `CuentaController`, `CuentaService`, `CuentaRepository`, `CuentaDto`,
-  `CuentaMapper`.
+  al nombre en español: `CuentaController`, `CuentaService`, `CuentaRepository`, `CuentaRequest`,
+  `CuentaResponse`.
 - Nunca se usan **tildes ni la letra ñ** en nombres de clases, métodos, variables, paquetes,
   columnas de base de datos, ni rutas de archivo (ej. `Categoria`, no `Categoría`;
   `anio`, no `año`).
@@ -27,12 +27,31 @@ raíz (`com.presupuesto`) y la base de datos (`presupuesto`) conservan su nombre
   (`CuentaListComponent`, `CuentaService`), archivos en `kebab-case`
   (`cuenta-list.component.ts`), selectores de componente con prefijo `app-`.
 
-## Backend: organización por feature
+## Estructura obligatoria de una feature
 
-El backend se organiza por **feature de negocio**, no por capa técnica. Cada feature
-(`auth`, `usuario` y las futuras `cuenta`, `categoria`, `transaccion`, etc.) es un paquete bajo
-`com.presupuesto`, y **dentro** de cada feature las clases se reparten en subpaquetes por capa.
-La infraestructura transversal, sin lógica de negocio, vive en `com.presupuesto.comun`.
+El backend se organiza por **feature de negocio**, no por capa técnica: cada feature es un
+paquete bajo `com.presupuesto` y, **dentro** de ella, las clases se reparten en subpaquetes por
+capa. La infraestructura transversal, sin lógica de negocio, vive en `com.presupuesto.comun`.
+
+**Toda feature nueva (cuentas, categorías, transacciones y las que sigan) sigue esta estructura
+sin excepciones.** Ningún change puede crear una feature con otra organización.
+
+### Plantilla
+
+```
+com/presupuesto/<feature>/
+├── controller/
+├── service/
+├── repository/
+├── entity/
+├── dto/
+│   ├── request/
+│   └── response/
+└── validacion/
+```
+
+Solo se crean los subpaquetes que la feature necesita, y **ninguna clase** vive en la raíz de la
+feature (`com.presupuesto.<feature>`) ni en la raíz de `dto/`.
 
 Árbol actual (`backend/src/main/java/com/presupuesto/`):
 
@@ -48,42 +67,61 @@ com/presupuesto/
 ├── auth/
 │   ├── controller/
 │   ├── dto/
-│   ├── mapper/
+│   │   ├── request/
+│   │   └── response/
 │   └── service/
 └── usuario/
     ├── controller/
     ├── dto/
+    │   └── response/
     ├── entity/
-    ├── mapper/
     ├── repository/
     ├── service/
     └── validacion/
 ```
 
-### Plantilla obligatoria de una feature
+`auth` no tiene `entity` ni `repository` porque trabaja con las entidades de `usuario`, y
+`usuario` no tiene `dto/request` porque todavía no recibe datos propios.
 
-Toda feature, actual o futura, sigue esta estructura:
+### Qué va en cada subpaquete
 
-| Subpaquete   | Contenido                                                                  |
-|--------------|----------------------------------------------------------------------------|
-| `controller` | `@RestController` de la feature                                            |
-| `service`    | `@Service` con la lógica de negocio y las transacciones                    |
-| `repository` | Interfaces de Spring Data JPA                                              |
-| `entity`     | Entidades JPA (extienden `EntidadBase`) y los enums propios que persisten  |
-| `dto`        | Records de request/response y sus helpers package-private                  |
-| `mapper`     | Interfaces MapStruct (`@Mapper(componentModel = "spring")`)                |
-| `validacion` | Anotaciones de Bean Validation propias de la feature y sus validadores     |
+| Subpaquete     | Contenido                                                                   |
+|----------------|-----------------------------------------------------------------------------|
+| `controller`   | `@RestController` de la feature, bajo `/api/v1/<ruta-en-kebab-case>`         |
+| `service`      | `@Service` con la lógica de negocio, las transacciones y el mapeo manual     |
+| `repository`   | Interfaces de Spring Data JPA                                               |
+| `entity`       | Entidades JPA (extienden `EntidadBase`) y los enums propios que persisten   |
+| `dto/request`  | Records que entran a la API, con sus validaciones y helpers package-private |
+| `dto/response` | Records que salen de la API, cada uno con su método `desde(...)`            |
+| `validacion`   | Anotaciones de Bean Validation propias de la feature y sus validadores      |
 
-Reglas **obligatorias**:
+Los DTO de la API son siempre **Java records**, nunca clases.
 
-- Dentro de una feature solo existen esos siete subpaquetes, con esos nombres exactos, y solo
-  los que la feature necesita (por ejemplo, `auth` no tiene `entity` ni `repository` porque
-  trabaja con las entidades de `usuario`).
-- **Ninguna clase** vive en la raíz de una feature (`com.presupuesto.<feature>`).
+### Mapeo manual entre entidades y DTO
+
+El proyecto **no usa MapStruct** ni ninguna otra librería de mapeo; Lombok es el único
+procesador de anotaciones del `pom.xml`.
+
+- **Entidad → response**: cada record de `dto/response` tiene un método
+  `public static <X>Response desde(<Entidad o valor> origen)` que construye el record (ej.
+  `UsuarioActualResponse.desde(Perfil)`, `TokenResponse.desde(TokenEmitido)`). El service lo usa
+  directamente: `.map(UsuarioActualResponse::desde)`.
+- **Request → entidad**: el service construye la entidad con su builder de Lombok
+  (`@SuperBuilder`), por ejemplo `Perfil.builder().usuario(usuario).nombre(request.nombre())...
+  .build()` en `AuthService`. El request no conoce las entidades.
+- Nunca constructores de copia en las entidades ni clases `*Mapper`.
+
+### Tests
+
+- Cada test va en `src/test`, en el **mismo subpaquete** que la clase que prueba (incluidos
+  `dto/request` y `dto/response`; ej. `auth/dto/request/RegistroRequestTest`).
+- Los tests de integración HTTP (MockMvc contra un endpoint) van en `controller`.
+
+### Visibilidad y dependencias
+
 - Visibilidad mínima: solo es `public` lo que se usa desde otro subpaquete o desde otra feature;
-  lo que solo usa su propio subpaquete queda package-private (ej. `auth/dto/Normalizacion`).
-- Los tests van en el mismo subpaquete que la clase que prueban (en `src/test`); los tests de
-  integración HTTP (MockMvc contra un endpoint) van en `controller`.
+  lo que solo usa su propio subpaquete queda package-private (ej.
+  `auth/dto/request/Normalizacion`).
 - **Las features dependen de `comun/`, nunca al revés**: ningún archivo de `comun/` (ni en
   `src/main` ni en `src/test`) importa `com.presupuesto.<feature>`. Si una clase de `comun/`
   necesita datos de una feature, los recibe como parámetros simples (ej.
@@ -91,6 +129,25 @@ Reglas **obligatorias**:
   `backend/src` con `grep -rnE "import com\.presupuesto\.(usuario|auth)" <dir>` para
   `<dir>` = `main/java/com/presupuesto/comun` y `test/java/com/presupuesto/comun` (ampliando la
   alternancia con cada feature nueva); debe devolver cero líneas.
+
+### Checklist para crear una feature nueva
+
+1. Crear `com.presupuesto.<feature>` sin ninguna clase en su raíz.
+2. Entidades en `entity`, extendiendo `EntidadBase`, con
+   `@Getter @Setter @SuperBuilder @NoArgsConstructor @AllArgsConstructor` y `@Table` explícito.
+3. Repositorios en `repository` (Spring Data JPA).
+4. Requests en `dto/request` como records con Bean Validation (y normalización en el constructor
+   compacto si hace falta); responses en `dto/response` como records con `desde(...)`.
+5. Validaciones propias de la feature en `validacion`; las genéricas van en `comun/validacion`.
+6. Service en `service`: crea entidades con builders, devuelve responses con `desde(...)`,
+   obtiene "hoy"/"ahora" del bean `Clock` y lanza las excepciones de `comun/excepcion`.
+7. Controller en `controller`, bajo `/api/v1/<ruta-en-kebab-case>`, con `@Valid` en los requests
+   y `@AuthenticationPrincipal UsuarioAutenticado` si necesita el usuario.
+8. Tests en el subpaquete de cada clase; los de HTTP en `controller`.
+9. Visibilidad mínima y el `grep` de dependencias de `comun/` (agregando la feature nueva a la
+   alternancia) en cero líneas.
+10. En el `design.md` del change, una tabla con el paquete completo de cada clase nueva o movida
+    y de su test.
 
 ### `comun/`: organizado por responsabilidad, no por capa
 
@@ -120,16 +177,6 @@ Toda entidad JPA extiende `EntidadBase` (`@MappedSuperclass`), que aporta:
 
 Las entidades usan `@Getter @Setter @SuperBuilder @NoArgsConstructor @AllArgsConstructor` de
 Lombok (las subclases de `EntidadBase` también deben usar `@SuperBuilder`, nunca `@Builder`).
-
-## DTOs y MapStruct
-
-- Los DTOs de entrada/salida de la API se modelan como **Java records**, no como clases.
-- El mapeo entidad ↔ DTO se hace con **MapStruct** (`@Mapper(componentModel = "spring")`), nunca
-  a mano ni con constructores de copia.
-- El `pom.xml` configura `annotationProcessorPaths` del `maven-compiler-plugin` en el orden
-  **lombok → lombok-mapstruct-binding → mapstruct-processor**: si no se agrega el binding en ese
-  orden exacto, Lombok genera los getters/setters después de que MapStruct los necesita y el
-  mapeo falla en tiempo de compilación.
 
 ## Excepciones y `ProblemDetail`
 

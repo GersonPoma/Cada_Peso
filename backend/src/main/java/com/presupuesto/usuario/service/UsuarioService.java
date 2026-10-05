@@ -2,8 +2,7 @@ package com.presupuesto.usuario.service;
 
 import com.presupuesto.comun.excepcion.CodigoError;
 import com.presupuesto.comun.excepcion.NoAutenticadoException;
-import com.presupuesto.usuario.dto.UsuarioActualResponse;
-import com.presupuesto.usuario.mapper.UsuarioMapper;
+import com.presupuesto.usuario.dto.response.UsuarioActualResponse;
 import com.presupuesto.usuario.repository.PerfilRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -14,7 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class UsuarioService {
 
     private final PerfilRepository perfilRepository;
-    private final UsuarioMapper usuarioMapper;
 
     /**
      * Datos del usuario dueño del token. Si ya no existe, el token no representa a nadie: responde
@@ -23,7 +21,7 @@ public class UsuarioService {
     @Transactional(readOnly = true)
     public UsuarioActualResponse obtenerActual(Long usuarioId) {
         return perfilRepository.findByUsuarioId(usuarioId)
-                .map(usuarioMapper::aUsuarioActual)
+                .map(UsuarioActualResponse::desde)
                 .orElseThrow(() -> new NoAutenticadoException(
                         CodigoError.NO_AUTENTICADO, NoAutenticadoException.MENSAJE_NO_AUTENTICADO));
     }

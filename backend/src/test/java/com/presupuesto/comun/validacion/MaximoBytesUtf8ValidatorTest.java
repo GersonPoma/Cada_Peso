@@ -2,7 +2,6 @@ package com.presupuesto.comun.validacion;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.lang.annotation.Annotation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -11,9 +10,9 @@ class MaximoBytesUtf8ValidatorTest {
     private MaximoBytesUtf8Validator validador;
 
     @BeforeEach
-    void crearValidador() {
+    void crearValidador() throws NoSuchFieldException {
         validador = new MaximoBytesUtf8Validator();
-        validador.initialize(anotacionConMaximo(72));
+        validador.initialize(anotacionConMaximo72());
     }
 
     @Test
@@ -39,33 +38,13 @@ class MaximoBytesUtf8ValidatorTest {
         assertThat(validador.isValid(null, null)).isTrue();
     }
 
-    private static MaximoBytesUtf8 anotacionConMaximo(int maximo) {
-        return new MaximoBytesUtf8() {
-            @Override
-            public int value() {
-                return maximo;
-            }
+    /** Campo de apoyo: la anotación se lee de aquí en vez de implementarla a mano. */
+    @MaximoBytesUtf8(72)
+    private static String campoConMaximo72;
 
-            @Override
-            public String message() {
-                return "";
-            }
-
-            @Override
-            public Class<?>[] groups() {
-                return new Class<?>[0];
-            }
-
-            @Override
-            @SuppressWarnings("unchecked")
-            public Class<? extends jakarta.validation.Payload>[] payload() {
-                return new Class[0];
-            }
-
-            @Override
-            public Class<? extends Annotation> annotationType() {
-                return MaximoBytesUtf8.class;
-            }
-        };
+    private static MaximoBytesUtf8 anotacionConMaximo72() throws NoSuchFieldException {
+        return MaximoBytesUtf8ValidatorTest.class
+                .getDeclaredField("campoConMaximo72")
+                .getAnnotation(MaximoBytesUtf8.class);
     }
 }

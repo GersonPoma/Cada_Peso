@@ -1,4 +1,4 @@
-package com.presupuesto.auth.dto;
+package com.presupuesto.auth.dto.request;
 
 import java.util.Locale;
 

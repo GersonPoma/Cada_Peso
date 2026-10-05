@@ -1,4 +1,4 @@
-package com.presupuesto.auth.dto;
+package com.presupuesto.auth.dto.request;
 
 import com.presupuesto.comun.validacion.MaximoBytesUtf8;
 import com.presupuesto.comun.validacion.MonedaValida;

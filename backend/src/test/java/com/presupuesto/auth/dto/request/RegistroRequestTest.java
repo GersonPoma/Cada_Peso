@@ -1,4 +1,4 @@
-package com.presupuesto.auth.dto;
+package com.presupuesto.auth.dto.request;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

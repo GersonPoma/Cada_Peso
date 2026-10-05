@@ -18,6 +18,15 @@ context: |
   Límite de línea de 100 columnas en todo el monorepo vía .editorconfig (único, en
   la raíz) y, en /frontend, Prettier (printWidth 100, singleQuote true). Commits
   convencionales en español.
+  Estructura obligatoria de toda feature del backend (sin excepciones, también para
+  cuentas, categorías, transacciones y las que sigan): com.presupuesto.<feature> con
+  los subpaquetes controller, service, repository, entity, dto/request, dto/response y
+  validacion, solo los que la feature necesite y ninguna clase en la raíz de la feature
+  ni de dto/. Mapeo manual sin MapStruct: los records de dto/response tienen un método
+  estático desde(...) y los services crean las entidades con sus builders de Lombok.
+  Tests en el mismo subpaquete que la clase que prueban; los de HTTP en controller.
+  comun/ (config, excepcion, seguridad, validacion) nunca importa una feature. Detalle y
+  checklist en AGENTS.md, sección "Estructura obligatoria de una feature".
 
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.
@@ -29,6 +38,15 @@ context: |
 rules:
   specs:
     - Cada capacidad debe describirse con escenarios Dado/Cuando/Entonces.
+  design:
+    - Toda feature nueva, y todo change que cree o mueva clases del backend, ubica cada clase
+      en su subpaquete según la estructura obligatoria de AGENTS.md ("Estructura obligatoria
+      de una feature") e incluye en el design una tabla con el paquete completo
+      (com.presupuesto.<feature>.<subpaquete>) de cada clase nueva o movida y de su test.
+  tasks:
+    - Cada tarea que crea o mueve una clase del backend indica su paquete completo y el de su
+      test, según la estructura obligatoria de AGENTS.md ("Estructura obligatoria de una
+      feature").
 
 # Per-operation guidance (optional)
 # Add advisory guidance for how apply and archive work should be conducted.

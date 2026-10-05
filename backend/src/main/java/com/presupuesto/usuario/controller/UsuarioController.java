@@ -1,7 +1,7 @@
 package com.presupuesto.usuario.controller;
 
 import com.presupuesto.comun.seguridad.UsuarioAutenticado;
-import com.presupuesto.usuario.dto.UsuarioActualResponse;
+import com.presupuesto.usuario.dto.response.UsuarioActualResponse;
 import com.presupuesto.usuario.service.UsuarioService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;

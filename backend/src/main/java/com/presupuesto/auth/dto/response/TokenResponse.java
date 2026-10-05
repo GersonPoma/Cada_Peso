@@ -1,4 +1,4 @@
-package com.presupuesto.auth.dto;
+package com.presupuesto.auth.dto.response;
 
 import com.presupuesto.comun.seguridad.TokenEmitido;
 import java.time.Instant;

@@ -1,13 +1,13 @@
 package com.presupuesto.auth.service;
 
-import com.presupuesto.auth.dto.LoginRequest;
-import com.presupuesto.auth.dto.RegistroRequest;
-import com.presupuesto.auth.dto.TokenResponse;
-import com.presupuesto.auth.mapper.RegistroMapper;
+import com.presupuesto.auth.dto.request.LoginRequest;
+import com.presupuesto.auth.dto.request.RegistroRequest;
+import com.presupuesto.auth.dto.response.TokenResponse;
 import com.presupuesto.comun.excepcion.CodigoError;
 import com.presupuesto.comun.excepcion.ConflictoException;
 import com.presupuesto.comun.excepcion.NoAutenticadoException;
 import com.presupuesto.comun.seguridad.JwtService;
+import com.presupuesto.usuario.entity.Perfil;
 import com.presupuesto.usuario.entity.Usuario;
 import com.presupuesto.usuario.repository.PerfilRepository;
 import com.presupuesto.usuario.repository.UsuarioRepository;
@@ -31,7 +31,6 @@ public class AuthService {
     private final PerfilRepository perfilRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
-    private final RegistroMapper registroMapper;
 
     /**
      * Hash contra el que se compara cuando el email no existe, para que el tiempo de respuesta no
@@ -43,13 +42,11 @@ public class AuthService {
             UsuarioRepository usuarioRepository,
             PerfilRepository perfilRepository,
             PasswordEncoder passwordEncoder,
-            JwtService jwtService,
-            RegistroMapper registroMapper) {
+            JwtService jwtService) {
         this.usuarioRepository = usuarioRepository;
         this.perfilRepository = perfilRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
-        this.registroMapper = registroMapper;
         this.hashFicticio = passwordEncoder.encode("contrasena-ficticia-para-igualar-tiempos");
     }
 
@@ -69,7 +66,14 @@ public class AuthService {
         } catch (DataIntegrityViolationException emailDuplicado) {
             throw emailYaRegistrado();
         }
-        perfilRepository.save(registroMapper.aPerfil(request, usuario));
+        perfilRepository.save(Perfil.builder()
+                .usuario(usuario)
+                .nombre(request.nombre())
+                .apellido(request.apellido())
+                .fechaNacimiento(request.fechaNacimiento())
+                .monedaPredeterminada(request.monedaPredeterminada())
+                .telefono(request.telefono())
+                .build());
         return TokenResponse.desde(jwtService.emitir(usuario.getId(), usuario.getRol()));
     }
 
