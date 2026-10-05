@@ -30,15 +30,83 @@ raíz (`com.presupuesto`) y la base de datos (`presupuesto`) conservan su nombre
 ## Backend: organización por feature
 
 El backend se organiza por **feature de negocio**, no por capa técnica. Cada feature
-(`cuenta`, `categoria`, `transaccion`, `auth`, etc.) es un paquete bajo `com.presupuesto` que
-agrupa su propio controller, service, repository, entidad, DTOs y mapper. La infraestructura
-transversal, sin lógica de negocio, vive en `com.presupuesto.comun`:
+(`auth`, `usuario` y las futuras `cuenta`, `categoria`, `transaccion`, etc.) es un paquete bajo
+`com.presupuesto`, y **dentro** de cada feature las clases se reparten en subpaquetes por capa.
+La infraestructura transversal, sin lógica de negocio, vive en `com.presupuesto.comun`.
 
+Árbol actual (`backend/src/main/java/com/presupuesto/`):
+
+```
+com/presupuesto/
+├── BackendApplication.java
+├── comun/
+│   ├── EntidadBase.java
+│   ├── config/
+│   ├── excepcion/
+│   ├── seguridad/
+│   └── validacion/
+├── auth/
+│   ├── controller/
+│   ├── dto/
+│   ├── mapper/
+│   └── service/
+└── usuario/
+    ├── controller/
+    ├── dto/
+    ├── entity/
+    ├── mapper/
+    ├── repository/
+    ├── service/
+    └── validacion/
+```
+
+### Plantilla obligatoria de una feature
+
+Toda feature, actual o futura, sigue esta estructura:
+
+| Subpaquete   | Contenido                                                                  |
+|--------------|----------------------------------------------------------------------------|
+| `controller` | `@RestController` de la feature                                            |
+| `service`    | `@Service` con la lógica de negocio y las transacciones                    |
+| `repository` | Interfaces de Spring Data JPA                                              |
+| `entity`     | Entidades JPA (extienden `EntidadBase`) y los enums propios que persisten  |
+| `dto`        | Records de request/response y sus helpers package-private                  |
+| `mapper`     | Interfaces MapStruct (`@Mapper(componentModel = "spring")`)                |
+| `validacion` | Anotaciones de Bean Validation propias de la feature y sus validadores     |
+
+Reglas **obligatorias**:
+
+- Dentro de una feature solo existen esos siete subpaquetes, con esos nombres exactos, y solo
+  los que la feature necesita (por ejemplo, `auth` no tiene `entity` ni `repository` porque
+  trabaja con las entidades de `usuario`).
+- **Ninguna clase** vive en la raíz de una feature (`com.presupuesto.<feature>`).
+- Visibilidad mínima: solo es `public` lo que se usa desde otro subpaquete o desde otra feature;
+  lo que solo usa su propio subpaquete queda package-private (ej. `auth/dto/Normalizacion`).
+- Los tests van en el mismo subpaquete que la clase que prueban (en `src/test`); los tests de
+  integración HTTP (MockMvc contra un endpoint) van en `controller`.
+- **Las features dependen de `comun/`, nunca al revés**: ningún archivo de `comun/` (ni en
+  `src/main` ni en `src/test`) importa `com.presupuesto.<feature>`. Si una clase de `comun/`
+  necesita datos de una feature, los recibe como parámetros simples (ej.
+  `JwtService.emitir(Long id, Rol rol)`, no la entidad `Usuario`). Se comprueba desde
+  `backend/src` con `grep -rnE "import com\.presupuesto\.(usuario|auth)" <dir>` para
+  `<dir>` = `main/java/com/presupuesto/comun` y `test/java/com/presupuesto/comun` (ampliando la
+  alternancia con cada feature nueva); debe devolver cero líneas.
+
+### `comun/`: organizado por responsabilidad, no por capa
+
+`comun/` no es una feature: cada subpaquete es una responsabilidad transversal y agrupa clases
+de varios tipos que funcionan juntas. No se divide en `controller`/`service`/`dto`.
+
+- `comun/EntidadBase`: superclase común de todas las entidades JPA (en la raíz de `comun/`).
+- `comun/config`: configuración transversal (bean `Clock` en `RelojConfig`, futuros CORS, etc.).
 - `comun/excepcion`: jerarquía de excepciones, `CodigoError`, `ManejadorGlobalExcepciones`.
-- `comun/seguridad`: `SecurityConfig`, filtro JWT (a implementar en el change de `auth`),
-  `AuthenticationEntryPoint`/`AccessDeniedHandler` personalizados.
-- `comun/config`: configuración transversal adicional (CORS, beans compartidos, etc.).
-- `comun/EntidadBase`: superclase común de todas las entidades JPA.
+- `comun/seguridad`: `SecurityConfig`, `FiltroAutenticacionJwt`, `JwtService`,
+  `JwtProperties`, `UsuarioAutenticado`, `TokenEmitido`, `Rol` y los
+  `AuthenticationEntryPoint`/`AccessDeniedHandler` personalizados. `Rol` es **solo** el rol de
+  autorización de la aplicación (viaja en el token y en el principal); los roles o estados del
+  dominio de una feature van en el `entity` de esa feature.
+- `comun/validacion`: anotaciones de Bean Validation genéricas, sin lógica de negocio
+  (`@MaximoBytesUtf8`, `@MonedaValida`) y sus validadores.
 
 ## `EntidadBase` y convenciones de Lombok
 
