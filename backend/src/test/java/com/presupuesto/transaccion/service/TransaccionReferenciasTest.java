@@ -177,4 +177,24 @@ class TransaccionReferenciasTest {
         }
         return partes;
     }
+
+    @Test
+    void exigirNoEsTransferenciaRechazaUnaPataConMensajeClaro() {
+        com.presupuesto.transaccion.entity.Transaccion pata =
+                com.presupuesto.transaccion.entity.Transaccion.builder().build();
+        pata.enlazarCon(com.presupuesto.transaccion.entity.Transaccion.builder().build());
+
+        NegocioException error = assertThrows(ReglaNegocioException.class,
+                () -> referencias.exigirNoEsTransferencia(pata));
+
+        assertThat(error.getCodigo()).isEqualTo(CodigoError.REGLA_NEGOCIO_VIOLADA);
+        assertThat(error.getMessage()).isEqualTo(
+                "Es parte de una transferencia; usa /transferencias");
+    }
+
+    @Test
+    void exigirNoEsTransferenciaAceptaUnaTransaccionNormal() {
+        referencias.exigirNoEsTransferencia(
+                com.presupuesto.transaccion.entity.Transaccion.builder().build());
+    }
 }

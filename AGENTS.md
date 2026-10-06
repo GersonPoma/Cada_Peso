@@ -228,6 +228,32 @@ de varios tipos que funcionan juntas. No se divide en `controller`/`service`/`dt
 - `comun/validacion`: anotaciones de Bean Validation genéricas, sin lógica de negocio
   (`@MaximoBytesUtf8`, `@MonedaValida`) y sus validadores.
 
+## Transferencias
+
+Una transferencia entre cuentas **no es una feature aparte**: vive dentro de `transaccion`
+(`TransferenciaController`, `TransferenciaService` y sus DTO, bajo
+`/api/v1/presupuestos/{presupuestoId}/transferencias`) y son **dos transacciones enlazadas**:
+una salida (monto negativo) en la cuenta origen y una entrada (positivo) en la destino, con la
+misma fecha, el mismo valor absoluto y el mismo memo. Cada fila apunta a la otra con
+`Transaccion.transaccionPar` (setter bloqueado; solo `enlazarCon`/`desenlazar`) y
+`TransaccionResponse.transaccionParId` es nulo si no es transferencia.
+
+- Se crean, editan y borran **siempre las dos juntas** en una sola transacción de base de datos.
+  Al borrar se desenlazan antes (cada fila tiene una FK a la otra).
+- Cada pata conserva su propio estado y su propio `aprobada` (cada cuenta se concilia por
+  separado): aprobar y cambiar el estado siguen siendo por pata en `/transacciones`.
+- Sobre una pata, `PUT` y `DELETE` de `/transacciones/{id}`, `mover-cuenta`, `duplicar` y, en
+  `/lote`, `BORRAR` y `CATEGORIZAR` responden 422 `REGLA_NEGOCIO_VIOLADA` ("Es parte de una
+  transferencia; usa /transferencias"). Cualquier operación nueva de `/transacciones` que cambie
+  una transacción debe llamar a `TransaccionReferencias.exigirNoEsTransferencia`.
+- **Regla de categoría** (según `enPresupuesto` de las dos cuentas): ambas del presupuesto o
+  ambas externas, sin categoría (si se envía, 422); del presupuesto a una externa, `categoriaId`
+  obligatoria (422 si falta); de una externa al presupuesto, opcional. La categoría se guarda
+  **solo en la pata de la cuenta del presupuesto**; la pata externa queda siempre sin categoría.
+- `asignacion` no cuenta como ingreso la entrada de una transferencia cuya pata par está en una
+  cuenta del presupuesto (`ActividadMensualRepository.ingresosSinCategoria`); la que viene de
+  una cuenta externa sin categoría sí es ingreso.
+
 ## Paginación
 
 Se paginan las listas que pueden crecer sin límite (hoy, las transacciones de un presupuesto);

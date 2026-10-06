@@ -46,6 +46,7 @@ class TransaccionResponseTest {
         assertThat(respuesta.estado()).isEqualTo(EstadoTransaccion.CONCILIADA);
         assertThat(respuesta.aprobada()).isFalse();
         assertThat(respuesta.subtransacciones()).isEmpty();
+        assertThat(respuesta.transaccionParId()).isNull();
         assertThat(respuesta.fechaCreacion()).isEqualTo(CREADA);
         assertThat(respuesta.fechaActualizacion()).isEqualTo(ACTUALIZADA);
     }
@@ -72,5 +73,24 @@ class TransaccionResponseTest {
                 .containsExactly(
                         new SubTransaccionResponse(10L, null, -1000L, "a"),
                         new SubTransaccionResponse(11L, 8L, -2000L, null));
+    }
+
+    @Test
+    void unaPataDeTransferenciaExponeElIdDeSuPar() {
+        Transaccion entrada = Transaccion.builder()
+                .id(21L)
+                .cuenta(Cuenta.builder().id(4L).build())
+                .fecha(LocalDate.of(2026, 10, 2))
+                .monto(3000L)
+                .build();
+        Transaccion salida = Transaccion.builder()
+                .id(20L)
+                .cuenta(Cuenta.builder().id(3L).build())
+                .fecha(LocalDate.of(2026, 10, 2))
+                .monto(-3000L)
+                .build();
+        salida.enlazarCon(entrada);
+
+        assertThat(TransaccionResponse.desde(salida).transaccionParId()).isEqualTo(21L);
     }
 }

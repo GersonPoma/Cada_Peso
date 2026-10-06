@@ -17,6 +17,7 @@ public record TransaccionResponse(
         EstadoTransaccion estado,
         boolean aprobada,
         List<SubTransaccionResponse> subtransacciones,
+        Long transaccionParId,
         Instant fechaCreacion,
         Instant fechaActualizacion) {
 
@@ -34,6 +35,9 @@ public record TransaccionResponse(
                 transaccion.getSubtransacciones().stream()
                         .map(SubTransaccionResponse::desde)
                         .toList(),
+                transaccion.getTransaccionPar() == null
+                        ? null
+                        : transaccion.getTransaccionPar().getId(),
                 transaccion.getFechaCreacion(),
                 transaccion.getFechaActualizacion());
     }

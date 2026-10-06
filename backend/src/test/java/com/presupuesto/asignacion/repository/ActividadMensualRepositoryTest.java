@@ -176,6 +176,48 @@ class ActividadMensualRepositoryTest {
     }
 
     @Test
+    void laEntradaDeUnaTransferenciaEntreCuentasDelPresupuestoNoEsIngreso() {
+        Cuenta ahorro = cuentaRepository.save(
+                cuenta(casa, "Ahorro", TipoCuenta.AHORRO, true, 0L));
+        guardar(banco, "2026-01-05", 500_000L, null);
+
+        transferir(banco, ahorro, 30_000L, null);
+
+        assertThat(repository.ingresosSinCategoria(casa.getId(), FIN_ANIO)).isEqualTo(500_000L);
+        assertThat(repository.actividadSimple(casa.getId(), FIN_ANIO)).isEmpty();
+    }
+
+    @Test
+    void laEntradaDesdeUnaCuentaExternaSinCategoriaSiEsIngreso() {
+        guardar(banco, "2026-01-05", 500_000L, null);
+
+        transferir(fuera, banco, 50_000L, null);
+
+        assertThat(repository.ingresosSinCategoria(casa.getId(), FIN_ANIO)).isEqualTo(550_000L);
+        assertThat(repository.actividadSimple(casa.getId(), FIN_ANIO)).isEmpty();
+    }
+
+    @Test
+    void laEntradaDesdeUnaCuentaExternaConCategoriaSumaActividadYNoEsIngreso() {
+        guardar(banco, "2026-01-05", 500_000L, null);
+
+        transferir(fuera, banco, 50_000L, comida);
+
+        assertThat(repository.ingresosSinCategoria(casa.getId(), FIN_ANIO)).isEqualTo(500_000L);
+        assertThat(total(repository.actividadSimple(casa.getId(), FIN_ANIO), comida, 2026, 1))
+                .isEqualTo(50_000L);
+    }
+
+    @Test
+    void laSalidaDelPresupuestoAUnaExternaConCategoriaRestaActividad() {
+        transferir(banco, fuera, 20_000L, comida);
+
+        assertThat(repository.ingresosSinCategoria(casa.getId(), FIN_ANIO)).isZero();
+        assertThat(total(repository.actividadSimple(casa.getId(), FIN_ANIO), comida, 2026, 1))
+                .isEqualTo(-20_000L);
+    }
+
+    @Test
     void sinDatosLasSumasSonCero() {
         assertThat(repository.ingresosSinCategoria(casa.getId(), FIN_ANIO)).isZero();
         assertThat(repository.saldosInicialesPositivos(casa.getId())).isZero();
@@ -190,6 +232,20 @@ class ActividadMensualRepositoryTest {
                         && f.getAnio() == anio && f.getMes() == mes)
                 .mapToLong(ActividadPorMes::getTotal)
                 .sum();
+    }
+
+    /** Salida y entrada enlazadas; la categoría va en la pata de la cuenta del presupuesto. */
+    private void transferir(Cuenta origen, Cuenta destino, long monto, Categoria categoria) {
+        Transaccion salida = Transaccion.builder()
+                .cuenta(origen).fecha(LocalDate.parse("2026-01-10")).monto(-monto)
+                .categoria(origen.isEnPresupuesto() ? categoria : null).build();
+        Transaccion entrada = Transaccion.builder()
+                .cuenta(destino).fecha(LocalDate.parse("2026-01-10")).monto(monto)
+                .categoria(origen.isEnPresupuesto() ? null : categoria).build();
+        transaccionRepository.saveAllAndFlush(List.of(salida, entrada));
+        salida.enlazarCon(entrada);
+        entrada.enlazarCon(salida);
+        transaccionRepository.saveAllAndFlush(List.of(salida, entrada));
     }
 
     private Transaccion guardar(Cuenta cuenta, String fecha, long monto, Categoria categoria) {

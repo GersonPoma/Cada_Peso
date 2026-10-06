@@ -86,6 +86,15 @@ public class Transaccion extends EntidadBase {
     @Builder.Default
     private boolean aprobada = true;
 
+    /**
+     * Otra pata de la transferencia a la que pertenece, o {@code null} si no es una pata. Sin
+     * setter: solo cambia con {@link #enlazarCon(Transaccion)} y {@link #desenlazar()}.
+     */
+    @Setter(AccessLevel.NONE)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "transaccion_par_id")
+    private Transaccion transaccionPar;
+
     /** Sin setter: solo cambia con {@link #reemplazarSubtransacciones(List)}. */
     @Setter(AccessLevel.NONE)
     @OneToMany(mappedBy = "transaccion", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -132,6 +141,18 @@ public class Transaccion extends EntidadBase {
 
     public void cambiarEstado(EstadoTransaccion nuevoEstado) {
         this.estado = nuevoEstado;
+    }
+
+    public void enlazarCon(Transaccion par) {
+        this.transaccionPar = par;
+    }
+
+    public void desenlazar() {
+        this.transaccionPar = null;
+    }
+
+    public boolean esTransferencia() {
+        return transaccionPar != null;
     }
 
     public boolean estaReconciliada() {

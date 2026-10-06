@@ -36,7 +36,7 @@ public class TransaccionLoteService {
 
     /**
      * Orden: 404 si algún id no es del presupuesto, 400 si falta la categoría, 404 si la
-     * categoría es ajena y 422 por reconciliadas (CATEGORIZAR y BORRAR; APROBAR las acepta,
+     * categoría es ajena y 422 por patas de transferencia (CATEGORIZAR y BORRAR), por reconciliadas (CATEGORIZAR y BORRAR; APROBAR las acepta,
      * igual que aprobar una sola) o por divididas (CATEGORIZAR).
      */
     @Transactional
@@ -80,6 +80,9 @@ public class TransaccionLoteService {
 
     private static void validar(OperacionLote operacion, List<Transaccion> transacciones) {
         for (Transaccion transaccion : transacciones) {
+            if (operacion != OperacionLote.APROBAR && transaccion.esTransferencia()) {
+                throw new ReglaNegocioException(TransaccionReferencias.MENSAJE_ES_TRANSFERENCIA);
+            }
             if (operacion != OperacionLote.APROBAR && transaccion.estaReconciliada()) {
                 throw new ReglaNegocioException(TransaccionService.MENSAJE_RECONCILIADA);
             }

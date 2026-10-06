@@ -209,4 +209,33 @@ class TransaccionLoteServiceTest {
                 .id(id).cuenta(Cuenta.builder().build()).fecha(LocalDate.of(2026, 9, 1))
                 .monto(-1000L).build();
     }
+
+    @Test
+    void borrarOCategorizarConUnaPataDeTransferenciaDa422YNoAplicaNada() {
+        b.enlazarCon(nueva(3L));
+
+        assertThrows(ReglaNegocioException.class,
+                () -> ejecutar(OperacionLote.BORRAR, null, 1L, 2L));
+        NegocioException error = assertThrows(ReglaNegocioException.class,
+                () -> ejecutar(OperacionLote.CATEGORIZAR, CATEGORIA_ID, 1L, 2L));
+
+        assertThat(error.getCodigo()).isEqualTo(CodigoError.REGLA_NEGOCIO_VIOLADA);
+        assertThat(a.getCategoria()).isNull();
+        verify(transaccionRepository, never()).deleteAll(anyCollection());
+        verify(transaccionRepository, never()).saveAllAndFlush(any());
+    }
+
+    @Test
+    void aprobarUnaPataDeTransferenciaEstaPermitido() {
+        Transaccion pata = Transaccion.builder()
+                .id(1L).cuenta(Cuenta.builder().build()).fecha(LocalDate.of(2026, 9, 1))
+                .monto(-1L).aprobada(false).build();
+        pata.enlazarCon(nueva(9L));
+        devolver(pata);
+
+        LoteResponse respuesta = ejecutar(OperacionLote.APROBAR, null, 1L);
+
+        assertThat(respuesta.afectadas()).isEqualTo(1);
+        assertThat(pata.isAprobada()).isTrue();
+    }
 }

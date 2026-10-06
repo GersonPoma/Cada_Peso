@@ -138,4 +138,25 @@ class TransaccionTest {
 
         assertThat(setters).isEmpty();
     }
+
+    @Test
+    void enlazarYDesenlazarCambianElPar() {
+        Transaccion salida = nueva();
+        Transaccion entrada = nueva();
+
+        assertThat(salida.esTransferencia()).isFalse();
+        assertThat(salida.getTransaccionPar()).isNull();
+
+        salida.enlazarCon(entrada);
+        entrada.enlazarCon(salida);
+
+        assertThat(salida.esTransferencia()).isTrue();
+        assertThat(salida.getTransaccionPar()).isSameAs(entrada);
+        assertThat(entrada.getTransaccionPar()).isSameAs(salida);
+
+        salida.desenlazar();
+
+        assertThat(salida.esTransferencia()).isFalse();
+        assertThat(salida.getTransaccionPar()).isNull();
+    }
 }

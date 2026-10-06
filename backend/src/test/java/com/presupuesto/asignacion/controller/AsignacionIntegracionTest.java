@@ -613,7 +613,77 @@ class AsignacionIntegracionTest {
         esperarNoEncontrado(obtener(beto, ana.presupuestoId, "basura", false));
     }
 
+    // ---------- transferencias ----------
+
+    @Test
+    void unaTransferenciaEntreCuentasDelPresupuestoNoCambiaElListoParaAsignar()
+            throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long p = ana.presupuestoId;
+        long banco = crearCuenta(ana, p, "Banco", "CORRIENTE", true, 0);
+        long ahorro = crearCuenta(ana, p, "Ahorro", "AHORRO", true, 0);
+        long comida = crearCategoria(ana, p, "Comida");
+        crearTx(ana, p, banco, "2026-01-01", 500_000, null);
+
+        transferir(ana, banco, ahorro, 30_000, null);
+
+        obtener(ana, p, ENERO, false)
+                .andExpect(jsonPath("$.listoParaAsignar").value(500_000));
+        org.assertj.core.api.Assertions.assertThat(cifra(ana, p, ENERO, comida, "actividad"))
+                .isZero();
+    }
+
+    @Test
+    void unaTransferenciaDesdeUnaExternaSinCategoriaSubeElListoParaAsignar() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long p = ana.presupuestoId;
+        long banco = crearCuenta(ana, p, "Banco", "CORRIENTE", true, 0);
+        long externa = crearCuenta(ana, p, "Inversion", "INVERSION", false, 0);
+        crearTx(ana, p, banco, "2026-01-01", 500_000, null);
+
+        transferir(ana, externa, banco, 50_000, null);
+
+        obtener(ana, p, ENERO, false)
+                .andExpect(jsonPath("$.listoParaAsignar").value(550_000));
+    }
+
+    @Test
+    void unaTransferenciaDesdeUnaExternaConCategoriaSumaActividadSinSubirElListo()
+            throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long p = ana.presupuestoId;
+        long banco = crearCuenta(ana, p, "Banco", "CORRIENTE", true, 0);
+        long externa = crearCuenta(ana, p, "Inversion", "INVERSION", false, 0);
+        long comida = crearCategoria(ana, p, "Comida");
+        crearTx(ana, p, banco, "2026-01-01", 500_000, null);
+
+        transferir(ana, externa, banco, 50_000, comida);
+
+        obtener(ana, p, ENERO, false)
+                .andExpect(jsonPath("$.listoParaAsignar").value(500_000));
+        org.assertj.core.api.Assertions.assertThat(cifra(ana, p, ENERO, comida, "actividad"))
+                .isEqualTo(50_000L);
+    }
+
+    @Test
+    void unaTransferenciaAUnaExternaConCategoriaRestaActividad() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long p = ana.presupuestoId;
+        long banco = crearCuenta(ana, p, "Banco", "CORRIENTE", true, 0);
+        long externa = crearCuenta(ana, p, "Inversion", "INVERSION", false, 0);
+        long comida = crearCategoria(ana, p, "Comida");
+        crearTx(ana, p, banco, "2026-01-01", 500_000, null);
+
+        transferir(ana, banco, externa, 20_000, comida);
+
+        obtener(ana, p, ENERO, false)
+                .andExpect(jsonPath("$.listoParaAsignar").value(500_000));
+        org.assertj.core.api.Assertions.assertThat(cifra(ana, p, ENERO, comida, "actividad"))
+                .isEqualTo(-20_000L);
+    }
+
     // ---------- ayudas ----------
+
 
     private record Sesion(String token, long presupuestoId) {
     }
@@ -704,6 +774,22 @@ class AsignacionIntegracionTest {
             Long categoriaId) throws Exception {
         enviar(post(rutaTransacciones(presupuestoId)), sesion,
                 cuerpoTx(cuentaId, fecha, monto, categoriaId))
+                .andExpect(status().isCreated());
+    }
+
+    private void transferir(
+            Sesion sesion, long origen, long destino, long monto, Long categoriaId)
+            throws Exception {
+        Map<String, Object> cuerpo = new LinkedHashMap<>();
+        cuerpo.put("cuentaOrigenId", origen);
+        cuerpo.put("cuentaDestinoId", destino);
+        cuerpo.put("fecha", "2026-01-10");
+        cuerpo.put("monto", monto);
+        if (categoriaId != null) {
+            cuerpo.put("categoriaId", categoriaId);
+        }
+        enviar(post(RUTA_PRESUPUESTOS + "/" + sesion.presupuestoId + "/transferencias"),
+                sesion, cuerpo)
                 .andExpect(status().isCreated());
     }
 

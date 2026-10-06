@@ -9,6 +9,7 @@ import com.presupuesto.cuenta.entity.Cuenta;
 import com.presupuesto.cuenta.repository.CuentaRepository;
 import com.presupuesto.transaccion.dto.request.SubTransaccionRequest;
 import com.presupuesto.transaccion.entity.SubTransaccion;
+import com.presupuesto.transaccion.entity.Transaccion;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -30,6 +31,8 @@ class TransaccionReferencias {
     static final String MENSAJE_CUENTA_NO_ENCONTRADA = "Cuenta no encontrada";
     static final String MENSAJE_CATEGORIA_NO_ENCONTRADA = "Categoría no encontrada";
     static final String MENSAJE_CUENTA_CERRADA = "La cuenta está cerrada";
+    static final String MENSAJE_ES_TRANSFERENCIA =
+            "Es parte de una transferencia; usa /transferencias";
     static final String MENSAJE_CANTIDAD_SUBTRANSACCIONES =
             "Una división lleva entre 2 y 20 subtransacciones";
     static final String MENSAJE_CATEGORIA_Y_DIVISION =
@@ -56,6 +59,13 @@ class TransaccionReferencias {
         return categoriaRepository.findByIdAndGrupoPresupuestoId(categoriaId, presupuestoId)
                 .orElseThrow(
                         () -> new RecursoNoEncontradoException(MENSAJE_CATEGORIA_NO_ENCONTRADA));
+    }
+
+    /** Las patas de una transferencia solo se cambian por {@code /transferencias}. */
+    void exigirNoEsTransferencia(Transaccion transaccion) {
+        if (transaccion.esTransferencia()) {
+            throw new ReglaNegocioException(MENSAJE_ES_TRANSFERENCIA);
+        }
     }
 
     void exigirAbierta(Cuenta cuenta) {

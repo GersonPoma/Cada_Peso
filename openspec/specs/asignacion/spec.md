@@ -212,8 +212,11 @@ asignado hasta ese mes (incluido), menos la suma de los sobregastos (`disponible
 cierre de los meses anteriores a ese mes. Los ingresos son las transacciones con monto positivo y
 sin categoría (ni subtransacciones) en cuentas con `enPresupuesto` verdadero con fecha hasta el
 fin del mes, más los saldos iniciales positivos de las cuentas con `enPresupuesto` verdadero que
-no son de tipo `TARJETA_CREDITO`. Puede ser negativo y se devuelve tal cual. Las transacciones
-sin categoría con monto negativo y las de cuentas fuera del presupuesto no lo afectan.
+no son de tipo `TARJETA_CREDITO`. De esos ingresos SHALL excluirse la entrada de una
+transferencia cuya pata par está en una cuenta con `enPresupuesto` verdadero (mover dinero dentro
+del presupuesto no es un ingreso); la entrada de una transferencia desde una cuenta externa sin
+categoría SÍ es un ingreso. Puede ser negativo y se devuelve tal cual. Las transacciones sin
+categoría con monto negativo y las de cuentas fuera del presupuesto no lo afectan.
 
 #### Scenario: Ingresos sin categoría
 - **DADO** una entrada de `+500000` sin categoría el `2026-01-01`
@@ -263,6 +266,30 @@ sin categoría con monto negativo y las de cuentas fuera del presupuesto no lo a
 - **DADO** un ingreso de `+300000` en enero y Comida con `asignado` `120000` en `2026-06`
 - **CUANDO** se consulta `2026-06`
 - **ENTONCES** `listoParaAsignar` es `180000`, y `2026-01` mantiene `300000`
+
+#### Scenario: Transferencia entre dos cuentas del presupuesto
+- **DADO** un `listoParaAsignar` de `500000` y una transferencia de `30000` entre dos cuentas con
+  `enPresupuesto` verdadero
+- **CUANDO** se consulta el mes de la transferencia
+- **ENTONCES** `listoParaAsignar` sigue siendo `500000` y ninguna categoría cambia su actividad
+
+#### Scenario: Transferencia desde una cuenta externa sin categoría
+- **DADO** un `listoParaAsignar` de `500000` y una transferencia de `50000` desde una cuenta con
+  `enPresupuesto` falso hacia una del presupuesto, sin categoría
+- **CUANDO** se consulta el mes de la transferencia
+- **ENTONCES** `listoParaAsignar` es `550000`
+
+#### Scenario: Transferencia desde una cuenta externa con categoría
+- **DADO** un `listoParaAsignar` de `500000` y una transferencia de `50000` desde una cuenta
+  externa hacia una del presupuesto, con la categoría Comida
+- **CUANDO** se consulta el mes de la transferencia
+- **ENTONCES** `listoParaAsignar` sigue siendo `500000` y la `actividad` de Comida suma `50000`
+
+#### Scenario: Transferencia del presupuesto a una cuenta externa
+- **DADO** una transferencia de `20000` desde una cuenta del presupuesto hacia una externa, con
+  la categoría Comida
+- **CUANDO** se consulta el mes de la transferencia
+- **ENTONCES** la `actividad` de Comida resta `20000` y `listoParaAsignar` no cambia
 
 ### Requirement: Mover dinero entre categorías
 `POST /mover-dinero` con `{ origenId, destinoId, monto }` SHALL restar `monto` al asignado del

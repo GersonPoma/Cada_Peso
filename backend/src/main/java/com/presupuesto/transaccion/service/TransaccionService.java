@@ -107,6 +107,7 @@ public class TransaccionService {
     public TransaccionResponse actualizar(
             Long presupuestoId, Long usuarioId, Long id, ActualizarTransaccionRequest request) {
         Transaccion transaccion = buscar(presupuestoId, usuarioId, id);
+        referencias.exigirNoEsTransferencia(transaccion);
         TransaccionReferencias.Division division = referencias.dividir(
                 presupuestoId, request.categoriaId(), request.monto(), request.subtransacciones());
         exigirNoReconciliada(transaccion);
@@ -124,6 +125,7 @@ public class TransaccionService {
     @Transactional
     public void borrar(Long presupuestoId, Long usuarioId, Long id) {
         Transaccion transaccion = buscar(presupuestoId, usuarioId, id);
+        referencias.exigirNoEsTransferencia(transaccion);
         exigirNoReconciliada(transaccion);
         transaccionRepository.delete(transaccion);
     }
@@ -153,6 +155,7 @@ public class TransaccionService {
     public TransaccionResponse moverCuenta(
             Long presupuestoId, Long usuarioId, Long id, MoverCuentaRequest request) {
         Transaccion transaccion = buscar(presupuestoId, usuarioId, id);
+        referencias.exigirNoEsTransferencia(transaccion);
         Cuenta destino = referencias.cuenta(request.cuentaId(), presupuestoId);
         exigirNoReconciliada(transaccion);
         referencias.exigirAbierta(destino);
@@ -164,6 +167,7 @@ public class TransaccionService {
     @Transactional
     public TransaccionResponse duplicar(Long presupuestoId, Long usuarioId, Long id) {
         Transaccion original = buscar(presupuestoId, usuarioId, id);
+        referencias.exigirNoEsTransferencia(original);
         referencias.exigirAbierta(original.getCuenta());
         Transaccion copia = Transaccion.builder()
                 .cuenta(original.getCuenta())

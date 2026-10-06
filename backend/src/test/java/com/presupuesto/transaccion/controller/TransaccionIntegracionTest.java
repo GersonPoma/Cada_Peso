@@ -1177,6 +1177,53 @@ class TransaccionIntegracionTest {
         esperarNoEncontrado(mover(ana, ana.presupuestoId, 999999L, cuenta));
     }
 
+    // ---------- transferencias ----------
+
+    @Test
+    void detalleYListadoExponenTransaccionParIdYSaldosSumanAmbasPatas() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long banco = crearCuenta(ana, ana.presupuestoId, "Banco", 100000);
+        long ahorros = crearCuenta(ana, ana.presupuestoId, "Ahorros", 40000);
+        long normal = crearTx(ana, ana.presupuestoId, banco, 0 + 1);
+        Map<String, Object> transferencia = new LinkedHashMap<>();
+        transferencia.put("cuentaOrigenId", banco);
+        transferencia.put("cuentaDestinoId", ahorros);
+        transferencia.put("fecha", FECHA);
+        transferencia.put("monto", 30000);
+        String cuerpoTransferencia = enviar(
+                post(RUTA_PRESUPUESTOS + "/" + ana.presupuestoId + "/transferencias"),
+                ana, transferencia)
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long salida = objectMapper.readTree(cuerpoTransferencia).get("salida").get("id").asLong();
+        long entrada =
+                objectMapper.readTree(cuerpoTransferencia).get("entrada").get("id").asLong();
+
+        obtener(ana, ana.presupuestoId, salida)
+                .andExpect(jsonPath("$.transaccionParId").value(entrada));
+        obtener(ana, ana.presupuestoId, normal)
+                .andExpect(jsonPath("$.transaccionParId", nullValue()));
+        listar(ana, ana.presupuestoId, Map.of())
+                .andExpect(jsonPath("$.totalElementos").value(3))
+                .andExpect(jsonPath("$.contenido[?(@.id==" + normal + ")].transaccionParId")
+                        .value(contains(nullValue())));
+        String cuerpoSaldos = saldos(ana, ana.presupuestoId)
+                .andReturn().getResponse().getContentAsString();
+        long saldoBanco = 0;
+        long saldoAhorros = 0;
+        for (tools.jackson.databind.JsonNode fila : objectMapper.readTree(cuerpoSaldos)) {
+            if (fila.get("cuentaId").asLong() == banco) {
+                saldoBanco = fila.get("saldo").asLong();
+            } else if (fila.get("cuentaId").asLong() == ahorros) {
+                saldoAhorros = fila.get("saldo").asLong();
+            }
+        }
+        // 100000 + 1 (normal) - 30000 y 40000 + 30000: la transferencia no cambia la suma.
+        org.junit.jupiter.api.Assertions.assertEquals(70001L, saldoBanco);
+        org.junit.jupiter.api.Assertions.assertEquals(70000L, saldoAhorros);
+        org.junit.jupiter.api.Assertions.assertEquals(140001L, saldoBanco + saldoAhorros);
+    }
+
     // ---------- ayudas ----------
 
     private record Sesion(String token, long presupuestoId) {

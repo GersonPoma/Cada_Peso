@@ -46,7 +46,12 @@ public interface ActividadMensualRepository extends Repository<Transaccion, Long
     List<ActividadPorMes> actividadDividida(
             @Param("presupuestoId") Long presupuestoId, @Param("hasta") LocalDate hasta);
 
-    /** Entradas sin categoría y sin subtransacciones hasta una fecha (inclusive). */
+    /**
+     * Entradas sin categoría y sin subtransacciones hasta una fecha (inclusive). Excluye la
+     * entrada de una transferencia cuya pata par está en una cuenta del presupuesto (mover dinero
+     * dentro del presupuesto no es un ingreso); {@code not exists} y no navegar a la pata par,
+     * porque la navegación implícita haría un inner join y descartaría las que no tienen par.
+     */
     @Query("""
             select coalesce(sum(t.monto), 0L)
             from Transaccion t
@@ -55,6 +60,8 @@ public interface ActividadMensualRepository extends Repository<Transaccion, Long
               and t.monto > 0
               and t.categoria is null
               and not exists (select 1 from SubTransaccion s where s.transaccion = t)
+              and not exists (select 1 from Transaccion p
+                              where p = t.transaccionPar and p.cuenta.enPresupuesto = true)
               and t.fecha <= :hasta
             """)
     long ingresosSinCategoria(

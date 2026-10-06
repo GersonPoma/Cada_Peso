@@ -527,4 +527,38 @@ class TransaccionServiceTest {
     private static FiltroTransacciones filtro() {
         return new FiltroTransacciones(null, null, null, null, null, false, null);
     }
+
+    // ---------- patas de transferencia ----------
+
+    @Test
+    void unaPataDeTransferenciaNoSeEditaBorraMueveNiDuplica() {
+        existente.enlazarCon(Transaccion.builder().id(41L).cuenta(otraCuenta).build());
+
+        assertThrows(ReglaNegocioException.class, () -> service.actualizar(
+                PRESUPUESTO_ID, USUARIO_ID, TRANSACCION_ID,
+                new ActualizarTransaccionRequest(FECHA, -5L, null, null, null, null)));
+        assertThrows(ReglaNegocioException.class,
+                () -> service.borrar(PRESUPUESTO_ID, USUARIO_ID, TRANSACCION_ID));
+        assertThrows(ReglaNegocioException.class, () -> service.moverCuenta(
+                PRESUPUESTO_ID, USUARIO_ID, TRANSACCION_ID, new MoverCuentaRequest(OTRA_CUENTA_ID)));
+        NegocioException error = assertThrows(ReglaNegocioException.class,
+                () -> service.duplicar(PRESUPUESTO_ID, USUARIO_ID, TRANSACCION_ID));
+
+        assertThat(error.getCodigo()).isEqualTo(CodigoError.REGLA_NEGOCIO_VIOLADA);
+        assertThat(existente.getMonto()).isEqualTo(-1000L);
+        assertThat(existente.getCuenta()).isSameAs(banco);
+        verify(transaccionRepository, never()).delete(any(Transaccion.class));
+        verify(transaccionRepository, never()).saveAndFlush(any(Transaccion.class));
+    }
+
+    @Test
+    void unaPataDeTransferenciaSiSeApruebaYCambiaDeEstado() {
+        existente.enlazarCon(Transaccion.builder().id(41L).cuenta(otraCuenta).build());
+
+        assertThat(service.aprobar(PRESUPUESTO_ID, USUARIO_ID, TRANSACCION_ID).aprobada())
+                .isTrue();
+        assertThat(service.cambiarEstado(PRESUPUESTO_ID, USUARIO_ID, TRANSACCION_ID,
+                new CambiarEstadoRequest(EstadoTransaccion.CONCILIADA)).estado())
+                .isEqualTo(EstadoTransaccion.CONCILIADA);
+    }
 }
