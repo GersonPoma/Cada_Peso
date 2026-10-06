@@ -29,6 +29,9 @@ class GrupoCategoriaIntegracionTest {
 
     private static final String RUTA_PRESUPUESTOS = "/api/v1/presupuestos";
 
+    /** Grupos con los que nace todo presupuesto: los de cada test quedan a continuación. */
+    private static final String[] INICIALES = {"Facturas", "Necesidades", "Deseos", "Ahorro"};
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -55,14 +58,14 @@ class GrupoCategoriaIntegracionTest {
     // ---------- crear y validar ----------
 
     @Test
-    void crearDevuelve201ConOrdenCeroYVisible() throws Exception {
+    void crearDevuelve201ConOrdenAlFinalYVisible() throws Exception {
         Sesion ana = registrar("ana@ejemplo.com");
 
         crear(ana, ana.presupuestoId, "Vivienda")
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id", notNullValue()))
                 .andExpect(jsonPath("$.nombre").value("Vivienda"))
-                .andExpect(jsonPath("$.orden").value(0))
+                .andExpect(jsonPath("$.orden").value(INICIALES.length))
                 .andExpect(jsonPath("$.oculto").value(false))
                 .andExpect(jsonPath("$.fechaCreacion", notNullValue()))
                 .andExpect(jsonPath("$.fechaActualizacion", notNullValue()));
@@ -72,9 +75,10 @@ class GrupoCategoriaIntegracionTest {
     void elOrdenAlCrearEsConsecutivo() throws Exception {
         Sesion ana = registrar("ana@ejemplo.com");
 
-        crear(ana, ana.presupuestoId, "Uno").andExpect(jsonPath("$.orden").value(0));
-        crear(ana, ana.presupuestoId, "Dos").andExpect(jsonPath("$.orden").value(1));
-        crear(ana, ana.presupuestoId, "Tres").andExpect(jsonPath("$.orden").value(2));
+        int n = INICIALES.length;
+        crear(ana, ana.presupuestoId, "Uno").andExpect(jsonPath("$.orden").value(n));
+        crear(ana, ana.presupuestoId, "Dos").andExpect(jsonPath("$.orden").value(n + 1));
+        crear(ana, ana.presupuestoId, "Tres").andExpect(jsonPath("$.orden").value(n + 2));
     }
 
     @Test
@@ -156,7 +160,7 @@ class GrupoCategoriaIntegracionTest {
         renombrar(ana, ana.presupuestoId, id, "Hogar")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nombre").value("Hogar"))
-                .andExpect(jsonPath("$.orden").value(1));
+                .andExpect(jsonPath("$.orden").value(INICIALES.length + 1));
     }
 
     @Test
@@ -174,7 +178,7 @@ class GrupoCategoriaIntegracionTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(cuerpo)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.orden").value(1))
+                .andExpect(jsonPath("$.orden").value(INICIALES.length + 1))
                 .andExpect(jsonPath("$.oculto").value(false));
     }
 
@@ -212,15 +216,16 @@ class GrupoCategoriaIntegracionTest {
         long b = idDe(crear(ana, ana.presupuestoId, "B"));
         long c = idDe(crear(ana, ana.presupuestoId, "C"));
 
-        mover(ana, ana.presupuestoId, a, 2)
-                .andExpect(status().isOk()).andExpect(jsonPath("$.orden").value(2));
+        int n = INICIALES.length;
+        mover(ana, ana.presupuestoId, a, n + 2)
+                .andExpect(status().isOk()).andExpect(jsonPath("$.orden").value(n + 2));
         esperarOrden(ana, ana.presupuestoId, "B", "C", "A");
 
-        mover(ana, ana.presupuestoId, c, 0)
-                .andExpect(status().isOk()).andExpect(jsonPath("$.orden").value(0));
+        mover(ana, ana.presupuestoId, c, n)
+                .andExpect(status().isOk()).andExpect(jsonPath("$.orden").value(n));
         esperarOrden(ana, ana.presupuestoId, "C", "B", "A");
 
-        mover(ana, ana.presupuestoId, b, 1).andExpect(status().isOk());
+        mover(ana, ana.presupuestoId, b, n + 1).andExpect(status().isOk());
         esperarOrden(ana, ana.presupuestoId, "C", "B", "A");
     }
 
@@ -232,7 +237,7 @@ class GrupoCategoriaIntegracionTest {
         long c = idDe(crear(ana, ana.presupuestoId, "C"));
         accion(ana, ana.presupuestoId, b, "ocultar").andExpect(status().isOk());
 
-        mover(ana, ana.presupuestoId, c, 0).andExpect(status().isOk());
+        mover(ana, ana.presupuestoId, c, INICIALES.length).andExpect(status().isOk());
 
         esperarOrden(ana, ana.presupuestoId, "C", "A", "B");
     }
@@ -243,7 +248,7 @@ class GrupoCategoriaIntegracionTest {
         long a = idDe(crear(ana, ana.presupuestoId, "A"));
         crear(ana, ana.presupuestoId, "B");
 
-        mover(ana, ana.presupuestoId, a, 2)
+        mover(ana, ana.presupuestoId, a, INICIALES.length + 2)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.codigo").value("DATOS_INVALIDOS"));
         esperarDatosInvalidos(mover(ana, ana.presupuestoId, a, -1), "posicion");
@@ -384,9 +389,15 @@ class GrupoCategoriaIntegracionTest {
                 .content(objectMapper.writeValueAsString(cuerpo)));
     }
 
-    /** Comprueba el orden de todos los grupos (ocultos incluidos) con el árbol de categorías. */
-    private void esperarOrden(Sesion sesion, long presupuestoId, String... nombres)
+    /**
+     * Comprueba el orden de todos los grupos (ocultos incluidos) con el árbol de categorías:
+     * primero los iniciales y después los {@code nombres} creados por el test.
+     */
+    private void esperarOrden(Sesion sesion, long presupuestoId, String... creados)
             throws Exception {
+        String[] nombres = new String[INICIALES.length + creados.length];
+        System.arraycopy(INICIALES, 0, nombres, 0, INICIALES.length);
+        System.arraycopy(creados, 0, nombres, INICIALES.length, creados.length);
         String cuerpo = mockMvc.perform(get(RUTA_PRESUPUESTOS + "/" + presupuestoId
                                 + "/categorias")
                         .param("incluirOcultas", "true")

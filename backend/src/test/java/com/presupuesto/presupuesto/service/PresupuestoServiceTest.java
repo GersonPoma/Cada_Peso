@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -15,6 +16,7 @@ import com.presupuesto.presupuesto.dto.request.ActualizarPresupuestoRequest;
 import com.presupuesto.presupuesto.dto.request.CrearPresupuestoRequest;
 import com.presupuesto.presupuesto.dto.response.PresupuestoResponse;
 import com.presupuesto.presupuesto.entity.Presupuesto;
+import com.presupuesto.presupuesto.evento.PresupuestoCreadoEvento;
 import com.presupuesto.presupuesto.repository.PresupuestoRepository;
 import com.presupuesto.usuario.entity.Perfil;
 import com.presupuesto.usuario.entity.Usuario;
@@ -30,6 +32,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 
 @ExtendWith(MockitoExtension.class)
@@ -47,13 +50,16 @@ class PresupuestoServiceTest {
     @Mock
     private PerfilRepository perfilRepository;
 
+    @Mock
+    private ApplicationEventPublisher publicador;
+
     private PresupuestoService service;
     private Usuario usuario;
 
     @BeforeEach
     void preparar() {
         service = new PresupuestoService(
-                presupuestoRepository, usuarioRepository, perfilRepository);
+                presupuestoRepository, usuarioRepository, perfilRepository, publicador);
         usuario = Usuario.builder().id(USUARIO_ID).email("ana@ejemplo.com").build();
         when(usuarioRepository.findById(USUARIO_ID)).thenReturn(Optional.of(usuario));
         when(presupuestoRepository.saveAndFlush(any(Presupuesto.class)))
@@ -88,6 +94,38 @@ class PresupuestoServiceTest {
         assertThrows(NoAutenticadoException.class,
                 () -> service.crear(USUARIO_ID, new CrearPresupuestoRequest("Viajes", null)));
         verify(presupuestoRepository, never()).saveAndFlush(any());
+        verify(publicador, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    void crearPublicaElEventoUnaVezConElPresupuestoGuardado() {
+        service.crear(USUARIO_ID, new CrearPresupuestoRequest("Viajes", "USD"));
+
+        ArgumentCaptor<PresupuestoCreadoEvento> captor =
+                ArgumentCaptor.forClass(PresupuestoCreadoEvento.class);
+        verify(publicador, times(1)).publishEvent(captor.capture());
+        assertThat(captor.getValue().presupuesto().getNombre()).isEqualTo("Viajes");
+    }
+
+    @Test
+    void crearInicialPublicaElEventoUnaVez() {
+        Presupuesto creado = service.crearInicial(usuario, "BOB");
+
+        ArgumentCaptor<PresupuestoCreadoEvento> captor =
+                ArgumentCaptor.forClass(PresupuestoCreadoEvento.class);
+        verify(publicador, times(1)).publishEvent(captor.capture());
+        assertThat(captor.getValue().presupuesto()).isSameAs(creado);
+    }
+
+    @Test
+    void renombrarNoPublicaElEvento() {
+        Presupuesto existente = presupuesto(7L, "Casa", "BOB");
+        when(presupuestoRepository.findByIdAndUsuarioId(7L, USUARIO_ID))
+                .thenReturn(Optional.of(existente));
+
+        service.renombrar(7L, USUARIO_ID, new ActualizarPresupuestoRequest("Hogar"));
+
+        verify(publicador, never()).publishEvent(any(Object.class));
     }
 
     @Test

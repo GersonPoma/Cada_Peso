@@ -31,6 +31,9 @@ class CategoriaIntegracionTest {
 
     private static final String RUTA_PRESUPUESTOS = "/api/v1/presupuestos";
 
+    /** Todo presupuesto nace con 4 grupos: los que crea un test quedan a continuación. */
+    private static final int GRUPOS_INICIALES = 4;
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -404,19 +407,19 @@ class CategoriaIntegracionTest {
                                 + "/grupos-categorias/" + y + "/mover")
                         .header(HttpHeaders.AUTHORIZATION, bearer(ana.token))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"posicion\": 0}"))
+                        .content("{\"posicion\": " + GRUPOS_INICIALES + "}"))
                 .andExpect(status().isOk());
 
         arbol(ana, ana.presupuestoId, false)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].nombre").value("Y"))
-                .andExpect(jsonPath("$[0].orden").value(0))
-                .andExpect(jsonPath("$[0].categorias[0].nombre").value("C"))
-                .andExpect(jsonPath("$[1].nombre").value("X"))
-                .andExpect(jsonPath("$[1].categorias", hasSize(2)))
-                .andExpect(jsonPath("$[1].categorias[0].nombre").value("A"))
-                .andExpect(jsonPath("$[1].categorias[1].nombre").value("B"));
+                .andExpect(jsonPath("$", hasSize(GRUPOS_INICIALES + 2)))
+                .andExpect(jsonPath("$[4].nombre").value("Y"))
+                .andExpect(jsonPath("$[4].orden").value(GRUPOS_INICIALES))
+                .andExpect(jsonPath("$[4].categorias[0].nombre").value("C"))
+                .andExpect(jsonPath("$[5].nombre").value("X"))
+                .andExpect(jsonPath("$[5].categorias", hasSize(2)))
+                .andExpect(jsonPath("$[5].categorias[0].nombre").value("A"))
+                .andExpect(jsonPath("$[5].categorias[1].nombre").value("B"));
     }
 
     @Test
@@ -436,28 +439,30 @@ class CategoriaIntegracionTest {
         mockMvc.perform(get(ruta(ana.presupuestoId))
                         .header(HttpHeaders.AUTHORIZATION, bearer(ana.token)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].nombre").value("Visible"))
-                .andExpect(jsonPath("$[0].categorias", hasSize(1)))
-                .andExpect(jsonPath("$[0].categorias[0].nombre").value("Normal"));
+                .andExpect(jsonPath("$", hasSize(GRUPOS_INICIALES + 1)))
+                .andExpect(jsonPath("$[4].nombre").value("Visible"))
+                .andExpect(jsonPath("$[4].categorias", hasSize(1)))
+                .andExpect(jsonPath("$[4].categorias[0].nombre").value("Normal"));
         arbol(ana, ana.presupuestoId, false)
-                .andExpect(jsonPath("$", hasSize(1)));
+                .andExpect(jsonPath("$", hasSize(GRUPOS_INICIALES + 1)));
         arbol(ana, ana.presupuestoId, true)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].categorias", hasSize(2)))
-                .andExpect(jsonPath("$[0].categorias[1].oculta").value(true))
-                .andExpect(jsonPath("$[1].oculto").value(true))
-                .andExpect(jsonPath("$[1].categorias", hasSize(1)));
+                .andExpect(jsonPath("$", hasSize(GRUPOS_INICIALES + 2)))
+                .andExpect(jsonPath("$[4].categorias", hasSize(2)))
+                .andExpect(jsonPath("$[4].categorias[1].oculta").value(true))
+                .andExpect(jsonPath("$[5].oculto").value(true))
+                .andExpect(jsonPath("$[5].categorias", hasSize(1)));
     }
 
     @Test
-    void elArbolDeUnPresupuestoSinGruposEsUnaListaVacia() throws Exception {
+    void elArbolDeUnPresupuestoSinGruposPropiosSoloTieneLosIniciales() throws Exception {
         Sesion ana = registrar("ana@ejemplo.com");
 
         arbol(ana, ana.presupuestoId, true)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(0)));
+                .andExpect(jsonPath("$", hasSize(GRUPOS_INICIALES)))
+                .andExpect(jsonPath("$[0].nombre").value("Facturas"))
+                .andExpect(jsonPath("$[3].nombre").value("Ahorro"));
     }
 
     @Test
@@ -470,12 +475,12 @@ class CategoriaIntegracionTest {
         crear(ana, otro, grupoViajes, "Pasajes", null);
 
         arbol(ana, ana.presupuestoId, true)
-                .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].nombre").value("Casa"))
-                .andExpect(jsonPath("$[0].categorias", hasSize(1)));
+                .andExpect(jsonPath("$", hasSize(GRUPOS_INICIALES + 1)))
+                .andExpect(jsonPath("$[4].nombre").value("Casa"))
+                .andExpect(jsonPath("$[4].categorias", hasSize(1)));
         arbol(ana, otro, true)
-                .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].nombre").value("Vuelos"));
+                .andExpect(jsonPath("$", hasSize(GRUPOS_INICIALES + 1)))
+                .andExpect(jsonPath("$[4].nombre").value("Vuelos"));
     }
 
     // ---------- aislamiento ----------
@@ -673,13 +678,17 @@ class CategoriaIntegracionTest {
         return cuerpo;
     }
 
-    /** Comprueba nombres y orden consecutivo de las categorías del grupo en esa posición. */
+    /**
+     * Comprueba nombres y orden consecutivo de las categorías del grupo en esa posición, contada
+     * desde el primer grupo creado por el test (después de los iniciales).
+     */
     private void esperarGrupo(Sesion sesion, long presupuestoId, int posicionGrupo,
             String... nombres) throws Exception {
         String cuerpo = arbol(sesion, presupuestoId, true)
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
-        JsonNode categorias = objectMapper.readTree(cuerpo).get(posicionGrupo).get("categorias");
+        JsonNode categorias = objectMapper.readTree(cuerpo).get(GRUPOS_INICIALES + posicionGrupo)
+                .get("categorias");
         assertThat(categorias.size()).isEqualTo(nombres.length);
         for (int i = 0; i < nombres.length; i++) {
             assertThat(categorias.get(i).get("nombre").asString()).isEqualTo(nombres[i]);

@@ -8,6 +8,7 @@ import com.presupuesto.presupuesto.dto.request.ActualizarPresupuestoRequest;
 import com.presupuesto.presupuesto.dto.request.CrearPresupuestoRequest;
 import com.presupuesto.presupuesto.dto.response.PresupuestoResponse;
 import com.presupuesto.presupuesto.entity.Presupuesto;
+import com.presupuesto.presupuesto.evento.PresupuestoCreadoEvento;
 import com.presupuesto.presupuesto.repository.PresupuestoRepository;
 import com.presupuesto.usuario.entity.Perfil;
 import com.presupuesto.usuario.entity.Usuario;
@@ -15,6 +16,7 @@ import com.presupuesto.usuario.repository.PerfilRepository;
 import com.presupuesto.usuario.repository.UsuarioRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +33,7 @@ public class PresupuestoService {
     private final PresupuestoRepository presupuestoRepository;
     private final UsuarioRepository usuarioRepository;
     private final PerfilRepository perfilRepository;
+    private final ApplicationEventPublisher publicador;
 
     /**
      * Devuelve el presupuesto si pertenece al usuario. Inexistente y ajeno responden igual
@@ -94,12 +97,15 @@ public class PresupuestoService {
                 usuario.getId(), normalizado)) {
             throw yaExiste();
         }
-        return guardar(Presupuesto.builder()
+        Presupuesto presupuesto = guardar(Presupuesto.builder()
                 .usuario(usuario)
                 .nombre(nombre)
                 .nombreNormalizado(normalizado)
                 .moneda(moneda)
                 .build());
+        // Síncrono: los oyentes corren en esta transacción y un fallo los revierte a todos.
+        publicador.publishEvent(new PresupuestoCreadoEvento(presupuesto));
+        return presupuesto;
     }
 
     /** Red de seguridad ante dos peticiones simultáneas con el mismo nombre. */

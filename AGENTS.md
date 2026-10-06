@@ -47,6 +47,7 @@ com/presupuesto/<feature>/
 ├── dto/
 │   ├── request/
 │   └── response/
+├── evento/
 └── validacion/
 ```
 
@@ -92,6 +93,7 @@ com/presupuesto/
 │   │   ├── request/
 │   │   └── response/
 │   ├── entity/
+│   ├── evento/
 │   ├── repository/
 │   └── service/
 └── usuario/
@@ -110,6 +112,16 @@ depender de `usuario` y de `comun`, y `auth` de `presupuesto` (crea el presupues
 registrarse); `cuenta` y `categoria` pueden depender de `presupuesto` y de `comun`; nunca al
 revés (`presupuesto` y `cuenta` no importan `categoria`).
 
+**Comunicación entre features: eventos.** Cuando una feature debe avisar a otra sin importarla
+(la dependencia iría al revés), publica un evento de Spring y la otra lo escucha. Hoy
+`presupuesto` publica `PresupuestoCreadoEvento` (record en `presupuesto/evento`, con el
+`Presupuesto` ya guardado) al final de `PresupuestoService.crear(...)` y `crearInicial(...)`, y
+`categoria` lo escucha (`CategoriasInicialesListener`, en `categoria/service`) para crear el
+árbol inicial de grupos y categorías. El oyente es un `@EventListener` **síncrono**, nunca
+asíncrono ni `@TransactionalEventListener`: corre en la transacción del publicador, así que un
+fallo revierte presupuesto y árbol juntos (y el usuario, en el registro). `presupuesto` nunca
+importa `categoria` ni `cuenta`.
+
 ### Qué va en cada subpaquete
 
 | Subpaquete     | Contenido                                                                   |
@@ -121,6 +133,7 @@ revés (`presupuesto` y `cuenta` no importan `categoria`).
 | `dto/request`  | Records que entran a la API, con sus validaciones y helpers package-private |
 | `dto/response` | Records que salen de la API, cada uno con su método `desde(...)`            |
 | `validacion`   | Anotaciones de Bean Validation propias de la feature y sus validadores      |
+| `evento`       | Records de eventos que la feature publica para otras (solo si los publica)  |
 
 Los DTO de la API son siempre **Java records**, nunca clases.
 
