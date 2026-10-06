@@ -1,0 +1,22 @@
+<mat-form-field appearance="outline" class="campo">
+  <mat-label>{{ etiqueta() }}</mat-label>
+  <input
+    matInput
+    [type]="visible() ? 'text' : 'password'"
+    [formControl]="control()"
+    [attr.autocomplete]="autocompletar()"
+  />
+  <button
+    mat-icon-button
+    matSuffix
+    type="button"
+    [attr.aria-label]="visible() ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+    [attr.aria-pressed]="visible()"
+    (click)="alternar()"
+  >
+    <mat-icon>{{ visible() ? 'visibility_off' : 'visibility' }}</mat-icon>
+  </button>
+  @if (mensaje(); as texto) {
+    <mat-error>{{ texto }}</mat-error>
+  }
+</mat-form-field>

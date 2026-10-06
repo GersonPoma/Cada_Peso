@@ -1,0 +1,36 @@
+<app-cabecera />
+<main class="pagina">
+  <mat-card class="tarjeta" appearance="outlined">
+    <mat-card-header>
+      <mat-card-title>Iniciar sesión</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <form class="formulario" [formGroup]="formulario" (ngSubmit)="enviar()" novalidate>
+        <mat-form-field appearance="outline">
+          <mat-label>Email</mat-label>
+          <input
+            matInput
+            type="text"
+            inputmode="email"
+            autocomplete="username"
+            formControlName="email"
+          />
+          @if (mensajeEmail(); as texto) {
+            <mat-error>{{ texto }}</mat-error>
+          }
+        </mat-form-field>
+
+        <app-campo-contrasena [control]="formulario.controls.contrasena" />
+
+        @if (errorGeneral(); as texto) {
+          <p class="error-general" role="alert">{{ texto }}</p>
+        }
+
+        <button mat-flat-button type="submit" [disabled]="formulario.invalid || enviando()">
+          Iniciar sesión
+        </button>
+      </form>
+      <p class="enlace">¿No tienes cuenta? <a routerLink="/registro">Regístrate</a></p>
+    </mat-card-content>
+  </mat-card>
+</main>

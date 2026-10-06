@@ -1,0 +1,85 @@
+<app-cabecera />
+<main class="pagina">
+  <mat-card class="tarjeta" appearance="outlined">
+    <mat-card-header>
+      <mat-card-title>Crear cuenta</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <form class="formulario" [formGroup]="formulario" (ngSubmit)="enviar()" novalidate>
+        <mat-form-field appearance="outline">
+          <mat-label>Email</mat-label>
+          <input
+            matInput
+            type="text"
+            inputmode="email"
+            autocomplete="username"
+            formControlName="email"
+          />
+          @if (mensajeEmail(); as texto) {
+            <mat-error>{{ texto }}</mat-error>
+          }
+        </mat-form-field>
+
+        <app-campo-contrasena
+          [control]="formulario.controls.contrasena"
+          autocompletar="new-password"
+        />
+
+        <mat-form-field appearance="outline">
+          <mat-label>Nombre</mat-label>
+          <input matInput type="text" autocomplete="given-name" formControlName="nombre" />
+          @if (mensajeNombre(); as texto) {
+            <mat-error>{{ texto }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Apellido</mat-label>
+          <input matInput type="text" autocomplete="family-name" formControlName="apellido" />
+          @if (mensajeApellido(); as texto) {
+            <mat-error>{{ texto }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Fecha de nacimiento</mat-label>
+          <input
+            matInput
+            autocomplete="bday"
+            formControlName="fechaNacimiento"
+            [matDatepicker]="selectorFecha"
+          />
+          <mat-datepicker-toggle matIconSuffix [for]="selectorFecha" />
+          <mat-datepicker #selectorFecha startView="multi-year" />
+          @if (mensajeFecha(); as texto) {
+            <mat-error>{{ texto }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Teléfono (opcional)</mat-label>
+          <input matInput type="tel" autocomplete="tel" formControlName="telefono" />
+          @if (mensajeTelefono(); as texto) {
+            <mat-error>{{ texto }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Moneda</mat-label>
+          <mat-select formControlName="monedaPredeterminada">
+            @for (moneda of monedas; track moneda.codigo) {
+              <mat-option [value]="moneda.codigo">
+                {{ moneda.codigo }} - {{ moneda.nombre }}
+              </mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <button mat-flat-button type="submit" [disabled]="formulario.invalid || enviando()">
+          Crear cuenta
+        </button>
+      </form>
+      <p class="enlace">¿Ya tienes cuenta? <a routerLink="/login">Inicia sesión</a></p>
+    </mat-card-content>
+  </mat-card>
+</main>

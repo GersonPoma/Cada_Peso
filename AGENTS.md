@@ -375,11 +375,26 @@ src/app/
 ├── app.ts, app.config.ts, app.routes.ts ...
 ├── core/
 │   ├── api-base-url.ts
-│   └── material/
+│   ├── auth/
+│   ├── material/
+│   └── sesion/
 ├── shared/
+│   ├── api/
+│   ├── cabecera/
 │   ├── fecha/
-│   └── formato/
+│   ├── formato/
+│   ├── formulario/
+│   └── validacion/
 └── features/
+    ├── auth/
+    │   ├── components/
+    │   ├── models/
+    │   ├── pages/
+    │   └── services/
+    ├── inicio/
+    │   ├── models/
+    │   ├── pages/
+    │   └── services/
     └── <feature>/
         ├── pages/
         ├── components/
@@ -388,9 +403,12 @@ src/app/
 ```
 
 - `core/`: servicios singleton, interceptores y configuración transversal del frontend (hoy,
-  la URL base de la API y `material/`, la configuración global de Angular Material).
+  la URL base de la API, `auth/` con el interceptor y los guards, `sesion/` con el servicio de
+  sesión y `material/`, la configuración global de Angular Material).
 - `shared/`: componentes, pipes, directivas y utilidades reutilizables entre features (hoy,
-  `formato/` con los pipes de monto y fecha, y `fecha/` con `aFechaNegocio()`).
+  `formato/` con los pipes de monto y fecha, `fecha/` con `aFechaNegocio()`, `api/` con la lectura
+  de errores del API, `cabecera/`, `formulario/` con los mensajes de error y `validacion/` con los
+  validadores).
 - `features/<feature>/`: una carpeta por feature de negocio (`cuentas/`, `categorias/`,
   `transacciones/`, etc.), con solo las subcarpetas que necesite:
   - `pages/`: componentes enrutables, uno por ruta.
@@ -400,7 +418,8 @@ src/app/
 - **Dependencias**: `core/` y `shared/` nunca importan nada de `features/`; una feature puede
   importar de `core/` y `shared/`, pero no de otra feature.
 - **Nombres de archivo** en `kebab-case` con el sufijo técnico: `*.page.ts`, `*.component.ts`,
-  `*.service.ts`, `*.model.ts`, `*.pipe.ts`. Los tests `*.spec.ts` van junto al archivo que
+  `*.service.ts`, `*.model.ts`, `*.pipe.ts`, `*.guard.ts`, `*.interceptor.ts`,
+  `*.validator.ts`. Los tests `*.spec.ts` van junto al archivo que
   prueban.
 
 Angular se usa con **standalone components + signals**, sin NgModules.
@@ -409,6 +428,20 @@ La URL base de la API en `environments` es siempre **relativa** (`/api/v1`), nun
 proxy de desarrollo de Angular (`proxy.conf.json`, referenciado en
 `angular.json` → `architect.serve.options.proxyConfig`) reenvía `/api` → `http://localhost:8080`
 como same-origin, evitando configurar CORS en el backend.
+
+## Sesión y autenticación del frontend
+
+- El token vive solo en `SesionService` (`core/sesion/`), guardado en `localStorage` bajo la clave
+  `cada-peso.sesion` junto con `expiraEn`. Un token vencido al arrancar se descarta.
+- `sesionInterceptor` agrega `Authorization: Bearer` solo a las peticiones a `/api/v1`; un 401 de
+  cualquier ruta que no sea `/api/v1/auth/**` cierra la sesión y lleva a `/login`.
+- `sesionGuard` protege las rutas privadas e `invitadoGuard` las de `/login` y `/registro`.
+- `core/` y `shared/` nunca importan `features/`: por eso el interceptor y los guards usan
+  `SesionService` y no `AuthService`.
+- La contraseña nunca se recorta ni se modifica; email, nombre y apellido se envían recortados
+  (el email, además, en minúsculas).
+- Los errores del API se interpretan por `codigo` (`leerProblemaApi`), nunca por `detail`.
+- Las fechas del registro se envían con `aFechaNegocio()`.
 
 ## Estilo de código
 
