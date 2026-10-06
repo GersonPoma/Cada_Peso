@@ -1,0 +1,97 @@
+<main class="pagina">
+  <header class="encabezado">
+    <div>
+      <h1 class="titulo">Cuentas</h1>
+      @if (estado() === 'listo' && moneda(); as moneda) {
+        <p class="total">
+          Total en el presupuesto:
+          <span class="monto" [class.negativo]="total() < 0">{{ total() | monto: moneda }}</span>
+        </p>
+      }
+    </div>
+    <div class="acciones">
+      <mat-slide-toggle [checked]="incluirCerradas()" (change)="cambiarCerradas($event.checked)">
+        Ver cuentas cerradas
+      </mat-slide-toggle>
+      <button mat-flat-button type="button" (click)="agregar()">
+        <mat-icon>add</mat-icon>
+        Agregar cuenta
+      </button>
+    </div>
+  </header>
+
+  @switch (estado()) {
+    @case ('cargando') {
+      <div class="centrado">
+        <mat-progress-spinner mode="indeterminate" diameter="48" aria-label="Cargando" />
+      </div>
+    }
+    @case ('error') {
+      <div class="centrado">
+        <p class="error" role="alert">No pudimos cargar tus cuentas.</p>
+        <button mat-stroked-button type="button" (click)="recargar()">Reintentar</button>
+      </div>
+    }
+    @case ('listo') {
+      @if (sinCuentas()) {
+        <div class="centrado">
+          <p class="vacio">Aún no tienes cuentas</p>
+          <button mat-stroked-button type="button" (click)="agregar()">
+            Agregar mi primera cuenta
+          </button>
+        </div>
+      } @else if (moneda(); as moneda) {
+        @for (seccion of secciones(); track seccion.titulo) {
+          <section class="seccion">
+            <h2 class="titulo-seccion">{{ seccion.titulo }}</h2>
+            <mat-list>
+              @for (fila of seccion.filas; track fila.cuenta.id) {
+                <mat-list-item class="cuenta" [lines]="3">
+                  <span matListItemTitle>{{ fila.cuenta.nombre }}</span>
+                  <span matListItemLine>{{ etiquetas[fila.cuenta.tipo] }}</span>
+                  <span matListItemLine class="conciliado">
+                    Conciliado: {{ fila.saldoConciliado | monto: moneda }}
+                  </span>
+                  <div matListItemMeta class="meta">
+                    <span class="monto" [class.negativo]="fila.saldo < 0">
+                      {{ fila.saldo | monto: moneda }}
+                    </span>
+                    <button
+                      mat-icon-button
+                      type="button"
+                      [attr.aria-label]="'Acciones de ' + fila.cuenta.nombre"
+                      [matMenuTriggerFor]="acciones"
+                      [matMenuTriggerData]="{ cuenta: fila.cuenta }"
+                    >
+                      <mat-icon>more_vert</mat-icon>
+                    </button>
+                  </div>
+                </mat-list-item>
+              }
+            </mat-list>
+          </section>
+        }
+      }
+    }
+  }
+
+  <mat-menu #acciones="matMenu">
+    <ng-template matMenuContent let-cuenta="cuenta">
+      @if (cuenta.cerrada) {
+        <button mat-menu-item type="button" (click)="reabrir(cuenta)">
+          <mat-icon>lock_open</mat-icon>
+          <span>Reabrir</span>
+        </button>
+      } @else {
+        <button mat-menu-item type="button" (click)="editar(cuenta)">
+          <mat-icon>edit</mat-icon>
+          <span>Editar</span>
+        </button>
+        <button mat-menu-item type="button" (click)="cerrar(cuenta)">
+          <mat-icon>lock</mat-icon>
+          <span>Cerrar</span>
+        </button>
+      }
+    </ng-template>
+  </mat-menu>
+</main>

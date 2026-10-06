@@ -34,6 +34,12 @@ export const routes: Routes = [
           import('./features/inicio/pages/inicio.page').then((m) => m.InicioPage),
         data: seccion('Inicio', 'home'),
       },
+      {
+        path: 'cuentas',
+        loadComponent: () =>
+          import('./features/cuentas/pages/cuentas.page').then((m) => m.CuentasPage),
+        data: seccion('Cuentas', 'account_balance'),
+      },
     ],
   },
   {

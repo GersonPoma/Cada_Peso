@@ -88,5 +88,61 @@ describe('rutas', () => {
 
       expect(url()).toBe('/presupuestos/3');
     });
+
+    /** Responde la lista del layout y, en la pantalla de cuentas, las cuentas y los saldos. */
+    async function responderCuentas(): Promise<void> {
+      const backend = TestBed.inject(HttpTestingController);
+      backend.expectOne('/api/v1/presupuestos').flush(PRESUPUESTOS);
+      await harness.fixture.whenStable();
+      backend
+        .expectOne((p) => p.url === '/api/v1/presupuestos/3/cuentas')
+        .flush([
+          {
+            id: 5,
+            nombre: 'Banco',
+            tipo: 'CORRIENTE',
+            enPresupuesto: true,
+            saldoInicial: 0,
+            cerrada: false,
+            fechaCreacion: '2026-10-06T12:00:00Z',
+            fechaActualizacion: '2026-10-06T12:00:00Z',
+          },
+        ]);
+      backend
+        .expectOne('/api/v1/presupuestos/3/transacciones/saldos')
+        .flush([{ cuentaId: 5, saldo: 0, saldoConciliado: 0 }]);
+      await harness.fixture.whenStable();
+      backend.verify();
+    }
+
+    const enlaceDelMenu = (etiqueta: string) =>
+      Array.from(
+        (harness.routeNativeElement as HTMLElement).querySelectorAll('mat-sidenav a'),
+      ).find((a) => a.textContent?.includes(etiqueta)) as HTMLAnchorElement | undefined;
+
+    it('/presupuestos/3/cuentas muestra las cuentas con el enlace Cuentas en el menú', async () => {
+      await harness.navigateByUrl('/presupuestos/3/cuentas');
+      await responderCuentas();
+
+      expect(url()).toBe('/presupuestos/3/cuentas');
+      expect(texto()).toContain('Banco');
+      expect(enlaceDelMenu('Inicio')).toBeDefined();
+      expect(enlaceDelMenu('Cuentas')).toBeDefined();
+    });
+
+    it('el enlace Cuentas del menú lleva a /presupuestos/3/cuentas', async () => {
+      await harness.navigateByUrl('/');
+      await responderHastaInicio();
+
+      enlaceDelMenu('Cuentas')?.click();
+      await harness.fixture.whenStable();
+      const backend = TestBed.inject(HttpTestingController);
+      backend.expectOne((p) => p.url === '/api/v1/presupuestos/3/cuentas').flush([]);
+      backend.expectOne('/api/v1/presupuestos/3/transacciones/saldos').flush([]);
+      await harness.fixture.whenStable();
+
+      expect(url()).toBe('/presupuestos/3/cuentas');
+      expect(texto()).toContain('Aún no tienes cuentas');
+    });
   });
 });

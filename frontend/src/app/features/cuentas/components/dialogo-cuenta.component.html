@@ -1,0 +1,57 @@
+<h2 mat-dialog-title>{{ esCrear ? 'Nueva cuenta' : 'Editar cuenta' }}</h2>
+<form [formGroup]="formulario" (ngSubmit)="enviar()" novalidate>
+  <mat-dialog-content class="contenido">
+    <mat-form-field appearance="outline">
+      <mat-label>Nombre</mat-label>
+      <input matInput type="text" autocomplete="off" [formControl]="nombre" />
+      @if (mensajeNombre(); as texto) {
+        <mat-error>{{ texto }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Tipo</mat-label>
+      <mat-select [formControl]="tipo">
+        @for (opcion of tipos; track opcion) {
+          <mat-option [value]="opcion">{{ etiquetas[opcion] }}</mat-option>
+        }
+      </mat-select>
+      @if (mensajeTipo(); as texto) {
+        <mat-error>{{ texto }}</mat-error>
+      }
+    </mat-form-field>
+
+    @if (esCrear) {
+      <mat-checkbox class="casilla" [formControl]="enPresupuesto"
+        >Cuenta del presupuesto</mat-checkbox
+      >
+
+      <mat-form-field appearance="outline">
+        <mat-label>Saldo inicial</mat-label>
+        <input
+          matInput
+          type="text"
+          inputmode="decimal"
+          autocomplete="off"
+          [formControl]="saldoInicial"
+        />
+        <mat-hint>Ej.: {{ ejemploMonto }}</mat-hint>
+        @if (mensajeSaldo(); as texto) {
+          <mat-error>{{ texto }}</mat-error>
+        }
+      </mat-form-field>
+    }
+
+    @if (errorGeneral(); as texto) {
+      <p class="error-general" role="alert">{{ texto }}</p>
+    }
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" [mat-dialog-close]="undefined" [disabled]="enviando()">
+      Cancelar
+    </button>
+    <button mat-flat-button type="submit" [disabled]="formulario.invalid || enviando()">
+      {{ esCrear ? 'Crear' : 'Guardar' }}
+    </button>
+  </mat-dialog-actions>
+</form>

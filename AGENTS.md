@@ -302,6 +302,14 @@ nunca como `double`/`float`/`BigDecimal`. Esta convención aplica desde la entid
 En el frontend, el pipe de moneda de `shared/` es responsable de convertir milésimas a la
 representación visible para el usuario.
 
+En el sentido contrario, todo monto que escribe la persona se convierte a milésimas **solo** con
+`aMilliunits()`/`leerMonto()` (`shared/formato/milliunits.ts`), que leen el texto con los
+separadores de su región y componen el entero a partir de los dígitos, sin aritmética de coma
+flotante. Nunca con `parseFloat`, `Number()` sobre el texto escrito ni multiplicando por 1000
+(`1.005 * 1000` da `1004.9999999999999`). El texto editable de un monto se arma con
+`deMilliunits()`, y los campos de monto se validan con `montoValido()`
+(`shared/validacion/monto.validator.ts`): como máximo 3 decimales.
+
 ## Fechas: `LocalDate` vs `Instant`
 
 - Las **fechas de negocio** sin hora (fecha de una transacción, mes del presupuesto) se modelan
@@ -490,6 +498,11 @@ src/app/
     │   ├── models/
     │   ├── pages/
     │   └── services/
+    ├── cuentas/
+    │   ├── components/
+    │   ├── models/
+    │   ├── pages/
+    │   └── services/
     ├── inicio/
     │   ├── models/
     │   ├── pages/
@@ -511,9 +524,10 @@ src/app/
   sesión, `presupuesto-activo/` con el presupuesto en el que se trabaja y `material/`, la
   configuración global de Angular Material).
 - `shared/`: componentes, pipes, directivas y utilidades reutilizables entre features (hoy,
-  `formato/` con los pipes de monto y fecha, `fecha/` con `aFechaNegocio()`, `api/` con la lectura
-  de errores del API, `cabecera/`, `formulario/` con los mensajes de error y `validacion/` con los
-  validadores).
+  `formato/` con los pipes de monto y fecha y las funciones de dinero `leerMonto()`,
+  `aMilliunits()` y `deMilliunits()`, `fecha/` con `aFechaNegocio()`, `api/` con la lectura de
+  errores del API, `cabecera/`, `formulario/` con los mensajes de error y `validacion/` con los
+  validadores, entre ellos `montoValido()`).
 - `features/<feature>/`: una carpeta por feature de negocio (`cuentas/`, `categorias/`,
   `transacciones/`, etc.), con solo las subcarpetas que necesite:
   - `pages/`: componentes enrutables, uno por ruta.

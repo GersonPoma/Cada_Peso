@@ -7,6 +7,8 @@ export const CODIGOS_API = {
   EMAIL_YA_REGISTRADO: 'EMAIL_YA_REGISTRADO',
   NO_AUTENTICADO: 'NO_AUTENTICADO',
   PRESUPUESTO_YA_EXISTE: 'PRESUPUESTO_YA_EXISTE',
+  CUENTA_YA_EXISTE: 'CUENTA_YA_EXISTE',
+  REGLA_NEGOCIO_VIOLADA: 'REGLA_NEGOCIO_VIOLADA',
 } as const;
 
 /** Aviso para cualquier error que el frontend no sabe mostrar de otra forma. */
