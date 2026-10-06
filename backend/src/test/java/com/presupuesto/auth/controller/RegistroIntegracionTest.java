@@ -1,6 +1,7 @@
 package com.presupuesto.auth.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -10,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.presupuesto.comun.config.RelojDePrueba;
 import com.presupuesto.comun.config.RelojDePruebaConfig;
 import com.presupuesto.comun.seguridad.Rol;
+import com.presupuesto.presupuesto.repository.PresupuestoRepository;
 import com.presupuesto.usuario.entity.Perfil;
 import com.presupuesto.usuario.entity.Usuario;
 import com.presupuesto.usuario.repository.PerfilRepository;
@@ -58,6 +60,9 @@ class RegistroIntegracionTest {
     private PerfilRepository perfilRepository;
 
     @Autowired
+    private PresupuestoRepository presupuestoRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @AfterEach
@@ -96,6 +101,35 @@ class RegistroIntegracionTest {
         registrar(datosValidosCon("monedaPredeterminada", "USD")).andExpect(status().isCreated());
 
         assertThat(perfilGuardado("ana@ejemplo.com").getMonedaPredeterminada()).isEqualTo("USD");
+    }
+
+    @Test
+    void elRegistroCreaElPresupuestoInicialConLaMonedaDelPerfil() throws Exception {
+        String token = tokenDe(registrar(datosValidosCon("monedaPredeterminada", "USD")));
+
+        presupuestosDe(token)
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].nombre").value("Mi presupuesto"))
+                .andExpect(jsonPath("$[0].moneda").value("USD"));
+    }
+
+    @Test
+    void sinMonedaElPresupuestoInicialQuedaEnBob() throws Exception {
+        String token = tokenDe(registrar(datosValidos()));
+
+        presupuestosDe(token)
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].nombre").value("Mi presupuesto"))
+                .andExpect(jsonPath("$[0].moneda").value("BOB"));
+    }
+
+    @Test
+    void unRegistroRechazadoNoCreaPresupuestos() throws Exception {
+        long antes = presupuestoRepository.count();
+
+        registrar(datosValidosCon("contrasena", "corta")).andExpect(status().isBadRequest());
+
+        assertThat(presupuestoRepository.count()).isEqualTo(antes);
     }
 
     @ParameterizedTest
@@ -212,6 +246,20 @@ class RegistroIntegracionTest {
 
         esperarDatosInvalidos(
                 registrar(datosValidosCon("fechaNacimiento", fechaNacimiento)), "fechaNacimiento");
+    }
+
+    private String tokenDe(ResultActions registro) throws Exception {
+        String cuerpo = registro.andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        return objectMapper.readTree(cuerpo).get("token").asString();
+    }
+
+    private ResultActions presupuestosDe(String token) throws Exception {
+        return mockMvc.perform(get("/api/v1/presupuestos")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk());
     }
 
     private ResultActions registrar(Map<String, Object> datos) throws Exception {

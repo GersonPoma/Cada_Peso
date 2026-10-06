@@ -7,6 +7,7 @@ import com.presupuesto.comun.excepcion.CodigoError;
 import com.presupuesto.comun.excepcion.ConflictoException;
 import com.presupuesto.comun.excepcion.NoAutenticadoException;
 import com.presupuesto.comun.seguridad.JwtService;
+import com.presupuesto.presupuesto.service.PresupuestoService;
 import com.presupuesto.usuario.entity.Perfil;
 import com.presupuesto.usuario.entity.Usuario;
 import com.presupuesto.usuario.repository.PerfilRepository;
@@ -31,6 +32,7 @@ public class AuthService {
     private final PerfilRepository perfilRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final PresupuestoService presupuestoService;
 
     /**
      * Hash contra el que se compara cuando el email no existe, para que el tiempo de respuesta no
@@ -42,15 +44,20 @@ public class AuthService {
             UsuarioRepository usuarioRepository,
             PerfilRepository perfilRepository,
             PasswordEncoder passwordEncoder,
-            JwtService jwtService) {
+            JwtService jwtService,
+            PresupuestoService presupuestoService) {
         this.usuarioRepository = usuarioRepository;
         this.perfilRepository = perfilRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.presupuestoService = presupuestoService;
         this.hashFicticio = passwordEncoder.encode("contrasena-ficticia-para-igualar-tiempos");
     }
 
-    /** Crea el usuario y su perfil en una sola transacción y devuelve su token de acceso. */
+    /**
+     * Crea el usuario, su perfil y su presupuesto inicial en una sola transacción y devuelve su
+     * token de acceso.
+     */
     @Transactional
     public TokenResponse registrar(RegistroRequest request) {
         if (usuarioRepository.existsByEmail(request.email())) {
@@ -74,6 +81,7 @@ public class AuthService {
                 .monedaPredeterminada(request.monedaPredeterminada())
                 .telefono(request.telefono())
                 .build());
+        presupuestoService.crearInicial(usuario, request.monedaPredeterminada());
         return TokenResponse.desde(jwtService.emitir(usuario.getId(), usuario.getRol()));
     }
 

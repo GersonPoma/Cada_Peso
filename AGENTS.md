@@ -70,6 +70,14 @@ com/presupuesto/
 │   │   ├── request/
 │   │   └── response/
 │   └── service/
+├── presupuesto/
+│   ├── controller/
+│   ├── dto/
+│   │   ├── request/
+│   │   └── response/
+│   ├── entity/
+│   ├── repository/
+│   └── service/
 └── usuario/
     ├── controller/
     ├── dto/
@@ -81,7 +89,9 @@ com/presupuesto/
 ```
 
 `auth` no tiene `entity` ni `repository` porque trabaja con las entidades de `usuario`, y
-`usuario` no tiene `dto/request` porque todavía no recibe datos propios.
+`usuario` no tiene `dto/request` porque todavía no recibe datos propios. `presupuesto` puede
+depender de `usuario` y de `comun`, y `auth` de `presupuesto` (crea el presupuesto inicial al
+registrarse); nunca al revés.
 
 ### Qué va en cada subpaquete
 
@@ -126,7 +136,7 @@ procesador de anotaciones del `pom.xml`.
   `src/main` ni en `src/test`) importa `com.presupuesto.<feature>`. Si una clase de `comun/`
   necesita datos de una feature, los recibe como parámetros simples (ej.
   `JwtService.emitir(Long id, Rol rol)`, no la entidad `Usuario`). Se comprueba desde
-  `backend/src` con `grep -rnE "import com\.presupuesto\.(usuario|auth)" <dir>` para
+  `backend/src` con `grep -rnE "import com\.presupuesto\.(usuario|auth|presupuesto)" <dir>` para
   `<dir>` = `main/java/com/presupuesto/comun` y `test/java/com/presupuesto/comun` (ampliando la
   alternancia con cada feature nueva); debe devolver cero líneas.
 
@@ -177,6 +187,12 @@ Toda entidad JPA extiende `EntidadBase` (`@MappedSuperclass`), que aporta:
 
 Las entidades usan `@Getter @Setter @SuperBuilder @NoArgsConstructor @AllArgsConstructor` de
 Lombok (las subclases de `EntidadBase` también deben usar `@SuperBuilder`, nunca `@Builder`).
+
+Cuando una entidad tiene **campos derivados** de otro (ej. `Presupuesto.nombreNormalizado`, que es
+`nombre` en minúsculas), se bloquea el setter de ambos con `@Setter(AccessLevel.NONE)` y solo se
+cambian mediante un método de la entidad (ej. `Presupuesto.renombrar(...)`), para que nunca
+queden desincronizados. Al crear la entidad, el service rellena ambos con el builder usando el
+mismo helper (ej. `Presupuesto.normalizar(...)`).
 
 ## Excepciones y `ProblemDetail`
 
@@ -288,6 +304,20 @@ representación visible para el usuario.
 - Los controllers obtienen el usuario autenticado con
   `@AuthenticationPrincipal UsuarioAutenticado usuario`, nunca leyendo el token a mano.
 
+## Recursos de negocio cuelgan de un presupuesto
+
+Todo recurso de negocio (cuentas, categorías, transacciones y los que sigan) pertenece a un
+**presupuesto**, que a su vez pertenece a una persona. Por eso:
+
+- Sus URLs son `/api/v1/presupuestos/{presupuestoId}/<recurso>` (ej.
+  `/api/v1/presupuestos/{presupuestoId}/cuentas`), nunca `/api/v1/<recurso>` a secas.
+- **Cada operación** del controller, de lectura o de escritura, valida primero la pertenencia con
+  `PresupuestoService.obtenerDelUsuario(presupuestoId, usuario.id())`, que devuelve el
+  presupuesto o lanza `RecursoNoEncontradoException`. Un presupuesto inexistente o de otra
+  persona responde siempre **404**, nunca 403, para no revelar qué ids existen.
+- Los repositorios de esos recursos consultan siempre acotados por el presupuesto validado, y un
+  recurso de otro presupuesto también responde 404.
+
 ## Variables de entorno
 
 `application.properties` lee la conexión a PostgreSQL y el secreto del JWT vía estas variables
@@ -323,6 +353,12 @@ futuros) debe reutilizar estos mismos nombres de variable, no inventar otros.
 - Toda la configuración de Spring Boot vive en `application.properties` (nunca YAML).
 - Sin Flyway/Liquibase en esta etapa: el esquema lo gestiona Hibernate (`ddl-auto=update`),
   decisión explícita y revisable si el proyecto introduce CI/CD.
+
+## Comandos de Maven
+
+Los comandos de Maven del proyecto usan siempre el wrapper del repositorio: `.\mvnw.cmd` en
+Windows y `./mvnw` en Linux o macOS (desde `backend/`, ej. `.\mvnw.cmd test`). Nunca `mvn`
+directamente, para que todos usen la misma versión de Maven. El build requiere JDK 21.
 
 ## Tests
 

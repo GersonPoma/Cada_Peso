@@ -6,6 +6,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
+import com.presupuesto.presupuesto.entity.Presupuesto;
+import com.presupuesto.presupuesto.repository.PresupuestoRepository;
 import com.presupuesto.usuario.entity.Perfil;
 import com.presupuesto.usuario.repository.PerfilRepository;
 import com.presupuesto.usuario.repository.UsuarioRepository;
@@ -42,6 +44,9 @@ class RegistroAtomicidadTest {
     @MockitoBean
     private PerfilRepository perfilRepository;
 
+    @MockitoBean
+    private PresupuestoRepository presupuestoRepository;
+
     @AfterEach
     void borrarDatosDePrueba() {
         usuarioRepository.findByEmail(EMAIL).ifPresent(usuarioRepository::delete);
@@ -51,6 +56,20 @@ class RegistroAtomicidadTest {
     void siFallaGuardarElPerfilNoQuedaNingunUsuarioConEseEmail() {
         when(perfilRepository.save(any(Perfil.class)))
                 .thenThrow(new IllegalStateException("Fallo simulado al guardar el perfil"));
+        Map<String, Object> datos = RegistroIntegracionTest.datosValidosCon("email", EMAIL);
+
+        assertThatThrownBy(() -> mockMvc.perform(post("/api/v1/auth/registro")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(datos))))
+                .hasRootCauseInstanceOf(IllegalStateException.class);
+
+        assertThat(usuarioRepository.findByEmail(EMAIL)).isEmpty();
+    }
+
+    @Test
+    void siFallaCrearElPresupuestoInicialNoQuedaNingunUsuarioConEseEmail() {
+        when(presupuestoRepository.saveAndFlush(any(Presupuesto.class)))
+                .thenThrow(new IllegalStateException("Fallo simulado al guardar el presupuesto"));
         Map<String, Object> datos = RegistroIntegracionTest.datosValidosCon("email", EMAIL);
 
         assertThatThrownBy(() -> mockMvc.perform(post("/api/v1/auth/registro")
