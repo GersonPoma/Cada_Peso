@@ -1,0 +1,566 @@
+## ADDED Requirements
+
+### Requirement: Autenticación obligatoria
+El sistema SHALL exigir autenticación en todas las rutas de
+`/api/v1/presupuestos/{presupuestoId}/transacciones`.
+
+#### Scenario: Petición sin token
+- **DADO** una petición sin token de acceso
+- **CUANDO** se llama a cualquier ruta de transacciones de un presupuesto
+- **ENTONCES** el sistema responde `401` con código `NO_AUTENTICADO`
+
+### Requirement: Aislamiento por presupuesto y por persona
+El sistema SHALL validar primero, en cada operación, que el presupuesto de la URL pertenece a la
+persona autenticada, y SHALL buscar toda transacción dentro de ese presupuesto. Un presupuesto o
+una transacción inexistente o ajena SHALL responder `404` con código `RECURSO_NO_ENCONTRADO`,
+nunca `403`.
+
+#### Scenario: Presupuesto de otra persona
+- **DADO** una persona B autenticada y un presupuesto de la persona A con una transacción
+- **CUANDO** B crea, lista, consulta, edita, borra, aprueba, cambia el estado, mueve de cuenta,
+  duplica, opera en lote o pide los saldos en el presupuesto de A
+- **ENTONCES** el sistema responde `404` en cada caso y no modifica nada
+
+#### Scenario: Transacción de otra persona
+- **DADO** una transacción del presupuesto de A y una persona B con su propio presupuesto
+- **CUANDO** B la consulta, edita, borra, aprueba, cambia su estado, la mueve o la duplica por
+  la URL de su propio presupuesto
+- **ENTONCES** el sistema responde `404` en cada caso y la transacción no cambia
+
+#### Scenario: Transacción de otro presupuesto de la misma persona
+- **DADO** una persona con dos presupuestos y una transacción en el primero
+- **CUANDO** la consulta, edita, borra, aprueba, cambia su estado, la mueve o la duplica por la
+  URL del segundo presupuesto
+- **ENTONCES** el sistema responde `404` en cada caso
+
+#### Scenario: Presupuesto o transacción inexistente
+- **DADO** un id que no existe
+- **CUANDO** se usa como presupuesto o como transacción en cualquier ruta
+- **ENTONCES** el sistema responde `404` con código `RECURSO_NO_ENCONTRADO`
+
+### Requirement: Crear una transacción
+El sistema SHALL permitir crear una transacción en una cuenta del presupuesto con `cuentaId`,
+`fecha`, `monto` y, opcionalmente, `categoriaId`, `beneficiario`, `memo`, `aprobada` y
+`subtransacciones`, y SHALL responder `201`. El `monto` está en milésimas con signo (entrada
+positiva, salida negativa). El estado inicial SHALL ser `NO_CONCILIADA` y `aprobada` SHALL ser
+`true` si no se indica. Se permiten fechas futuras.
+
+#### Scenario: Creación mínima
+- **DADO** una cuenta abierta del presupuesto
+- **CUANDO** se crea una transacción con `cuentaId`, `fecha` y `monto` `-25000`
+- **ENTONCES** el sistema responde `201` con la transacción, estado `NO_CONCILIADA`, `aprobada`
+  `true`, `categoriaId`, `beneficiario` y `memo` nulos, sin subtransacciones y con
+  `fechaCreacion` y `fechaActualizacion`
+
+#### Scenario: Entrada de dinero
+- **DADO** una cuenta abierta
+- **CUANDO** se crea una transacción con `monto` positivo
+- **ENTONCES** el sistema responde `201` y conserva el signo del monto
+
+#### Scenario: Fecha futura
+- **DADO** una cuenta abierta
+- **CUANDO** se crea una transacción con una fecha posterior a hoy
+- **ENTONCES** el sistema responde `201`
+
+#### Scenario: Aprobada explícitamente en falso
+- **DADO** una cuenta abierta
+- **CUANDO** se crea una transacción con `aprobada` `false`
+- **ENTONCES** el sistema responde `201` con `aprobada` `false`
+
+#### Scenario: Beneficiario y memo normalizados
+- **DADO** un beneficiario `"  Tienda  "` y un memo `"   "`
+- **CUANDO** se crea la transacción
+- **ENTONCES** el beneficiario se guarda como `"Tienda"` y el memo como nulo
+
+#### Scenario: Monto cero
+- **DADO** una petición con `monto` `0`
+- **CUANDO** se crea la transacción
+- **ENTONCES** el sistema responde `400` con código `DATOS_INVALIDOS` y el campo `monto` en
+  `errores`
+
+#### Scenario: Campos obligatorios y longitudes
+- **DADO** una petición sin `fecha`, sin `cuentaId`, sin `monto`, con beneficiario de más de
+  100 caracteres o con memo de más de 500
+- **CUANDO** se crea la transacción
+- **ENTONCES** el sistema responde `400` con código `DATOS_INVALIDOS` y el campo en `errores`
+
+#### Scenario: Fecha imposible o cuerpo ilegible
+- **DADO** una fecha inexistente (`2026-02-31`) o un cuerpo vacío
+- **CUANDO** se crea la transacción
+- **ENTONCES** el sistema responde `400` con código `DATOS_INVALIDOS`
+
+### Requirement: Cuenta y categorías del presupuesto
+La cuenta (`cuentaId`) y toda categoría usada (`categoriaId` o la de cada subtransacción) SHALL
+pertenecer al presupuesto de la URL; si no, el sistema SHALL responder `404`. Una categoría
+oculta SHALL poder usarse.
+
+#### Scenario: Cuenta de otro presupuesto
+- **DADO** una cuenta que pertenece a otro presupuesto
+- **CUANDO** se crea una transacción con ese `cuentaId`
+- **ENTONCES** el sistema responde `404` con código `RECURSO_NO_ENCONTRADO` y no crea nada
+
+#### Scenario: Cuenta inexistente
+- **DADO** un `cuentaId` que no existe
+- **CUANDO** se crea una transacción
+- **ENTONCES** el sistema responde `404`
+
+#### Scenario: Categoría de otro presupuesto
+- **DADO** una categoría de otro presupuesto
+- **CUANDO** se crea o edita una transacción con ese `categoriaId`
+- **ENTONCES** el sistema responde `404` y no modifica nada
+
+#### Scenario: Categoría de otro presupuesto en una subtransacción
+- **DADO** una división donde una subtransacción usa una categoría de otro presupuesto
+- **CUANDO** se crea o edita la transacción
+- **ENTONCES** el sistema responde `404` y no modifica nada
+
+#### Scenario: Categoría oculta permitida
+- **DADO** una categoría oculta del presupuesto
+- **CUANDO** se crea una transacción, o una subtransacción, con esa categoría
+- **ENTONCES** el sistema responde `201` y la transacción queda con esa categoría
+
+### Requirement: Cuenta cerrada
+El sistema SHALL rechazar con `422` y código `REGLA_NEGOCIO_VIOLADA` crear o editar una
+transacción en una cuenta cerrada.
+
+#### Scenario: Crear en cuenta cerrada
+- **DADO** una cuenta cerrada
+- **CUANDO** se crea una transacción en ella
+- **ENTONCES** el sistema responde `422` con código `REGLA_NEGOCIO_VIOLADA` y no crea nada
+
+#### Scenario: Editar en cuenta cerrada
+- **DADO** una transacción existente cuya cuenta se cerró después
+- **CUANDO** se edita
+- **ENTONCES** el sistema responde `422` con código `REGLA_NEGOCIO_VIOLADA` y no cambia nada
+
+### Requirement: División en subtransacciones
+Una transacción SHALL poder dividirse en subtransacciones (`categoriaId` opcional, `monto` con
+signo distinto de 0 y `memo` de hasta 500 caracteres cada una). Si vienen subtransacciones
+SHALL ser entre 2 y 20, la suma de sus montos SHALL ser exactamente el monto de la transacción
+y la transacción no SHALL llevar `categoriaId` propio.
+
+#### Scenario: División correcta
+- **DADO** una transacción de `-30000` con subtransacciones de `-10000` y `-20000`
+- **CUANDO** se crea
+- **ENTONCES** el sistema responde `201` con `categoriaId` nulo y las dos subtransacciones, cada
+  una con `id`, `categoriaId`, `monto` y `memo`
+
+#### Scenario: Suma distinta del monto
+- **DADO** una transacción de `-30000` con subtransacciones que suman `-25000`
+- **CUANDO** se crea o edita
+- **ENTONCES** el sistema responde `422` con código `REGLA_NEGOCIO_VIOLADA` y no cambia nada
+
+#### Scenario: Menos de dos subtransacciones
+- **DADO** una lista con una sola subtransacción
+- **CUANDO** se crea o edita
+- **ENTONCES** el sistema responde `400` con código `DATOS_INVALIDOS`
+
+#### Scenario: Más de veinte subtransacciones
+- **DADO** una lista con 21 subtransacciones
+- **CUANDO** se crea o edita
+- **ENTONCES** el sistema responde `400` con código `DATOS_INVALIDOS`
+
+#### Scenario: Veinte subtransacciones
+- **DADO** una lista de 20 subtransacciones cuya suma es el monto
+- **CUANDO** se crea
+- **ENTONCES** el sistema responde `201`
+
+#### Scenario: Categoría propia junto a subtransacciones
+- **DADO** una petición con `categoriaId` y con subtransacciones
+- **CUANDO** se crea o edita
+- **ENTONCES** el sistema responde `400` con código `DATOS_INVALIDOS`
+
+#### Scenario: Subtransacción con monto cero
+- **DADO** una subtransacción con `monto` `0`
+- **CUANDO** se crea o edita la transacción
+- **ENTONCES** el sistema responde `400` con código `DATOS_INVALIDOS`
+
+#### Scenario: Lista vacía equivale a sin división
+- **DADO** una petición con `subtransacciones` vacía
+- **CUANDO** se crea
+- **ENTONCES** el sistema responde `201` como una transacción sin división
+
+### Requirement: Consultar el detalle
+El sistema SHALL devolver una transacción por su id con `id`, `cuentaId`, `fecha`, `monto`,
+`categoriaId`, `beneficiario`, `memo`, `estado`, `aprobada`, `subtransacciones`,
+`fechaCreacion` y `fechaActualizacion`.
+
+#### Scenario: Detalle existente
+- **DADO** una transacción del presupuesto
+- **CUANDO** se consulta por su id
+- **ENTONCES** el sistema responde `200` con todos esos campos
+
+### Requirement: Listado paginado y filtrado
+El sistema SHALL listar las transacciones del presupuesto paginadas, con `page` (desde 0, por
+defecto 0) y `size` (por defecto 20, entre 1 y 100), ordenadas por fecha descendente y luego
+por id descendente, y SHALL responder con `contenido`, `pagina`, `tamano`, `totalElementos` y
+`totalPaginas`. Un `page` o `size` fuera de rango SHALL responder `400` con código
+`DATOS_INVALIDOS`. SHALL admitir los filtros opcionales y combinables `cuentaId`, `categoriaId`
+(que también coincide con las subtransacciones), `desde` y `hasta` (inclusivos), `estado`,
+`soloSinAprobar` y `q` (sin distinguir mayúsculas en beneficiario y memo, tratando `%` y `_`
+como texto literal).
+
+#### Scenario: Valores por defecto
+- **DADO** 25 transacciones del presupuesto
+- **CUANDO** se lista sin parámetros
+- **ENTONCES** el sistema responde `200` con 20 elementos, `pagina` 0, `tamano` 20,
+  `totalElementos` 25 y `totalPaginas` 2
+
+#### Scenario: Última página
+- **DADO** 25 transacciones
+- **CUANDO** se lista con `page=1&size=20`
+- **ENTONCES** el sistema responde con 5 elementos y `pagina` 1
+
+#### Scenario: Página más allá del final
+- **DADO** 25 transacciones
+- **CUANDO** se lista con `page=5`
+- **ENTONCES** el sistema responde `200` con `contenido` vacío y `totalElementos` 25
+
+#### Scenario: Sin transacciones
+- **DADO** un presupuesto sin transacciones
+- **CUANDO** se lista
+- **ENTONCES** el sistema responde `200` con `contenido` vacío, `totalElementos` 0 y
+  `totalPaginas` 0
+
+#### Scenario: Tamaño fuera de rango
+- **DADO** `size=0`, `size=101` o `page=-1`
+- **CUANDO** se lista
+- **ENTONCES** el sistema responde `400` con código `DATOS_INVALIDOS`
+
+#### Scenario: Tamaño máximo
+- **DADO** `size=100`
+- **CUANDO** se lista
+- **ENTONCES** el sistema responde `200` con `tamano` 100
+
+#### Scenario: Orden
+- **DADO** transacciones con distintas fechas y dos con la misma fecha
+- **CUANDO** se lista
+- **ENTONCES** vienen por fecha descendente y, con la misma fecha, por id descendente
+
+#### Scenario: Filtro por cuenta
+- **DADO** transacciones en dos cuentas
+- **CUANDO** se lista con el `cuentaId` de una de ellas
+- **ENTONCES** solo vienen las de esa cuenta
+
+#### Scenario: Filtro por categoría
+- **DADO** una transacción con la categoría X, otra dividida con una subtransacción en X y otra
+  con la categoría Y
+- **CUANDO** se lista con `categoriaId` X
+- **ENTONCES** vienen la primera y la dividida, y no la de Y
+
+#### Scenario: Filtro por rango de fechas
+- **DADO** transacciones en distintas fechas
+- **CUANDO** se lista con `desde` y `hasta`
+- **ENTONCES** vienen las de fecha entre ambas, incluyendo los extremos
+
+#### Scenario: Solo desde o solo hasta
+- **DADO** transacciones en distintas fechas
+- **CUANDO** se lista con solo `desde`, o con solo `hasta`
+- **ENTONCES** el filtro se aplica solo por ese extremo
+
+#### Scenario: Rango invertido
+- **DADO** `desde` posterior a `hasta`
+- **CUANDO** se lista
+- **ENTONCES** el sistema responde `400` con código `DATOS_INVALIDOS`
+
+#### Scenario: Filtro por estado
+- **DADO** transacciones en distintos estados
+- **CUANDO** se lista con `estado=CONCILIADA`
+- **ENTONCES** solo vienen las conciliadas
+
+#### Scenario: Solo sin aprobar
+- **DADO** transacciones aprobadas y sin aprobar
+- **CUANDO** se lista con `soloSinAprobar=true`
+- **ENTONCES** solo vienen las sin aprobar; con `false` o sin el parámetro vienen todas
+
+#### Scenario: Búsqueda de texto
+- **DADO** una transacción con beneficiario `Supermercado Norte` y otra con memo `compra norte`
+- **CUANDO** se lista con `q=NORTE`
+- **ENTONCES** vienen ambas, sin distinguir mayúsculas
+
+#### Scenario: Comodines como texto literal
+- **DADO** una transacción con memo `100% listo`, otra con memo `a_b` y otras sin `%` ni `_`
+- **CUANDO** se lista con `q=%` o con `q=_`
+- **ENTONCES** solo vienen las que contienen literalmente ese carácter
+
+#### Scenario: Filtros combinados
+- **DADO** transacciones variadas
+- **CUANDO** se lista con cuenta, categoría, rango, estado, sin aprobar y texto a la vez
+- **ENTONCES** vienen solo las que cumplen todos los filtros, y los totales reflejan el
+  resultado filtrado
+
+#### Scenario: Filtro con cuenta o categoría ajena
+- **DADO** un `cuentaId` o `categoriaId` de otro presupuesto
+- **CUANDO** se lista con ese filtro
+- **ENTONCES** el sistema responde `404`
+
+#### Scenario: Aislamiento del listado
+- **DADO** transacciones en dos presupuestos
+- **CUANDO** se lista uno
+- **ENTONCES** solo vienen las de ese presupuesto
+
+### Requirement: Parámetros de consulta inválidos
+Un parámetro de consulta con un tipo inválido (por ejemplo `estado=XYZ`, `desde=ayer` o
+`page=abc`) SHALL responder `400` con código `DATOS_INVALIDOS`, nunca `500`.
+
+#### Scenario: Estado inválido
+- **DADO** `estado=XYZ`
+- **CUANDO** se lista
+- **ENTONCES** el sistema responde `400` con código `DATOS_INVALIDOS`
+
+#### Scenario: Fecha de filtro inválida
+- **DADO** `desde=ayer`
+- **CUANDO** se lista
+- **ENTONCES** el sistema responde `400` con código `DATOS_INVALIDOS`
+
+### Requirement: Editar una transacción
+El sistema SHALL permitir editar `fecha`, `monto`, `categoriaId`, `beneficiario`, `memo` y
+`subtransacciones` (reemplazando las existentes), con las mismas reglas que al crear, y SHALL
+responder `200`. La cuenta, el estado y `aprobada` no SHALL cambiar por esta ruta.
+
+#### Scenario: Edición correcta
+- **DADO** una transacción `NO_CONCILIADA`
+- **CUANDO** se edita con nuevos valores válidos
+- **ENTONCES** el sistema responde `200` con los valores nuevos, la misma cuenta, el mismo
+  estado y `fechaActualizacion` actualizada
+
+#### Scenario: Pasar de simple a dividida y viceversa
+- **DADO** una transacción simple y otra dividida
+- **CUANDO** se edita la primera con subtransacciones y la segunda sin ellas y con categoría
+- **ENTONCES** las subtransacciones se reemplazan o eliminan y la categoría queda según lo
+  enviado
+
+#### Scenario: Reglas de validación al editar
+- **DADO** una edición con monto `0`, con suma de subtransacciones distinta, o con categoría
+  junto a subtransacciones
+- **CUANDO** se edita
+- **ENTONCES** el sistema responde `400` o `422` según corresponda y no cambia nada
+
+### Requirement: Borrar una transacción
+El sistema SHALL borrar una transacción con sus subtransacciones y responder `204`.
+
+#### Scenario: Borrado correcto
+- **DADO** una transacción dividida
+- **CUANDO** se borra
+- **ENTONCES** el sistema responde `204` y deja de existir, con sus subtransacciones
+
+#### Scenario: Borrar dos veces
+- **DADO** una transacción ya borrada
+- **CUANDO** se vuelve a borrar
+- **ENTONCES** el sistema responde `404`
+
+### Requirement: Transacción reconciliada inmutable
+Una transacción `RECONCILIADA` SHALL rechazar con `422` y código `REGLA_NEGOCIO_VIOLADA`
+editarla, moverla de cuenta, borrarla y cambiar su estado.
+
+#### Scenario: Editar una reconciliada
+- **DADO** una transacción `RECONCILIADA`
+- **CUANDO** se edita
+- **ENTONCES** el sistema responde `422` con código `REGLA_NEGOCIO_VIOLADA` y no cambia nada
+
+#### Scenario: Mover una reconciliada
+- **DADO** una transacción `RECONCILIADA`
+- **CUANDO** se mueve a otra cuenta
+- **ENTONCES** el sistema responde `422` con código `REGLA_NEGOCIO_VIOLADA`
+
+#### Scenario: Borrar una reconciliada
+- **DADO** una transacción `RECONCILIADA`
+- **CUANDO** se borra
+- **ENTONCES** el sistema responde `422` con código `REGLA_NEGOCIO_VIOLADA` y sigue existiendo
+
+#### Scenario: Cambiar el estado de una reconciliada
+- **DADO** una transacción `RECONCILIADA`
+- **CUANDO** se intenta pasar a `NO_CONCILIADA` o a `CONCILIADA`
+- **ENTONCES** el sistema responde `422` con código `REGLA_NEGOCIO_VIOLADA`
+
+### Requirement: Aprobar una transacción
+El sistema SHALL marcar una transacción como aprobada, de forma idempotente, y responder `200`.
+
+#### Scenario: Aprobar una sin aprobar
+- **DADO** una transacción con `aprobada` `false`
+- **CUANDO** se aprueba
+- **ENTONCES** el sistema responde `200` con `aprobada` `true`
+
+#### Scenario: Aprobar es idempotente
+- **DADO** una transacción ya aprobada
+- **CUANDO** se aprueba otra vez
+- **ENTONCES** el sistema responde `200` con `aprobada` `true`
+
+### Requirement: Cambiar el estado manualmente
+El sistema SHALL permitir `PUT /{id}/estado` con `{ estado }` solo entre `NO_CONCILIADA` y
+`CONCILIADA`, y responder `200`. Pasar a `RECONCILIADA` por la API SHALL responder `422`.
+
+#### Scenario: Conciliar y desconciliar
+- **DADO** una transacción `NO_CONCILIADA`
+- **CUANDO** se pone `CONCILIADA` y luego `NO_CONCILIADA`
+- **ENTONCES** el sistema responde `200` con cada estado
+
+#### Scenario: Mismo estado
+- **DADO** una transacción `CONCILIADA`
+- **CUANDO** se pone `CONCILIADA`
+- **ENTONCES** el sistema responde `200` sin cambios
+
+#### Scenario: Pasar a reconciliada
+- **DADO** una transacción no reconciliada
+- **CUANDO** se pone `RECONCILIADA`
+- **ENTONCES** el sistema responde `422` con código `REGLA_NEGOCIO_VIOLADA` y no cambia nada
+
+#### Scenario: Estado ausente o inválido
+- **DADO** un cuerpo sin `estado` o con un valor desconocido
+- **CUANDO** se cambia el estado
+- **ENTONCES** el sistema responde `400` con código `DATOS_INVALIDOS`
+
+### Requirement: Mover una transacción de cuenta
+El sistema SHALL mover una transacción a otra cuenta del mismo presupuesto con
+`POST /{id}/mover-cuenta` y `{ cuentaId }`, siempre que la cuenta destino esté abierta, y
+responder `200`.
+
+#### Scenario: Movimiento correcto
+- **DADO** una transacción y otra cuenta abierta del mismo presupuesto
+- **CUANDO** se mueve
+- **ENTONCES** el sistema responde `200` con el nuevo `cuentaId` y los saldos reflejan el cambio
+
+#### Scenario: Cuenta destino de otro presupuesto
+- **DADO** una cuenta de otro presupuesto
+- **CUANDO** se mueve la transacción a ella
+- **ENTONCES** el sistema responde `404` y la transacción no cambia
+
+#### Scenario: Cuenta destino cerrada
+- **DADO** una cuenta destino cerrada
+- **CUANDO** se mueve la transacción a ella
+- **ENTONCES** el sistema responde `422` con código `REGLA_NEGOCIO_VIOLADA`
+
+#### Scenario: Mover desde una cuenta cerrada
+- **DADO** una transacción en una cuenta cerrada y una cuenta destino abierta
+- **CUANDO** se mueve
+- **ENTONCES** el sistema responde `200` (mover la saca de la cuenta cerrada)
+
+#### Scenario: Mover a la misma cuenta
+- **DADO** una transacción en una cuenta abierta
+- **CUANDO** se mueve a esa misma cuenta
+- **ENTONCES** el sistema responde `200` sin cambios
+
+#### Scenario: Cuenta ausente
+- **DADO** un cuerpo sin `cuentaId`
+- **CUANDO** se mueve
+- **ENTONCES** el sistema responde `400` con código `DATOS_INVALIDOS`
+
+### Requirement: Duplicar una transacción
+El sistema SHALL duplicar una transacción con `POST /{id}/duplicar` y responder `201` con una
+copia con la fecha de hoy, estado `NO_CONCILIADA`, `aprobada` `true`, y con copia de sus
+subtransacciones. Cuenta, monto, categoría, beneficiario y memo SHALL mantenerse.
+
+#### Scenario: Duplicado simple
+- **DADO** una transacción `CONCILIADA` y no aprobada de hace un mes
+- **CUANDO** se duplica
+- **ENTONCES** el sistema responde `201` con un id nuevo, la fecha de hoy, estado
+  `NO_CONCILIADA`, `aprobada` `true` y los demás campos iguales; la original no cambia
+
+#### Scenario: Duplicado de una dividida
+- **DADO** una transacción con subtransacciones
+- **CUANDO** se duplica
+- **ENTONCES** la copia tiene sus propias subtransacciones con ids nuevos y los mismos datos
+
+#### Scenario: Duplicar una reconciliada
+- **DADO** una transacción `RECONCILIADA`
+- **CUANDO** se duplica
+- **ENTONCES** el sistema responde `201` con la copia `NO_CONCILIADA`
+
+#### Scenario: Duplicar en cuenta cerrada
+- **DADO** una transacción en una cuenta cerrada
+- **CUANDO** se duplica
+- **ENTONCES** el sistema responde `422` con código `REGLA_NEGOCIO_VIOLADA`
+
+### Requirement: Operaciones en lote
+El sistema SHALL ofrecer `POST /lote` con `{ ids, operacion }`, donde `operacion` es
+`CATEGORIZAR` (con `categoriaId`), `APROBAR` o `BORRAR`, y responder `200` con la cantidad
+afectada. SHALL aceptar entre 1 y 100 ids y SHALL ser atómica: si falla alguna validación no
+se aplica nada.
+
+#### Scenario: Categorizar
+- **DADO** varias transacciones simples del presupuesto y una categoría del presupuesto
+- **CUANDO** se envía `CATEGORIZAR` con esa categoría
+- **ENTONCES** el sistema responde `200` con la cantidad y todas quedan con esa categoría
+
+#### Scenario: Categorizar sin categoría
+- **DADO** una operación `CATEGORIZAR` sin `categoriaId`
+- **CUANDO** se envía
+- **ENTONCES** el sistema responde `400` con código `DATOS_INVALIDOS`
+
+#### Scenario: Categorizar con categoría ajena
+- **DADO** una categoría de otro presupuesto
+- **CUANDO** se envía `CATEGORIZAR` con ella
+- **ENTONCES** el sistema responde `404` y no cambia nada
+
+#### Scenario: Categorizar una dividida
+- **DADO** entre los ids una transacción con subtransacciones
+- **CUANDO** se envía `CATEGORIZAR`
+- **ENTONCES** el sistema responde `422` con código `REGLA_NEGOCIO_VIOLADA` y no cambia ninguna
+
+#### Scenario: Aprobar en lote
+- **DADO** varias transacciones sin aprobar, algunas ya aprobadas
+- **CUANDO** se envía `APROBAR`
+- **ENTONCES** el sistema responde `200` con la cantidad de ids y todas quedan aprobadas
+
+#### Scenario: Borrar en lote
+- **DADO** varias transacciones del presupuesto
+- **CUANDO** se envía `BORRAR`
+- **ENTONCES** el sistema responde `200` con la cantidad y dejan de existir
+
+#### Scenario: Un id ajeno o inexistente
+- **DADO** entre los ids uno de otro presupuesto, de otra persona o inexistente
+- **CUANDO** se envía cualquier operación
+- **ENTONCES** el sistema responde `404` y no se aplica nada a los demás
+
+#### Scenario: Una reconciliada en el lote
+- **DADO** entre los ids una transacción `RECONCILIADA`
+- **CUANDO** se envía `CATEGORIZAR` o `BORRAR`
+- **ENTONCES** el sistema responde `422` con código `REGLA_NEGOCIO_VIOLADA` y no se aplica nada
+
+#### Scenario: Aprobar en lote con reconciliadas
+- **DADO** entre los ids una transacción `RECONCILIADA` sin aprobar, igual que el aprobar
+  individual
+- **CUANDO** se envía `APROBAR`
+- **ENTONCES** el sistema responde `200`, cuenta también la reconciliada y todas quedan aprobadas
+
+#### Scenario: Ids repetidos
+- **DADO** un mismo id repetido en `ids`
+- **CUANDO** se envía una operación
+- **ENTONCES** el sistema lo cuenta una sola vez
+
+#### Scenario: Cantidad de ids u operación fuera de rango
+- **DADO** una lista vacía, una con más de 100 ids, o una `operacion` ausente o desconocida
+- **CUANDO** se envía
+- **ENTONCES** el sistema responde `400` con código `DATOS_INVALIDOS`
+
+### Requirement: Saldos por cuenta
+El sistema SHALL responder `GET /saldos` con, por cada cuenta del presupuesto (abiertas y
+cerradas), `cuentaId`, `saldo` (saldo inicial más la suma de todas sus transacciones) y
+`saldoConciliado` (saldo inicial más la suma de las `CONCILIADA` y `RECONCILIADA`), en
+milésimas.
+
+#### Scenario: Cuenta sin transacciones
+- **DADO** una cuenta con saldo inicial `100000` y sin transacciones
+- **CUANDO** se piden los saldos
+- **ENTONCES** su `saldo` y su `saldoConciliado` son `100000`
+
+#### Scenario: Cuenta con transacciones
+- **DADO** una cuenta con saldo inicial `100000`, una `NO_CONCILIADA` de `-20000`, una
+  `CONCILIADA` de `-10000` y una `RECONCILIADA` de `5000`
+- **CUANDO** se piden los saldos
+- **ENTONCES** `saldo` es `75000` y `saldoConciliado` es `95000`
+
+#### Scenario: Cuenta cerrada
+- **DADO** una cuenta cerrada con transacciones
+- **CUANDO** se piden los saldos
+- **ENTONCES** aparece con sus saldos calculados
+
+#### Scenario: Sin cuentas
+- **DADO** un presupuesto sin cuentas
+- **CUANDO** se piden los saldos
+- **ENTONCES** el sistema responde `200` con una lista vacía
+
+#### Scenario: Aislamiento de saldos
+- **DADO** transacciones en cuentas de otro presupuesto
+- **CUANDO** se piden los saldos de este presupuesto
+- **ENTONCES** solo cuentan las transacciones de las cuentas de este presupuesto

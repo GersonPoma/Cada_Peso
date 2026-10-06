@@ -10,12 +10,14 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class ManejadorGlobalExcepciones {
 
     static final String MENSAJE_CAMPOS_INVALIDOS = "Uno o más campos no son válidos";
     static final String MENSAJE_CUERPO_ILEGIBLE = "El cuerpo de la petición no es válido";
+    static final String MENSAJE_PARAMETRO_INVALIDO = "Un parámetro de la petición no es válido";
 
     @ExceptionHandler(RecursoNoEncontradoException.class)
     public ProblemDetail manejarRecursoNoEncontrado(RecursoNoEncontradoException excepcion) {
@@ -64,6 +66,16 @@ public class ManejadorGlobalExcepciones {
     public ProblemDetail manejarCuerpoIlegible(HttpMessageNotReadableException excepcion) {
         return construirProblemDetail(
                 HttpStatus.BAD_REQUEST, CodigoError.DATOS_INVALIDOS, MENSAJE_CUERPO_ILEGIBLE);
+    }
+
+    /**
+     * Parámetro de ruta o de consulta con un tipo inválido (enum desconocido, fecha imposible,
+     * texto donde va un número). Mensaje fijo: no se expone el valor recibido ni la causa.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ProblemDetail manejarParametroInvalido(MethodArgumentTypeMismatchException excepcion) {
+        return construirProblemDetail(
+                HttpStatus.BAD_REQUEST, CodigoError.DATOS_INVALIDOS, MENSAJE_PARAMETRO_INVALIDO);
     }
 
     private Map<String, String> extraerErroresPorCampo(MethodArgumentNotValidException excepcion) {

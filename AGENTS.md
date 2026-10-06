@@ -63,6 +63,7 @@ com/presupuesto/
 │   ├── EntidadBase.java
 │   ├── config/
 │   ├── excepcion/
+│   ├── paginacion/
 │   ├── seguridad/
 │   └── validacion/
 ├── auth/
@@ -96,6 +97,15 @@ com/presupuesto/
 │   ├── evento/
 │   ├── repository/
 │   └── service/
+├── transaccion/
+│   ├── controller/
+│   ├── dto/
+│   │   ├── request/
+│   │   └── response/
+│   ├── entity/
+│   ├── repository/
+│   ├── service/
+│   └── validacion/
 └── usuario/
     ├── controller/
     ├── dto/
@@ -109,8 +119,9 @@ com/presupuesto/
 `auth` no tiene `entity` ni `repository` porque trabaja con las entidades de `usuario`, y
 `usuario` no tiene `dto/request` porque todavía no recibe datos propios. `presupuesto` puede
 depender de `usuario` y de `comun`, y `auth` de `presupuesto` (crea el presupuesto inicial al
-registrarse); `cuenta` y `categoria` pueden depender de `presupuesto` y de `comun`; nunca al
-revés (`presupuesto` y `cuenta` no importan `categoria`).
+registrarse); `cuenta` y `categoria` pueden depender de `presupuesto` y de `comun`;
+`transaccion` puede depender de `presupuesto`, `cuenta`, `categoria` y `comun`; nunca al revés
+(`presupuesto` y `cuenta` no importan `categoria`, y ninguna de ellas importa `transaccion`).
 
 **Comunicación entre features: eventos.** Cuando una feature debe avisar a otra sin importarla
 (la dependencia iría al revés), publica un evento de Spring y la otra lo escucha. Hoy
@@ -166,7 +177,7 @@ procesador de anotaciones del `pom.xml`.
   `src/main` ni en `src/test`) importa `com.presupuesto.<feature>`. Si una clase de `comun/`
   necesita datos de una feature, los recibe como parámetros simples (ej.
   `JwtService.emitir(Long id, Rol rol)`, no la entidad `Usuario`). Se comprueba desde
-  `backend/src` con `grep -rnE "import com\.presupuesto\.(usuario|auth|presupuesto|cuenta|categoria)" <dir>` para
+  `backend/src` con `grep -rnE "import com\.presupuesto\.(usuario|auth|presupuesto|cuenta|categoria|transaccion)" <dir>` para
   `<dir>` = `main/java/com/presupuesto/comun` y `test/java/com/presupuesto/comun` (ampliando la
   alternancia con cada feature nueva); debe devolver cero líneas.
 
@@ -197,6 +208,8 @@ de varios tipos que funcionan juntas. No se divide en `controller`/`service`/`dt
 - `comun/EntidadBase`: superclase común de todas las entidades JPA (en la raíz de `comun/`).
 - `comun/config`: configuración transversal (bean `Clock` en `RelojConfig`, futuros CORS, etc.).
 - `comun/excepcion`: jerarquía de excepciones, `CodigoError`, `ManejadorGlobalExcepciones`.
+- `comun/paginacion`: `PaginaResponse<T>`, el record de respuesta de toda lista paginada (ver
+  "Paginación").
 - `comun/seguridad`: `SecurityConfig`, `FiltroAutenticacionJwt`, `JwtService`,
   `JwtProperties`, `UsuarioAutenticado`, `TokenEmitido`, `Rol` y los
   `AuthenticationEntryPoint`/`AccessDeniedHandler` personalizados. `Rol` es **solo** el rol de
@@ -204,6 +217,20 @@ de varios tipos que funcionan juntas. No se divide en `controller`/`service`/`dt
   dominio de una feature van en el `entity` de esa feature.
 - `comun/validacion`: anotaciones de Bean Validation genéricas, sin lógica de negocio
   (`@MaximoBytesUtf8`, `@MonedaValida`) y sus validadores.
+
+## Paginación
+
+Se paginan las listas que pueden crecer sin límite (hoy, las transacciones de un presupuesto);
+las acotadas por naturaleza (cuentas, árbol de categorías, saldos) devuelven la lista completa.
+
+- Parámetros de consulta `page` (desde 0, por defecto 0) y `size` (por defecto 20, entre 1 y
+  100). Un valor fuera de rango responde 400 `DATOS_INVALIDOS` (`DatosInvalidosException` del
+  service); un valor que no es número lo cubre el manejador de parámetros inválidos.
+- El orden de la lista es siempre explícito y determinista (ej. fecha descendente y luego id
+  descendente), nunca el del motor de base de datos.
+- La respuesta es `PaginaResponse<T>` (`comun/paginacion`): `contenido`, `pagina`, `tamano`,
+  `totalElementos` y `totalPaginas`, construida con `PaginaResponse.desde(page, mapeo)`. La API
+  **nunca devuelve un `Page` de Spring**: expondría su estructura interna.
 
 ## `EntidadBase` y convenciones de Lombok
 
@@ -251,6 +278,9 @@ Las respuestas de error de la API siguen **RFC 9457** (`ProblemDetail`) de forma
 - El 400 por cuerpo ilegible usa siempre el mensaje fijo "El cuerpo de la petición no es
   válido" y **nunca** expone el mensaje ni la causa de la excepción: el de Jackson incluye
   clases internas, posiciones y fragmentos del cuerpo recibido.
+- Un parámetro de ruta o de consulta con tipo inválido (`MethodArgumentTypeMismatchException`,
+  ej. `estado=XYZ` o `desde=ayer`) responde 400 `DATOS_INVALIDOS` con el mensaje fijo "Un
+  parámetro de la petición no es válido", sin `errores` y sin exponer el valor recibido.
 - Un 401 que decide un controller o service (ej. login con credenciales incorrectas) se lanza
   como `NoAutenticadoException` y lo emite el `@RestControllerAdvice`. El 401 `NO_AUTENTICADO` de
   una petición sin token válido a una ruta protegida lo sigue emitiendo el

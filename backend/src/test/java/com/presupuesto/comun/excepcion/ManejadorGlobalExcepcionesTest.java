@@ -125,4 +125,26 @@ class ManejadorGlobalExcepcionesTest {
                 .doesNotContainIgnoringCase("line")
                 .doesNotContainIgnoringCase("column");
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "/prueba/parametro-numero?valor=abc",
+        "/prueba/parametro-enum?color=VERDE",
+        "/prueba/parametro-fecha?fecha=ayer"
+    })
+    @WithMockUser
+    void parametroConTipoInvalidoDevuelve400DatosInvalidosSinExponerElValor(String ruta)
+            throws Exception {
+        String respuesta = mockMvc.perform(get(ruta))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.codigo").value("DATOS_INVALIDOS"))
+                .andExpect(
+                        jsonPath("$.detail").value("Un parámetro de la petición no es válido"))
+                .andExpect(jsonPath("$.errores").doesNotExist())
+                .andReturn()
+                .getResponse()
+                .getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(respuesta).doesNotContain("abc").doesNotContain("VERDE").doesNotContain("ayer");
+    }
 }

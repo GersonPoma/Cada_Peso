@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -44,6 +45,17 @@ class ControladorDePrueba {
         throw new NoAutenticadoException(
                 CodigoError.CREDENCIALES_INVALIDAS, "Credenciales de prueba incorrectas");
     }
+
+    enum ColorDePrueba { ROJO, AZUL }
+
+    @GetMapping("/prueba/parametro-numero")
+    void recibirNumero(@RequestParam Long valor) {}
+
+    @GetMapping("/prueba/parametro-enum")
+    void recibirEnum(@RequestParam ColorDePrueba color) {}
+
+    @GetMapping("/prueba/parametro-fecha")
+    void recibirFecha(@RequestParam LocalDate fecha) {}
 
     @PostMapping("/prueba/validacion")
     void validar(@Valid @RequestBody DatosDePrueba datos) {}
