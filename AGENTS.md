@@ -70,6 +70,14 @@ com/presupuesto/
 │   │   ├── request/
 │   │   └── response/
 │   └── service/
+├── cuenta/
+│   ├── controller/
+│   ├── dto/
+│   │   ├── request/
+│   │   └── response/
+│   ├── entity/
+│   ├── repository/
+│   └── service/
 ├── presupuesto/
 │   ├── controller/
 │   ├── dto/
@@ -91,7 +99,7 @@ com/presupuesto/
 `auth` no tiene `entity` ni `repository` porque trabaja con las entidades de `usuario`, y
 `usuario` no tiene `dto/request` porque todavía no recibe datos propios. `presupuesto` puede
 depender de `usuario` y de `comun`, y `auth` de `presupuesto` (crea el presupuesto inicial al
-registrarse); nunca al revés.
+registrarse); `cuenta` puede depender de `presupuesto` y de `comun`; nunca al revés.
 
 ### Qué va en cada subpaquete
 
@@ -136,7 +144,7 @@ procesador de anotaciones del `pom.xml`.
   `src/main` ni en `src/test`) importa `com.presupuesto.<feature>`. Si una clase de `comun/`
   necesita datos de una feature, los recibe como parámetros simples (ej.
   `JwtService.emitir(Long id, Rol rol)`, no la entidad `Usuario`). Se comprueba desde
-  `backend/src` con `grep -rnE "import com\.presupuesto\.(usuario|auth|presupuesto)" <dir>` para
+  `backend/src` con `grep -rnE "import com\.presupuesto\.(usuario|auth|presupuesto|cuenta)" <dir>` para
   `<dir>` = `main/java/com/presupuesto/comun` y `test/java/com/presupuesto/comun` (ampliando la
   alternancia con cada feature nueva); debe devolver cero líneas.
 
