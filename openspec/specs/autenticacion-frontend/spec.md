@@ -209,15 +209,15 @@ cuerpo reconocible o un error de red SHALL mostrar un aviso genérico en un `Mat
 - **ENTONCES** se muestra el aviso genérico
 
 ### Requirement: Página de inicio protegida
-El sistema SHALL mostrar la página de inicio como sección por defecto de
-`/presupuestos/:presupuestoId`, con el saludo `Hola, {nombre}` y el nombre que devuelve
-`GET /api/v1/usuarios/yo`. La página de inicio SHALL NOT tener botón propio de cerrar sesión: el
-botón `Cerrar sesión` vive en la cabecera de la pantalla del presupuesto, borra la sesión y lleva
-a `/login`.
+El sistema SHALL mostrar la página de inicio en `/presupuestos/:presupuestoId/inicio`, con el
+saludo `Hola, {nombre}` y el nombre que devuelve `GET /api/v1/usuarios/yo`, y SHALL ofrecerla en
+el menú lateral con el enlace `Inicio`. La página de inicio SHALL NOT tener botón propio de cerrar
+sesión: el botón `Cerrar sesión` vive en la cabecera de la pantalla del presupuesto, borra la
+sesión y lleva a `/login`.
 
 #### Scenario: Saludo
 - **DADO** una sesión vigente, un presupuesto con id `3` y la API respondiendo el nombre `Ana`
-- **CUANDO** la persona entra a `/presupuestos/3`
+- **CUANDO** la persona entra a `/presupuestos/3/inicio`
 - **ENTONCES** ve `Hola, Ana`
 
 #### Scenario: Mientras carga
