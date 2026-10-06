@@ -1,0 +1,85 @@
+<div class="layout">
+  <app-cabecera>
+    <div class="acciones">
+      @if (estrecha()) {
+        <button mat-icon-button type="button" aria-label="Abrir menú" (click)="menu.toggle()">
+          <mat-icon>menu</mat-icon>
+        </button>
+      }
+      @if (estado() === 'listo') {
+        <mat-form-field class="selector" appearance="outline" subscriptSizing="dynamic">
+          <mat-select
+            aria-label="Presupuesto"
+            [value]="presupuestoDeUrl()?.id"
+            (selectionChange)="cambiarPresupuesto($event.value)"
+          >
+            @for (presupuesto of presupuestos(); track presupuesto.id) {
+              <mat-option [value]="presupuesto.id">{{ presupuesto.nombre }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      }
+      <button
+        mat-icon-button
+        type="button"
+        aria-label="Gestionar presupuestos"
+        [matMenuTriggerFor]="gestion"
+      >
+        <mat-icon>settings</mat-icon>
+      </button>
+      <mat-menu #gestion="matMenu">
+        <button mat-menu-item type="button" (click)="crear()">
+          <mat-icon>add</mat-icon>
+          <span>Nuevo presupuesto</span>
+        </button>
+        <button mat-menu-item type="button" [disabled]="!presupuestoDeUrl()" (click)="renombrar()">
+          <mat-icon>edit</mat-icon>
+          <span>Renombrar presupuesto</span>
+        </button>
+      </mat-menu>
+      <button mat-button type="button" (click)="cerrarSesion()">Cerrar sesión</button>
+    </div>
+  </app-cabecera>
+
+  <mat-sidenav-container class="contenedor">
+    <mat-sidenav #menu class="menu" [mode]="estrecha() ? 'over' : 'side'" [opened]="!estrecha()">
+      <mat-nav-list>
+        @for (enlace of secciones; track enlace.ruta) {
+          <a
+            mat-list-item
+            [routerLink]="enlace.ruta"
+            routerLinkActive
+            #enlaceActivo="routerLinkActive"
+            [routerLinkActiveOptions]="{ exact: enlace.ruta === '' }"
+            [activated]="enlaceActivo.isActive"
+            (click)="alElegirSeccion(menu)"
+          >
+            <mat-icon matListItemIcon>{{ enlace.seccion.icono }}</mat-icon>
+            <span matListItemTitle>{{ enlace.seccion.etiqueta }}</span>
+          </a>
+        }
+      </mat-nav-list>
+    </mat-sidenav>
+
+    <mat-sidenav-content>
+      @switch (estado()) {
+        @case ('cargando') {
+          <div class="centrado">
+            <mat-progress-spinner mode="indeterminate" diameter="48" aria-label="Cargando" />
+          </div>
+        }
+        @case ('error') {
+          <div class="centrado">
+            <p class="error" role="alert">No pudimos cargar tus presupuestos.</p>
+            <button mat-stroked-button type="button" (click)="cargar()">Reintentar</button>
+          </div>
+        }
+        @case ('listo') {
+          @if (contenidoListo()) {
+            <router-outlet />
+          }
+        }
+      }
+    </mat-sidenav-content>
+  </mat-sidenav-container>
+</div>

@@ -1,0 +1,35 @@
+<h2 mat-dialog-title>{{ esCrear ? 'Nuevo presupuesto' : 'Renombrar presupuesto' }}</h2>
+<form [formGroup]="formulario" (ngSubmit)="enviar()" novalidate>
+  <mat-dialog-content class="contenido">
+    <mat-form-field appearance="outline">
+      <mat-label>Nombre</mat-label>
+      <input matInput type="text" autocomplete="off" formControlName="nombre" />
+      @if (mensajeNombre(); as texto) {
+        <mat-error>{{ texto }}</mat-error>
+      }
+    </mat-form-field>
+
+    @if (esCrear) {
+      <mat-form-field appearance="outline">
+        <mat-label>Moneda</mat-label>
+        <mat-select formControlName="moneda">
+          <mat-option [value]="monedaDelPerfil">Moneda de mi perfil</mat-option>
+          @for (moneda of monedas; track moneda) {
+            <mat-option [value]="moneda">{{ moneda }}</mat-option>
+          }
+        </mat-select>
+        @if (mensajeMoneda(); as texto) {
+          <mat-error>{{ texto }}</mat-error>
+        }
+      </mat-form-field>
+    }
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" [mat-dialog-close]="undefined" [disabled]="enviando()">
+      Cancelar
+    </button>
+    <button mat-flat-button type="submit" [disabled]="formulario.invalid || enviando()">
+      {{ esCrear ? 'Crear' : 'Guardar' }}
+    </button>
+  </mat-dialog-actions>
+</form>

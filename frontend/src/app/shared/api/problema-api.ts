@@ -6,6 +6,7 @@ export const CODIGOS_API = {
   CREDENCIALES_INVALIDAS: 'CREDENCIALES_INVALIDAS',
   EMAIL_YA_REGISTRADO: 'EMAIL_YA_REGISTRADO',
   NO_AUTENTICADO: 'NO_AUTENTICADO',
+  PRESUPUESTO_YA_EXISTE: 'PRESUPUESTO_YA_EXISTE',
 } as const;
 
 /** Aviso para cualquier error que el frontend no sabe mostrar de otra forma. */

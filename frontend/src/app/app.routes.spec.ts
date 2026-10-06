@@ -28,7 +28,7 @@ describe('rutas', () => {
   describe('sin sesión', () => {
     beforeEach(() => iniciar(false));
 
-    it.each(['/', '/ruta-desconocida'])('%s termina en /login', async (ruta) => {
+    it.each(['/', '/ruta-desconocida', '/presupuestos/3'])('%s termina en /login', async (ruta) => {
       await harness.navigateByUrl(ruta);
 
       expect(url()).toBe('/login');
@@ -46,27 +46,47 @@ describe('rutas', () => {
   });
 
   describe('con sesión', () => {
+    const PRESUPUESTOS = [
+      {
+        id: 3,
+        nombre: 'Casa',
+        moneda: 'BOB',
+        fechaCreacion: '2026-10-06T12:00:00Z',
+        fechaActualizacion: '2026-10-06T12:00:00Z',
+      },
+    ];
+
     beforeEach(() => iniciar(true));
 
-    it('/ muestra la página de inicio con la cabecera', async () => {
-      await harness.navigateByUrl('/');
-      const peticion = TestBed.inject(HttpTestingController).expectOne('/api/v1/usuarios/yo');
-      expect(peticion.request.headers.get('Authorization')).toBe('Bearer abc');
-      peticion.flush({ nombre: 'Ana' });
+    /** Responde la redirección, la lista del layout y el usuario de la página de inicio. */
+    async function responderHastaInicio(): Promise<void> {
+      const backend = TestBed.inject(HttpTestingController);
+      const redireccion = backend.expectOne('/api/v1/presupuestos');
+      expect(redireccion.request.headers.get('Authorization')).toBe('Bearer abc');
+      redireccion.flush(PRESUPUESTOS);
       await harness.fixture.whenStable();
+      backend.expectOne('/api/v1/presupuestos').flush(PRESUPUESTOS);
+      await harness.fixture.whenStable();
+      backend.expectOne('/api/v1/usuarios/yo').flush({ nombre: 'Ana' });
+      await harness.fixture.whenStable();
+      backend.verify();
+    }
 
-      expect(url()).toBe('/');
-      expect(texto()).toContain('Cada Peso');
+    it('/ lleva al primer presupuesto, con la cabecera una vez y el saludo', async () => {
+      await harness.navigateByUrl('/');
+      await responderHastaInicio();
+
+      expect(url()).toBe('/presupuestos/3');
+      expect(texto().match(/Cada Peso/g)).toHaveLength(1);
       expect(texto()).toContain('Hola, Ana');
+      expect(texto()).toContain('Cerrar sesión');
     });
 
-    it.each(['/login', '/registro'])('%s termina en /', async (ruta) => {
+    it.each(['/login', '/registro'])('%s termina en /presupuestos/3', async (ruta) => {
       await harness.navigateByUrl(ruta);
-      TestBed.inject(HttpTestingController)
-        .expectOne('/api/v1/usuarios/yo')
-        .flush({ nombre: 'Ana' });
+      await responderHastaInicio();
 
-      expect(url()).toBe('/');
+      expect(url()).toBe('/presupuestos/3');
     });
   });
 });

@@ -475,6 +475,7 @@ src/app/
 │   ├── api-base-url.ts
 │   ├── auth/
 │   ├── material/
+│   ├── presupuesto-activo/
 │   └── sesion/
 ├── shared/
 │   ├── api/
@@ -493,6 +494,11 @@ src/app/
     │   ├── models/
     │   ├── pages/
     │   └── services/
+    ├── presupuestos/
+    │   ├── components/
+    │   ├── models/
+    │   ├── pages/
+    │   └── services/
     └── <feature>/
         ├── pages/
         ├── components/
@@ -502,7 +508,8 @@ src/app/
 
 - `core/`: servicios singleton, interceptores y configuración transversal del frontend (hoy,
   la URL base de la API, `auth/` con el interceptor y los guards, `sesion/` con el servicio de
-  sesión y `material/`, la configuración global de Angular Material).
+  sesión, `presupuesto-activo/` con el presupuesto en el que se trabaja y `material/`, la
+  configuración global de Angular Material).
 - `shared/`: componentes, pipes, directivas y utilidades reutilizables entre features (hoy,
   `formato/` con los pipes de monto y fecha, `fecha/` con `aFechaNegocio()`, `api/` con la lectura
   de errores del API, `cabecera/`, `formulario/` con los mensajes de error y `validacion/` con los
@@ -526,6 +533,20 @@ La URL base de la API en `environments` es siempre **relativa** (`/api/v1`), nun
 proxy de desarrollo de Angular (`proxy.conf.json`, referenciado en
 `angular.json` → `architect.serve.options.proxyConfig`) reenvía `/api` → `http://localhost:8080`
 como same-origin, evitando configurar CORS en el backend.
+
+## Presupuesto activo y navegación del frontend
+
+- `/` (`RedireccionPresupuestoPage`) lleva al primer presupuesto de la persona, o le ofrece crear
+  el primero. Cada presupuesto vive en `/presupuestos/:presupuestoId`
+  (`LayoutPresupuestoPage`): cabecera con el selector de presupuesto, menú lateral y un
+  `router-outlet` para las secciones. Un id que no está en la lista de la persona vuelve a `/`.
+- Las features obtienen el presupuesto actual (`id`, `nombre`, `moneda`) **solo** de
+  `PresupuestoActivoService` (`core/presupuesto-activo/`), nunca de `features/presupuestos` ni de
+  otra feature. El layout lo fija según la URL antes de pintar cualquier sección, y
+  `SesionService.cerrar()` lo vacía.
+- Cada feature con pantallas dentro de un presupuesto agrega su ruta como hija de
+  `presupuestos/:presupuestoId` en `app.routes.ts`, con `data: seccion('<Etiqueta>', '<icono>')`
+  (`loadComponent`, no `loadChildren`); el menú lateral se arma solo a partir de esas rutas.
 
 ## Sesión y autenticación del frontend
 

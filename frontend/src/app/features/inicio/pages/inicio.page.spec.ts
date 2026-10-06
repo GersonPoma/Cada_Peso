@@ -5,7 +5,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router, provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { proveerMaterial } from '../../../core/material/proveer-material';
-import { CLAVE_SESION, SesionService } from '../../../core/sesion/sesion.service';
+import { SesionService } from '../../../core/sesion/sesion.service';
 import { MENSAJE_ERROR_GENERICO } from '../../../shared/api/problema-api';
 import { InicioPage } from './inicio.page';
 
@@ -58,17 +58,15 @@ describe('InicioPage', () => {
     expect(fixture.nativeElement.querySelector('mat-progress-spinner')).toBeNull();
   });
 
-  it('Cerrar sesión, dentro de la cabecera, borra la sesión y navega a /login', async () => {
+  it('no tiene cabecera propia ni botón de cerrar sesión', async () => {
     backend.expectOne(URL_USUARIO).flush({ nombre: 'Ana' });
     await fixture.whenStable();
 
-    const boton = fixture.nativeElement.querySelector('app-cabecera button') as HTMLButtonElement;
-    expect(boton.textContent?.trim()).toBe('Cerrar sesión');
-    boton.click();
-
-    expect(localStorage.getItem(CLAVE_SESION)).toBeNull();
-    expect(TestBed.inject(SesionService).haySesion()).toBe(false);
-    expect(navegar).toHaveBeenCalledWith('/login');
+    const elemento = fixture.nativeElement as HTMLElement;
+    expect(elemento.querySelector('app-cabecera')).toBeNull();
+    expect(elemento.querySelector('button')).toBeNull();
+    expect(texto()).not.toContain('Cerrar sesión');
+    expect(navegar).not.toHaveBeenCalled();
   });
 
   it('un 500 muestra el aviso genérico y el texto de error sin cerrar la sesión', async () => {

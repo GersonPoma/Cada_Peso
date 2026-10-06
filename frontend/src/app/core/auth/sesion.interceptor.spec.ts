@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { PresupuestoActivoService } from '../presupuesto-activo/presupuesto-activo.service';
 import { SesionService } from '../sesion/sesion.service';
 import { sesionInterceptor } from './sesion.interceptor';
 
@@ -79,6 +80,20 @@ describe('sesionInterceptor', () => {
       expect(estado).toBe(401);
       expect(sesion.haySesion()).toBe(false);
       expect(localStorage.length).toBe(0);
+      expect(navegar).toHaveBeenCalledWith('/login');
+    });
+
+    it('en /api/v1/presupuestos deja sin presupuesto activo y lleva a /login', () => {
+      sesion.iniciar('abc', '2026-10-07T12:00:00Z');
+      const presupuestoActivo = TestBed.inject(PresupuestoActivoService);
+      presupuestoActivo.fijar({ id: 3, nombre: 'Casa', moneda: 'BOB' });
+
+      http.get('/api/v1/presupuestos').subscribe({ error: () => undefined });
+      backend
+        .expectOne('/api/v1/presupuestos')
+        .flush({ codigo: 'NO_AUTENTICADO' }, { status: 401, statusText: 'Unauthorized' });
+
+      expect(presupuestoActivo.presupuesto()).toBeNull();
       expect(navegar).toHaveBeenCalledWith('/login');
     });
 

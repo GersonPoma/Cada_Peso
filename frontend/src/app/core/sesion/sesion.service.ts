@@ -1,4 +1,5 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
+import { PresupuestoActivoService } from '../presupuesto-activo/presupuesto-activo.service';
 
 /** Sesión de la persona: el token JWT y el instante (ISO-8601) en que expira. */
 export interface Sesion {
@@ -13,10 +14,12 @@ export const CLAVE_SESION = 'cada-peso.sesion';
  * Guarda y expone la sesión. Al arrancar la restaura de `localStorage` solo si el token no ha
  * expirado; un valor ilegible, incompleto o vencido se borra y se arranca sin sesión. Si el
  * almacenamiento no está disponible, la sesión vive en memoria mientras la página siga abierta.
- * Durante el uso, un token que vence se detecta por el 401 del interceptor.
+ * Durante el uso, un token que vence se detecta por el 401 del interceptor. Cerrar la sesión
+ * también vacía el presupuesto activo.
  */
 @Injectable({ providedIn: 'root' })
 export class SesionService {
+  private readonly presupuestoActivo = inject(PresupuestoActivoService);
   private readonly estado = signal<Sesion | null>(this.restaurar());
 
   readonly sesion = this.estado.asReadonly();
@@ -39,6 +42,7 @@ export class SesionService {
   cerrar(): void {
     this.borrar();
     this.estado.set(null);
+    this.presupuestoActivo.limpiar();
   }
 
   private restaurar(): Sesion | null {

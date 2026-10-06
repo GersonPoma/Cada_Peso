@@ -1,0 +1,25 @@
+<app-cabecera>
+  <button mat-button type="button" (click)="cerrarSesion()">Cerrar sesión</button>
+</app-cabecera>
+<main class="pagina">
+  @switch (estado()) {
+    @case ('cargando') {
+      <mat-progress-spinner mode="indeterminate" diameter="48" aria-label="Cargando" />
+    }
+    @case ('sin-presupuestos') {
+      <section class="vacio">
+        <h1 class="titulo">Todavía no tienes presupuestos</h1>
+        <p class="texto">Crea uno para empezar a darle un trabajo a cada peso.</p>
+        <button mat-flat-button type="button" (click)="crearPrimero()">
+          Crear mi primer presupuesto
+        </button>
+      </section>
+    }
+    @case ('error') {
+      <section class="vacio">
+        <p class="error" role="alert">No pudimos cargar tus presupuestos.</p>
+        <button mat-stroked-button type="button" (click)="cargar()">Reintentar</button>
+      </section>
+    }
+  }
+</main>

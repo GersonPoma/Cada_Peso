@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { PresupuestoActivoService } from '../presupuesto-activo/presupuesto-activo.service';
 import { CLAVE_SESION, SesionService } from './sesion.service';
 
 describe('SesionService', () => {
@@ -100,6 +101,17 @@ describe('SesionService', () => {
       expect(servicio.haySesion()).toBe(false);
       expect(servicio.token()).toBeNull();
       expect(localStorage.getItem(CLAVE_SESION)).toBeNull();
+    });
+
+    it('cerrar deja sin presupuesto activo', () => {
+      const servicio = crearServicio();
+      const presupuestoActivo = TestBed.inject(PresupuestoActivoService);
+      servicio.iniciar('abc', '2026-10-07T12:00:00Z');
+      presupuestoActivo.fijar({ id: 3, nombre: 'Casa', moneda: 'BOB' });
+
+      servicio.cerrar();
+
+      expect(presupuestoActivo.presupuesto()).toBeNull();
     });
   });
 

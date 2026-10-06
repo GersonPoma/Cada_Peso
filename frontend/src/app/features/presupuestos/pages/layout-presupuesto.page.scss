@@ -1,0 +1,39 @@
+.layout {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+
+.acciones {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.selector {
+  width: 200px;
+  font: var(--mat-sys-body-medium);
+}
+
+.contenedor {
+  flex: 1 1 auto;
+}
+
+.menu {
+  width: 240px;
+  border-right: 1px solid var(--mat-sys-outline-variant);
+}
+
+.centrado {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 48px 16px;
+}
+
+.error {
+  margin: 0;
+  color: var(--mat-sys-error);
+  font: var(--mat-sys-body-large);
+}
