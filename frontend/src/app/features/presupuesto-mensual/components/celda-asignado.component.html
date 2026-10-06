@@ -1,0 +1,32 @@
+@if (editando()) {
+  <mat-form-field class="campo" appearance="outline" subscriptSizing="dynamic">
+    <input
+      #entrada
+      matInput
+      type="text"
+      inputmode="decimal"
+      autocomplete="off"
+      [attr.aria-label]="'Asignado de ' + nombre()"
+      [formControl]="texto"
+      (keydown)="alTeclear($event)"
+      (blur)="alSalir()"
+    />
+    @if (texto.hasError('montoInvalido')) {
+      <mat-error>Monto inválido</mat-error>
+    }
+  </mat-form-field>
+} @else {
+  <button
+    #boton
+    type="button"
+    class="boton-asignado"
+    [class.guardando]="guardando()"
+    [attr.aria-label]="'Editar el asignado de ' + nombre()"
+    (click)="abrir()"
+  >
+    {{ asignado() | monto: moneda() }}
+  </button>
+  @if (errorServidor(); as mensaje) {
+    <span class="error" role="alert">{{ mensaje }}</span>
+  }
+}

@@ -344,7 +344,9 @@ separadores de su región y componen el entero a partir de los dígitos, sin ari
 flotante. Nunca con `parseFloat`, `Number()` sobre el texto escrito ni multiplicando por 1000
 (`1.005 * 1000` da `1004.9999999999999`). El texto editable de un monto se arma con
 `deMilliunits()`, y los campos de monto se validan con `montoValido()`
-(`shared/validacion/monto.validator.ts`): como máximo 3 decimales.
+(`shared/validacion/monto.validator.ts`): como máximo 3 decimales. Esto vale para **todo**
+campo donde se edita un monto (saldo inicial, asignado del mes, mover dinero y los que sigan):
+siempre `aMilliunits()`/`leerMonto()`, nunca otra conversión.
 
 ## Fechas: `LocalDate` vs `Instant`
 
@@ -361,6 +363,12 @@ flotante. Nunca con `parseFloat`, `Number()` sobre el texto escrito ni multiplic
   `RelojDePrueba` (`src/test`, registrado como `@Primary` vía `@Import(RelojDePruebaConfig.class)`)
   en vez de depender del día en que se ejecutan. La única excepción es el `timestamp` informativo
   de las respuestas de error (`ProblemDetail`), que no participa en ninguna regla.
+- En el frontend, el "hoy" y el mes actual salen de la fecha **local** del navegador
+  (`getFullYear()`, `getMonth()`, `getDate()`), nunca de `toISOString()`, `toJSON()` ni
+  `getUTC*()`: en Bolivia, desde las 20:00, la fecha en UTC ya es la del día siguiente y, el
+  último día del mes, la del mes siguiente. El mes `yyyy-MM` del presupuesto se arma con
+  `mesActual()` (`features/presupuesto-mensual/services/mes.ts`), y sus tests fijan el reloj en al
+  menos dos zonas horarias.
 
 ## Formato regional (frontend)
 
@@ -545,6 +553,11 @@ src/app/
     │   ├── pages/
     │   └── services/
     ├── inicio/
+    │   ├── models/
+    │   ├── pages/
+    │   └── services/
+    ├── presupuesto-mensual/
+    │   ├── components/
     │   ├── models/
     │   ├── pages/
     │   └── services/

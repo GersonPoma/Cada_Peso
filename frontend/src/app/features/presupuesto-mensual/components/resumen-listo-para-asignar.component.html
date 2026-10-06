@@ -1,0 +1,9 @@
+<section class="resumen" [class]="estado()" role="status" aria-live="polite">
+  <mat-icon class="icono" aria-hidden="true">{{ presentacion().icono }}</mat-icon>
+  <div class="textos">
+    @if (estado() !== 'cero') {
+      <span class="monto">{{ listoParaAsignar() | monto: moneda() }}</span>
+    }
+    <span class="etiqueta">{{ presentacion().texto }}</span>
+  </div>
+</section>

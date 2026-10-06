@@ -1,8 +1,12 @@
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import {
+  HttpTestingController,
+  TestRequest,
+  provideHttpClientTesting,
+} from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { appConfig } from './app.config';
 import { SesionService } from './core/sesion/sesion.service';
 
@@ -23,7 +27,10 @@ describe('rutas', () => {
     harness = await RouterTestingHarness.create();
   }
 
-  afterEach(() => localStorage.clear());
+  afterEach(() => {
+    vi.useRealTimers();
+    localStorage.clear();
+  });
 
   describe('sin sesión', () => {
     beforeEach(() => iniciar(false));
@@ -56,10 +63,56 @@ describe('rutas', () => {
       },
     ];
 
-    beforeEach(() => iniciar(true));
+    beforeEach(() => {
+      // Hoy, en hora local: el mes por defecto es 2026-10.
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date(2026, 9, 6, 12));
+      return iniciar(true);
+    });
 
-    /** Responde la redirección, la lista del layout y el usuario de la página de inicio. */
-    async function responderHastaInicio(): Promise<void> {
+    const MES_OCTUBRE = {
+      mes: '2026-10',
+      listoParaAsignar: 500000,
+      totalAsignado: 0,
+      totalActividad: 0,
+      totalDisponible: 0,
+      grupos: [
+        {
+          id: 1,
+          nombre: 'Facturas',
+          orden: 0,
+          oculto: false,
+          categorias: [
+            {
+              categoriaId: 7,
+              nombre: 'Luz',
+              oculta: false,
+              asignado: 0,
+              actividad: 0,
+              disponible: 0,
+              sobregastada: false,
+            },
+          ],
+        },
+      ],
+    };
+
+    /** Espera a que la página (cargada en diferido) haga la petición a `url`. */
+    async function esperarPeticion(url: string): Promise<TestRequest> {
+      const backend = TestBed.inject(HttpTestingController);
+      for (let intento = 0; intento < 10; intento++) {
+        const [peticion] = backend.match((p) => p.url === url);
+        if (peticion) {
+          return peticion;
+        }
+        harness.fixture.detectChanges();
+        await harness.fixture.whenStable();
+      }
+      return backend.expectOne((p) => p.url === url);
+    }
+
+    /** Responde la redirección, la lista del layout y el mes de la pantalla principal. */
+    async function responderHastaPresupuesto(): Promise<void> {
       const backend = TestBed.inject(HttpTestingController);
       const redireccion = backend.expectOne('/api/v1/presupuestos');
       expect(redireccion.request.headers.get('Authorization')).toBe('Bearer abc');
@@ -67,26 +120,38 @@ describe('rutas', () => {
       await harness.fixture.whenStable();
       backend.expectOne('/api/v1/presupuestos').flush(PRESUPUESTOS);
       await harness.fixture.whenStable();
-      backend.expectOne('/api/v1/usuarios/yo').flush({ nombre: 'Ana' });
+      (await esperarPeticion('/api/v1/presupuestos/3/meses/2026-10')).flush(MES_OCTUBRE);
       await harness.fixture.whenStable();
       backend.verify();
     }
 
-    it('/ lleva al primer presupuesto, con la cabecera una vez y el saludo', async () => {
+    it('/ lleva al presupuesto del mes actual, con la cabecera una vez', async () => {
       await harness.navigateByUrl('/');
-      await responderHastaInicio();
+      await responderHastaPresupuesto();
 
-      expect(url()).toBe('/presupuestos/3');
+      expect(url()).toBe('/presupuestos/3/presupuesto/2026-10');
       expect(texto().match(/Cada Peso/g)).toHaveLength(1);
-      expect(texto()).toContain('Hola, Ana');
+      expect(texto()).toContain('Listo para asignar');
+      expect(texto()).toContain('Luz');
       expect(texto()).toContain('Cerrar sesión');
     });
 
-    it.each(['/login', '/registro'])('%s termina en /presupuestos/3', async (ruta) => {
+    it.each(['/login', '/registro'])('%s termina en el presupuesto del mes', async (ruta) => {
       await harness.navigateByUrl(ruta);
-      await responderHastaInicio();
+      await responderHastaPresupuesto();
 
-      expect(url()).toBe('/presupuestos/3');
+      expect(url()).toBe('/presupuestos/3/presupuesto/2026-10');
+    });
+
+    it('/presupuestos/3/inicio saluda con el nombre', async () => {
+      await harness.navigateByUrl('/presupuestos/3/inicio');
+      const backend = TestBed.inject(HttpTestingController);
+      backend.expectOne('/api/v1/presupuestos').flush(PRESUPUESTOS);
+      await harness.fixture.whenStable();
+      backend.expectOne('/api/v1/usuarios/yo').flush({ nombre: 'Ana' });
+      await harness.fixture.whenStable();
+
+      expect(texto()).toContain('Hola, Ana');
     });
 
     /** Responde la lista del layout y, en la pantalla de cuentas, las cuentas y los saldos. */
@@ -126,13 +191,15 @@ describe('rutas', () => {
 
       expect(url()).toBe('/presupuestos/3/cuentas');
       expect(texto()).toContain('Banco');
-      expect(enlaceDelMenu('Inicio')).toBeDefined();
-      expect(enlaceDelMenu('Cuentas')).toBeDefined();
+      const enlaces = Array.from(
+        (harness.routeNativeElement as HTMLElement).querySelectorAll('mat-sidenav a'),
+      ).map((a) => a.querySelector('[matListItemTitle]')?.textContent?.trim());
+      expect(enlaces).toEqual(['Presupuesto', 'Inicio', 'Cuentas', 'Categorías']);
     });
 
     it('el enlace Cuentas del menú lleva a /presupuestos/3/cuentas', async () => {
       await harness.navigateByUrl('/');
-      await responderHastaInicio();
+      await responderHastaPresupuesto();
 
       enlaceDelMenu('Cuentas')?.click();
       await harness.fixture.whenStable();

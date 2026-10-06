@@ -11,6 +11,8 @@ export const CODIGOS_API = {
   REGLA_NEGOCIO_VIOLADA: 'REGLA_NEGOCIO_VIOLADA',
   GRUPO_CATEGORIA_YA_EXISTE: 'GRUPO_CATEGORIA_YA_EXISTE',
   CATEGORIA_YA_EXISTE: 'CATEGORIA_YA_EXISTE',
+  CONFLICTO: 'CONFLICTO',
+  RECURSO_NO_ENCONTRADO: 'RECURSO_NO_ENCONTRADO',
 } as const;
 
 /** Aviso para cualquier error que el frontend no sabe mostrar de otra forma. */

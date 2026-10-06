@@ -1,0 +1,22 @@
+<nav class="barra" aria-label="Mes del presupuesto">
+  <button
+    mat-icon-button
+    type="button"
+    aria-label="Mes anterior"
+    [disabled]="esPrimero()"
+    (click)="anterior()"
+  >
+    <mat-icon>chevron_left</mat-icon>
+  </button>
+  <h2 class="mes" aria-live="polite">{{ texto() }}</h2>
+  <button
+    mat-icon-button
+    type="button"
+    aria-label="Mes siguiente"
+    [disabled]="esUltimo()"
+    (click)="siguiente()"
+  >
+    <mat-icon>chevron_right</mat-icon>
+  </button>
+  <button mat-stroked-button type="button" class="hoy" (click)="hoy()">Hoy</button>
+</nav>

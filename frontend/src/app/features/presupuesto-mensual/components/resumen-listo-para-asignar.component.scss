@@ -1,0 +1,38 @@
+.resumen {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  background: var(--mat-sys-surface-container-high);
+  color: var(--mat-sys-on-surface);
+}
+
+.resumen.positivo {
+  background: var(--mat-sys-primary-container);
+  color: var(--mat-sys-on-primary-container);
+}
+
+.resumen.negativo {
+  background: var(--mat-sys-error-container);
+  color: var(--mat-sys-on-error-container);
+}
+
+.icono {
+  width: 32px;
+  height: 32px;
+  font-size: 32px;
+}
+
+.textos {
+  display: flex;
+  flex-direction: column;
+}
+
+.monto {
+  font: var(--mat-sys-headline-small);
+}
+
+.etiqueta {
+  font: var(--mat-sys-label-large);
+}

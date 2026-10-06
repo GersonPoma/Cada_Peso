@@ -1,0 +1,117 @@
+:host {
+  display: block;
+}
+
+.fila {
+  display: grid;
+  grid-template-columns: minmax(10em, 2fr) repeat(3, minmax(7em, 1fr));
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+}
+
+.encabezado-grupo {
+  background: var(--mat-sys-surface-container);
+  font: var(--mat-sys-title-small);
+}
+
+.plegar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--mat-sys-on-surface);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.categoria {
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+
+.col-nombre {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.nombre-categoria {
+  overflow: hidden;
+  font: var(--mat-sys-body-large);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.monto {
+  font: var(--mat-sys-body-large);
+  white-space: nowrap;
+}
+
+.encabezado-grupo .monto {
+  font: var(--mat-sys-title-small);
+}
+
+.disponible {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.disponible.positivo {
+  color: var(--mat-sys-primary);
+}
+
+.disponible.sobregastado {
+  color: var(--mat-sys-error);
+}
+
+.valor-disponible {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.advertencia {
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
+}
+
+.texto-sobregasto {
+  font: var(--mat-sys-label-small);
+}
+
+.oculto,
+.oculta {
+  opacity: 0.55;
+}
+
+/* Las etiquetas de columna solo se ven cuando las filas se apilan. */
+.etiqueta-columna {
+  display: none;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-label-small);
+}
+
+@media (max-width: 599.98px) {
+  .fila {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .col-nombre,
+  .plegar {
+    grid-column: 1 / -1;
+  }
+
+  .etiqueta-columna {
+    display: block;
+  }
+}

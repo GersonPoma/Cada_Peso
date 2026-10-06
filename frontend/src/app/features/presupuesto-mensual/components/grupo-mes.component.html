@@ -1,0 +1,94 @@
+<section class="grupo" [class.oculto]="grupo().oculto">
+  <div class="fila encabezado-grupo">
+    <button
+      type="button"
+      class="plegar"
+      [attr.aria-expanded]="desplegado()"
+      [attr.aria-controls]="idLista"
+      (click)="alternar()"
+    >
+      <mat-icon aria-hidden="true">{{ desplegado() ? 'expand_more' : 'chevron_right' }}</mat-icon>
+      <span class="nombre-grupo">{{ grupo().nombre }}</span>
+    </button>
+    <span class="col monto total-asignado">
+      <span class="etiqueta-columna">Asignado</span>
+      {{ totales().asignado | monto: moneda() }}
+    </span>
+    <span class="col monto total-actividad">
+      <span class="etiqueta-columna">Actividad</span>
+      {{ totales().actividad | monto: moneda() }}
+    </span>
+    <span class="col monto total-disponible">
+      <span class="etiqueta-columna">Disponible</span>
+      {{ totales().disponible | monto: moneda() }}
+    </span>
+  </div>
+
+  @if (desplegado()) {
+    <div class="categorias" role="list" [id]="idLista">
+      @for (categoria of grupo().categorias; track categoria.categoriaId) {
+        <div class="fila categoria" role="listitem" [class.oculta]="categoria.oculta">
+          <div class="col-nombre">
+            <span class="nombre-categoria">{{ categoria.nombre }}</span>
+            <button
+              mat-icon-button
+              type="button"
+              class="acciones"
+              [attr.aria-label]="'Acciones de ' + categoria.nombre"
+              [matMenuTriggerFor]="menuCategoria"
+              [matMenuTriggerData]="{ categoria }"
+            >
+              <mat-icon>more_vert</mat-icon>
+            </button>
+          </div>
+          <div class="col">
+            <span class="etiqueta-columna">Asignado</span>
+            <app-celda-asignado
+              [asignado]="categoria.asignado"
+              [moneda]="moneda()"
+              [nombre]="categoria.nombre"
+              [guardando]="guardando().has(categoria.categoriaId)"
+              [errorServidor]="errores().get(categoria.categoriaId) ?? null"
+              (guardar)="asignar.emit({ categoriaId: categoria.categoriaId, asignado: $event })"
+            />
+          </div>
+          <div class="col monto actividad">
+            <span class="etiqueta-columna">Actividad</span>
+            {{ categoria.actividad | monto: moneda() }}
+          </div>
+          <div
+            class="col monto disponible"
+            [class.positivo]="categoria.disponible > 0"
+            [class.sobregastado]="categoria.sobregastada"
+          >
+            <span class="etiqueta-columna">Disponible</span>
+            <span class="valor-disponible">
+              @if (categoria.sobregastada) {
+                <mat-icon class="advertencia" aria-hidden="true">warning</mat-icon>
+              }
+              {{ categoria.disponible | monto: moneda() }}
+            </span>
+            @if (categoria.sobregastada) {
+              <span class="texto-sobregasto">Sobregastado</span>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  }
+</section>
+
+<mat-menu #menuCategoria="matMenu">
+  <ng-template matMenuContent let-categoria="categoria">
+    <button mat-menu-item type="button" (click)="moverDinero.emit(categoria)">
+      <mat-icon>swap_horiz</mat-icon>
+      <span>Mover dinero...</span>
+    </button>
+    @if (categoria.sobregastada) {
+      <button mat-menu-item type="button" (click)="cubrirSobregasto.emit(categoria)">
+        <mat-icon>healing</mat-icon>
+        <span>Cubrir sobregasto</span>
+      </button>
+    }
+  </ng-template>
+</mat-menu>

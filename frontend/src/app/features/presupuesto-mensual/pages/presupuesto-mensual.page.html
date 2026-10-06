@@ -1,0 +1,69 @@
+<main class="pagina">
+  <header class="encabezado">
+    @if (mesValido()) {
+      <app-barra-mes [mes]="mes()" (cambiar)="irAMes($event)" />
+    }
+    @if (estado() === 'listo' && moneda(); as moneda) {
+      <app-resumen-listo-para-asignar
+        [listoParaAsignar]="datos()?.listoParaAsignar ?? 0"
+        [moneda]="moneda"
+      />
+    }
+  </header>
+
+  <div class="herramientas">
+    <mat-slide-toggle [checked]="incluirOcultas()" (change)="cambiarOcultas($event.checked)">
+      Mostrar ocultas
+    </mat-slide-toggle>
+  </div>
+
+  @switch (estado()) {
+    @case ('cargando') {
+      <div class="centrado">
+        <mat-progress-spinner mode="indeterminate" diameter="48" aria-label="Cargando" />
+      </div>
+    }
+    @case ('error') {
+      <div class="centrado">
+        <p class="error" role="alert">No pudimos cargar el presupuesto del mes.</p>
+        <button mat-stroked-button type="button" (click)="recargar()">Reintentar</button>
+      </div>
+    }
+    @case ('listo') {
+      @if (sinCategorias()) {
+        <div class="centrado">
+          <p class="vacio">Aún no tienes categorías</p>
+          <a mat-stroked-button [routerLink]="['/presupuestos', presupuestoId(), 'categorias']">
+            Ir a Categorías
+          </a>
+        </div>
+      } @else if (moneda(); as moneda) {
+        <section class="tabla" aria-label="Categorías del mes">
+          <div class="fila columnas" aria-hidden="true">
+            <span>Categoría</span>
+            <span class="derecha">Asignado</span>
+            <span class="derecha">Actividad</span>
+            <span class="derecha">Disponible</span>
+          </div>
+          @for (grupo of datos()?.grupos ?? []; track grupo.id) {
+            <app-grupo-mes
+              [grupo]="grupo"
+              [moneda]="moneda"
+              [guardando]="guardando()"
+              [errores]="errores()"
+              (asignar)="asignar($event)"
+              (moverDinero)="moverDinero($event)"
+              (cubrirSobregasto)="cubrirSobregasto($event)"
+            />
+          }
+          <div class="fila total">
+            <span>Total del mes</span>
+            <span class="derecha total-asignado">{{ totales().asignado | monto: moneda }}</span>
+            <span class="derecha total-actividad">{{ totales().actividad | monto: moneda }}</span>
+            <span class="derecha total-disponible">{{ totales().disponible | monto: moneda }}</span>
+          </div>
+        </section>
+      }
+    }
+  }
+</main>
