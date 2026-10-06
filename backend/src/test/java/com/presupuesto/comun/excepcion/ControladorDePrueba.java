@@ -34,6 +34,11 @@ class ControladorDePrueba {
         throw new ReglaNegocioException("Regla de negocio de prueba violada");
     }
 
+    @GetMapping("/prueba/datos-invalidos")
+    void lanzarDatosInvalidos() {
+        throw new DatosInvalidosException("Datos de prueba invalidos");
+    }
+
     @GetMapping("/prueba/no-autenticado")
     void lanzarNoAutenticado() {
         throw new NoAutenticadoException(

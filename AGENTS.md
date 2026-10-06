@@ -70,6 +70,14 @@ com/presupuesto/
 │   │   ├── request/
 │   │   └── response/
 │   └── service/
+├── categoria/
+│   ├── controller/
+│   ├── dto/
+│   │   ├── request/
+│   │   └── response/
+│   ├── entity/
+│   ├── repository/
+│   └── service/
 ├── cuenta/
 │   ├── controller/
 │   ├── dto/
@@ -99,7 +107,8 @@ com/presupuesto/
 `auth` no tiene `entity` ni `repository` porque trabaja con las entidades de `usuario`, y
 `usuario` no tiene `dto/request` porque todavía no recibe datos propios. `presupuesto` puede
 depender de `usuario` y de `comun`, y `auth` de `presupuesto` (crea el presupuesto inicial al
-registrarse); `cuenta` puede depender de `presupuesto` y de `comun`; nunca al revés.
+registrarse); `cuenta` y `categoria` pueden depender de `presupuesto` y de `comun`; nunca al
+revés (`presupuesto` y `cuenta` no importan `categoria`).
 
 ### Qué va en cada subpaquete
 
@@ -144,7 +153,7 @@ procesador de anotaciones del `pom.xml`.
   `src/main` ni en `src/test`) importa `com.presupuesto.<feature>`. Si una clase de `comun/`
   necesita datos de una feature, los recibe como parámetros simples (ej.
   `JwtService.emitir(Long id, Rol rol)`, no la entidad `Usuario`). Se comprueba desde
-  `backend/src` con `grep -rnE "import com\.presupuesto\.(usuario|auth|presupuesto|cuenta)" <dir>` para
+  `backend/src` con `grep -rnE "import com\.presupuesto\.(usuario|auth|presupuesto|cuenta|categoria)" <dir>` para
   `<dir>` = `main/java/com/presupuesto/comun` y `test/java/com/presupuesto/comun` (ampliando la
   alternancia con cada feature nueva); debe devolver cero líneas.
 
@@ -208,7 +217,7 @@ Las respuestas de error de la API siguen **RFC 9457** (`ProblemDetail`) de forma
 
 - Jerarquía de excepciones de negocio en `comun/excepcion`: `NegocioException` (abstracta),
   `RecursoNoEncontradoException` (404), `ConflictoException` (409), `ReglaNegocioException`
-  (422) y `NoAutenticadoException` (401). Cada una lleva un `CodigoError`; `ConflictoException`
+  (422), `DatosInvalidosException` (400) y `NoAutenticadoException` (401). Cada una lleva un `CodigoError`; `ConflictoException`
   y `NoAutenticadoException` lo reciben como parámetro para indicar el motivo concreto (ej.
   `EMAIL_YA_REGISTRADO`, `CREDENCIALES_INVALIDAS`).
 - `ManejadorGlobalExcepciones` (`@RestControllerAdvice`) traduce esa jerarquía — y los errores de
@@ -219,7 +228,9 @@ Las respuestas de error de la API siguen **RFC 9457** (`ProblemDetail`) de forma
   - **400 `DATOS_INVALIDOS`**: la petición es inválida por sí misma. Incluye cualquier fallo de
     Bean Validation (con el mapa `errores` campo → mensaje), también de anotaciones propias como
     `@MayorDeEdad`, `@MaximoBytesUtf8` o `@MonedaValida`, y el cuerpo ilegible (JSON mal
-    formado, cuerpo vacío, tipo incorrecto, fecha imposible), sin `errores`.
+    formado, cuerpo vacío, tipo incorrecto, fecha imposible), sin `errores`. Lo que solo el
+    service puede comprobar (ej. una `posicion` fuera de rango) lanza `DatosInvalidosException`,
+    también 400 `DATOS_INVALIDOS` y sin `errores`.
   - **422 `REGLA_NEGOCIO_VIOLADA`** (`ReglaNegocioException`): la petición es válida, pero el
     negocio no la permite en el estado actual del sistema.
   - **409** (`ConflictoException`): la petición choca con un recurso existente (ej. email ya

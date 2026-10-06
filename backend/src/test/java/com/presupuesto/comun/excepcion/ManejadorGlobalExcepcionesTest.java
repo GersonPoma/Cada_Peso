@@ -65,6 +65,17 @@ class ManejadorGlobalExcepcionesTest {
 
     @Test
     @WithMockUser
+    void datosInvalidosDevuelve400ConCodigoDatosInvalidosYSinErrores() throws Exception {
+        mockMvc.perform(get("/prueba/datos-invalidos"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.codigo").value("DATOS_INVALIDOS"))
+                .andExpect(jsonPath("$.timestamp", notNullValue()))
+                .andExpect(jsonPath("$.detail").value("Datos de prueba invalidos"))
+                .andExpect(jsonPath("$.errores").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser
     void noAutenticadoDevuelve401ConElCodigoYElMensajeRecibidos() throws Exception {
         mockMvc.perform(get("/prueba/no-autenticado"))
                 .andExpect(status().isUnauthorized())

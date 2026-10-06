@@ -35,6 +35,12 @@ public class ManejadorGlobalExcepciones {
                 HttpStatus.UNPROCESSABLE_ENTITY, excepcion.getCodigo(), excepcion.getMessage());
     }
 
+    @ExceptionHandler(DatosInvalidosException.class)
+    public ProblemDetail manejarDatosInvalidos(DatosInvalidosException excepcion) {
+        return construirProblemDetail(
+                HttpStatus.BAD_REQUEST, excepcion.getCodigo(), excepcion.getMessage());
+    }
+
     @ExceptionHandler(NoAutenticadoException.class)
     public ProblemDetail manejarNoAutenticado(NoAutenticadoException excepcion) {
         return construirProblemDetail(
