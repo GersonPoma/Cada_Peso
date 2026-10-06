@@ -336,15 +336,72 @@ futuros) debe reutilizar estos mismos nombres de variable, no inventar otros.
   `ManejadorGlobalExcepciones` o el de `SecurityConfig`) se conservan de forma permanente como
   parte de la suite.
 
-## Estructura del frontend
+## Angular Material (única librería de UI)
 
-`src/app` se organiza en tres carpetas:
+**Angular Material es la única librería de UI del frontend.** No se agrega ninguna otra librería
+de componentes (PrimeNG, Bootstrap, Tailwind UI, etc.) ni de íconos (Font Awesome, SVGs sueltos,
+etc.), en ningún change.
 
-- `core/`: servicios singleton, interceptores, configuración transversal del frontend.
-- `shared/`: componentes, pipes y directivas reutilizables entre features (incluye el pipe de
-  dinero en milésimas).
-- `features/`: un subdirectorio por feature de negocio (`cuentas/`, `categorias/`,
-  `transacciones/`, etc.), cada uno con sus propios componentes standalone.
+- **Componentes**: botones (`mat-button` y variantes), inputs y formularios con `mat-form-field`
+  + `matInput` + `mat-error`, selects, datepicker, diálogos (`MatDialog`), tablas (`mat-table` +
+  `mat-paginator`) y snackbars son siempre de Material. Los mensajes de validación en español
+  (ver "Validación de formularios") van dentro de `mat-error`.
+- **Íconos**: solo con `<mat-icon>` y los nombres de **Material Symbols Outlined**. La fuente se
+  instala desde npm (`material-symbols`) y se empaqueta en el build; no se usa Google Fonts.
+- **Tema**: Material 3 en `src/styles.scss`, solo modo claro, con color principal `#2E7D32` (el
+  del favicon). Las paletas de `src/_theme-colors.scss` se generan con
+  `ng generate @angular/material:theme-color` y no se editan a mano. Los colores de los
+  componentes salen de los tokens `--mat-sys-*`, nunca de valores hex sueltos.
+- **Configuración global** en `core/material/`, registrada una sola vez con `proveerMaterial()`
+  en `app.config.ts`: `AdaptadorFechaRegional`, `MAT_DATE_LOCALE` (igual a `regionUsuario()`),
+  textos internos en español (`PaginadorIntl`, `CalendarioIntl`) y la fuente de `mat-icon`. Todo
+  componente de Material nuevo que tenga textos internos se traduce ahí el día que se empieza a
+  usar.
+- **Fechas del datepicker**: `AdaptadorFechaRegional` es el único `DateAdapter`; interpreta lo
+  escrito a mano según el orden de día, mes y año de la región y trata una fecha inexistente
+  (ej. `31/02/2003`) como inválida. Nunca se registra otro adapter ni se usa `Date.parse` para
+  fechas escritas por el usuario.
+- **Conversión al backend**: el `Date` del datepicker se convierte a `yyyy-MM-dd` (`LocalDate`)
+  **solo** con `aFechaNegocio()` de `shared/fecha/`; nunca con `toISOString()`, `toJSON()` ni
+  `getUTC*()`, que corren la fecha un día según la zona horaria.
+
+## Estructura obligatoria del frontend
+
+`src/app` se organiza en tres carpetas, y **toda feature nueva (cuentas, categorías,
+transacciones y las que sigan) sigue esta estructura sin excepciones**, igual que en el backend:
+
+```
+src/app/
+├── app.ts, app.config.ts, app.routes.ts ...
+├── core/
+│   ├── api-base-url.ts
+│   └── material/
+├── shared/
+│   ├── fecha/
+│   └── formato/
+└── features/
+    └── <feature>/
+        ├── pages/
+        ├── components/
+        ├── services/
+        └── models/
+```
+
+- `core/`: servicios singleton, interceptores y configuración transversal del frontend (hoy,
+  la URL base de la API y `material/`, la configuración global de Angular Material).
+- `shared/`: componentes, pipes, directivas y utilidades reutilizables entre features (hoy,
+  `formato/` con los pipes de monto y fecha, y `fecha/` con `aFechaNegocio()`).
+- `features/<feature>/`: una carpeta por feature de negocio (`cuentas/`, `categorias/`,
+  `transacciones/`, etc.), con solo las subcarpetas que necesite:
+  - `pages/`: componentes enrutables, uno por ruta.
+  - `components/`: componentes de presentación de la feature (no enrutables).
+  - `services/`: acceso a la API de la feature con `HttpClient`.
+  - `models/`: interfaces que reflejan los DTO de request y response del backend.
+- **Dependencias**: `core/` y `shared/` nunca importan nada de `features/`; una feature puede
+  importar de `core/` y `shared/`, pero no de otra feature.
+- **Nombres de archivo** en `kebab-case` con el sufijo técnico: `*.page.ts`, `*.component.ts`,
+  `*.service.ts`, `*.model.ts`, `*.pipe.ts`. Los tests `*.spec.ts` van junto al archivo que
+  prueban.
 
 Angular se usa con **standalone components + signals**, sin NgModules.
 

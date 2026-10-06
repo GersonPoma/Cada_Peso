@@ -27,6 +27,14 @@ context: |
   Tests en el mismo subpaquete que la clase que prueban; los de HTTP en controller.
   comun/ (config, excepcion, seguridad, validacion) nunca importa una feature. Detalle y
   checklist en AGENTS.md, sección "Estructura obligatoria de una feature".
+  Estructura obligatoria del frontend (sin excepciones para toda feature nueva): src/app con
+  core/, shared/ y features/<feature>/ con las subcarpetas pages, components, services y
+  models, solo las que la feature necesite; core/ y shared/ nunca importan features/.
+  Angular Material es la única librería de UI (íconos solo con mat-icon y Material
+  Symbols; no se agregan otras librerías de componentes ni de íconos). El único DateAdapter
+  es AdaptadorFechaRegional (core/material/) y las fechas del datepicker se convierten a
+  yyyy-MM-dd solo con aFechaNegocio() de shared/fecha/, nunca con toISOString(). Detalle en
+  AGENTS.md, secciones "Estructura obligatoria del frontend" y "Angular Material".
 
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.
@@ -43,10 +51,18 @@ rules:
       en su subpaquete según la estructura obligatoria de AGENTS.md ("Estructura obligatoria
       de una feature") e incluye en el design una tabla con el paquete completo
       (com.presupuesto.<feature>.<subpaquete>) de cada clase nueva o movida y de su test.
+    - Toda feature nueva, y todo change que cree o mueva archivos del frontend, ubica cada
+      archivo según la estructura obligatoria del frontend de AGENTS.md (sección "Estructura
+      obligatoria del frontend", con core/, shared/ y features/<feature>/ y sus pages,
+      components, services y models) e incluye en el design una tabla con la ruta de cada
+      archivo nuevo o movido (desde src/app/) y la de su test.
   tasks:
     - Cada tarea que crea o mueve una clase del backend indica su paquete completo y el de su
       test, según la estructura obligatoria de AGENTS.md ("Estructura obligatoria de una
       feature").
+    - Cada tarea que crea o mueve un archivo del frontend indica su ruta (desde src/app/) y la
+      de su test, según la estructura obligatoria del frontend de AGENTS.md ("Estructura
+      obligatoria del frontend").
 
 # Per-operation guidance (optional)
 # Add advisory guidance for how apply and archive work should be conducted.

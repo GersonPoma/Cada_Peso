@@ -2,10 +2,8 @@ import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/
 import { provideRouter } from '@angular/router';
 
 import { routes } from './app.routes';
+import { proveerMaterial } from './core/material/proveer-material';
 
 export const appConfig: ApplicationConfig = {
-  providers: [
-    provideBrowserGlobalErrorListeners(),
-    provideRouter(routes)
-  ]
+  providers: [provideBrowserGlobalErrorListeners(), provideRouter(routes), ...proveerMaterial()],
 };

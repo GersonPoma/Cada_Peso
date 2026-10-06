@@ -1,1 +1,42 @@
-/* You can add global styles to this file, and also import other style files */
+// Tema Material 3 de Cada Peso. Las paletas de `_theme-colors.scss` se generan con
+// `ng generate @angular/material:theme-color` a partir de #2E7D32 (el verde del favicon) y no se
+// editan a mano.
+@use '@angular/material' as mat;
+@use './theme-colors';
+
+// Fuentes del sistema: no se descargan fuentes de texto de Google Fonts.
+$fuentes-sistema: (system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif);
+
+html {
+  color-scheme: light;
+
+  @include mat.theme(
+    (
+      color: (
+        primary: theme-colors.$primary-palette,
+        tertiary: theme-colors.$tertiary-palette,
+        theme-type: light,
+      ),
+      typography: (
+        plain-family: $fuentes-sistema,
+        brand-family: $fuentes-sistema,
+      ),
+      density: 0,
+    )
+  );
+
+  // En la paleta M3 el tono principal no cae exactamente en #2E7D32: se fija el token de sistema
+  // para que botones y elementos primarios usen el verde del favicon.
+  @include mat.theme-overrides(
+    (
+      primary: #2e7d32,
+    )
+  );
+}
+
+body {
+  margin: 0;
+  background: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-body-large);
+}
