@@ -1,0 +1,68 @@
+<main class="pagina">
+  <header class="encabezado">
+    <h1 class="titulo">Categorías</h1>
+    <div class="acciones">
+      <mat-slide-toggle [checked]="incluirOcultas()" (change)="cambiarOcultas($event.checked)">
+        Mostrar ocultas
+      </mat-slide-toggle>
+      <button mat-flat-button type="button" (click)="agregarGrupo()">
+        <mat-icon>add</mat-icon>
+        Agregar grupo
+      </button>
+    </div>
+  </header>
+
+  @switch (estado()) {
+    @case ('cargando') {
+      <div class="centrado">
+        <mat-progress-spinner mode="indeterminate" diameter="48" aria-label="Cargando" />
+      </div>
+    }
+    @case ('error') {
+      <div class="centrado">
+        <p class="error" role="alert">No pudimos cargar tus categorías.</p>
+        <button mat-stroked-button type="button" (click)="recargar()">Reintentar</button>
+      </div>
+    }
+    @case ('listo') {
+      @if (arbol(); as grupos) {
+        @if (grupos.length === 0) {
+          <div class="centrado">
+            <p class="vacio">Aún no tienes categorías</p>
+            <button mat-stroked-button type="button" (click)="agregarGrupo()">
+              Agregar mi primer grupo
+            </button>
+          </div>
+        } @else {
+          <!-- cdkDropListGroup conecta solo las listas de categorías: no incluye a su propio host. -->
+          <div
+            class="grupos"
+            cdkDropList
+            cdkDropListGroup
+            [cdkDropListData]="grupos"
+            [cdkDropListDisabled]="moviendo()"
+            [cdkDropListEnterPredicate]="soloGrupos"
+            (cdkDropListDropped)="soltarGrupo($event)"
+          >
+            @for (grupo of grupos; track grupo.id) {
+              <app-grupo-categorias
+                cdkDrag
+                [cdkDragData]="{ tipo: 'grupo', grupo }"
+                [cdkDragDisabled]="moviendo()"
+                [grupo]="grupo"
+                [moviendo]="moviendo()"
+                (renombrar)="renombrarGrupo(grupo)"
+                (alternarVisibilidad)="alternarVisibilidadGrupo(grupo)"
+                (agregarCategoria)="agregarCategoria(grupo)"
+                (editarCategoria)="editarCategoria($event)"
+                (alternarVisibilidadCategoria)="alternarVisibilidadCategoria($event)"
+                (moverCategoriaA)="moverCategoriaA($event)"
+                (soltarCategoria)="soltarCategoria($event)"
+              />
+            }
+          </div>
+        }
+      }
+    }
+  }
+</main>

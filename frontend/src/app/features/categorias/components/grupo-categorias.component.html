@@ -1,0 +1,94 @@
+<section class="grupo" [class.oculto]="grupo().oculto">
+  <header class="cabecera">
+    <mat-icon class="asa" cdkDragHandle [attr.aria-label]="'Arrastrar el grupo ' + grupo().nombre"
+      >drag_indicator</mat-icon
+    >
+    <h2 class="nombre-grupo">{{ grupo().nombre }}</h2>
+    @if (grupo().oculto) {
+      <mat-icon class="icono-oculto" aria-label="Oculto">visibility_off</mat-icon>
+    }
+    <span class="espaciador"></span>
+    <button mat-button type="button" (click)="agregarCategoria.emit()">
+      <mat-icon>add</mat-icon>
+      Agregar categoría
+    </button>
+    <button
+      mat-icon-button
+      type="button"
+      [attr.aria-label]="'Acciones del grupo ' + grupo().nombre"
+      [matMenuTriggerFor]="menuGrupo"
+    >
+      <mat-icon>more_vert</mat-icon>
+    </button>
+    <mat-menu #menuGrupo="matMenu">
+      <button mat-menu-item type="button" (click)="renombrar.emit()">
+        <mat-icon>edit</mat-icon>
+        <span>Renombrar</span>
+      </button>
+      <button mat-menu-item type="button" (click)="alternarVisibilidad.emit()">
+        <mat-icon>{{ grupo().oculto ? 'visibility' : 'visibility_off' }}</mat-icon>
+        <span>{{ grupo().oculto ? 'Mostrar' : 'Ocultar' }}</span>
+      </button>
+    </mat-menu>
+  </header>
+
+  <div
+    class="categorias"
+    cdkDropList
+    [cdkDropListData]="grupo()"
+    [cdkDropListDisabled]="moviendo()"
+    [cdkDropListEnterPredicate]="soloCategorias"
+    (cdkDropListDropped)="soltarCategoria.emit($event)"
+  >
+    @for (categoria of grupo().categorias; track categoria.id) {
+      <div
+        class="categoria"
+        cdkDrag
+        [cdkDragData]="datoCategoria(categoria)"
+        [cdkDragDisabled]="moviendo()"
+        [class.oculta]="categoria.oculta"
+      >
+        <mat-icon class="asa" cdkDragHandle [attr.aria-label]="'Arrastrar ' + categoria.nombre"
+          >drag_indicator</mat-icon
+        >
+        <div class="textos">
+          <span class="nombre-categoria">{{ categoria.nombre }}</span>
+          @if (categoria.nota) {
+            <span class="nota">{{ categoria.nota }}</span>
+          }
+        </div>
+        @if (categoria.oculta) {
+          <mat-icon class="icono-oculto" aria-label="Oculta">visibility_off</mat-icon>
+        }
+        <button
+          mat-icon-button
+          type="button"
+          [attr.aria-label]="'Acciones de ' + categoria.nombre"
+          [matMenuTriggerFor]="menuCategoria"
+          [matMenuTriggerData]="{ categoria }"
+        >
+          <mat-icon>more_vert</mat-icon>
+        </button>
+      </div>
+    } @empty {
+      <p class="zona-vacia">Arrastra una categoría aquí</p>
+    }
+  </div>
+</section>
+
+<mat-menu #menuCategoria="matMenu">
+  <ng-template matMenuContent let-categoria="categoria">
+    <button mat-menu-item type="button" (click)="editarCategoria.emit(categoria)">
+      <mat-icon>edit</mat-icon>
+      <span>Editar</span>
+    </button>
+    <button mat-menu-item type="button" (click)="alternarVisibilidadCategoria.emit(categoria)">
+      <mat-icon>{{ categoria.oculta ? 'visibility' : 'visibility_off' }}</mat-icon>
+      <span>{{ categoria.oculta ? 'Mostrar' : 'Ocultar' }}</span>
+    </button>
+    <button mat-menu-item type="button" (click)="moverCategoriaA.emit(categoria)">
+      <mat-icon>drive_file_move</mat-icon>
+      <span>Mover a...</span>
+    </button>
+  </ng-template>
+</mat-menu>

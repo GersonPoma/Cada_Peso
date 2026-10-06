@@ -508,6 +508,11 @@ src/app/
     │   ├── models/
     │   ├── pages/
     │   └── services/
+    ├── categorias/
+    │   ├── components/
+    │   ├── models/
+    │   ├── pages/
+    │   └── services/
     ├── cuentas/
     │   ├── components/
     │   ├── models/

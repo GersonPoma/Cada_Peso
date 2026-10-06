@@ -1,0 +1,32 @@
+<h2 mat-dialog-title>Mover {{ categoria.nombre }}</h2>
+<form [formGroup]="formulario" (ngSubmit)="enviar()" novalidate>
+  <mat-dialog-content class="contenido">
+    <mat-form-field appearance="outline">
+      <mat-label>Grupo</mat-label>
+      <mat-select formControlName="grupoId">
+        @for (grupo of grupos; track grupo.id) {
+          <mat-option [value]="grupo.id">{{ grupo.nombre }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Lugar</mat-label>
+      <mat-select formControlName="indice">
+        @for (lugar of lugares(); track lugar.indice) {
+          <mat-option [value]="lugar.indice">{{ lugar.etiqueta }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    @if (errorGeneral(); as texto) {
+      <p class="error-general" role="alert">{{ texto }}</p>
+    }
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" [mat-dialog-close]="undefined" [disabled]="enviando()">
+      Cancelar
+    </button>
+    <button mat-flat-button type="submit" [disabled]="enviando()">Mover</button>
+  </mat-dialog-actions>
+</form>

@@ -1,0 +1,33 @@
+<h2 mat-dialog-title>{{ esCrear ? 'Nueva categoría' : 'Editar categoría' }}</h2>
+<form [formGroup]="formulario" (ngSubmit)="enviar()" novalidate>
+  <mat-dialog-content class="contenido">
+    <mat-form-field appearance="outline">
+      <mat-label>Nombre</mat-label>
+      <input matInput type="text" autocomplete="off" formControlName="nombre" />
+      @if (mensajeNombre(); as texto) {
+        <mat-error>{{ texto }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Nota (opcional)</mat-label>
+      <textarea matInput rows="3" formControlName="nota"></textarea>
+      <mat-hint align="end" class="contador">{{ caracteresNota() }}/{{ maximoNota }}</mat-hint>
+      @if (mensajeNota(); as texto) {
+        <!-- Con un error Material oculta el hint: el contador se repite junto al mensaje. -->
+        <mat-error class="error-nota">
+          <span>{{ texto }}</span>
+          <span>{{ caracteresNota() }}/{{ maximoNota }}</span>
+        </mat-error>
+      }
+    </mat-form-field>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" [mat-dialog-close]="undefined" [disabled]="enviando()">
+      Cancelar
+    </button>
+    <button mat-flat-button type="submit" [disabled]="formulario.invalid || enviando()">
+      {{ esCrear ? 'Crear' : 'Guardar' }}
+    </button>
+  </mat-dialog-actions>
+</form>

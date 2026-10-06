@@ -1,0 +1,12 @@
+.contenido {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+}
+
+.error-nota {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}

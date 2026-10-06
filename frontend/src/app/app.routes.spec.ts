@@ -144,5 +144,21 @@ describe('rutas', () => {
       expect(url()).toBe('/presupuestos/3/cuentas');
       expect(texto()).toContain('Aún no tienes cuentas');
     });
+
+    it('/presupuestos/3/categorias muestra el árbol con el enlace Categorías', async () => {
+      await harness.navigateByUrl('/presupuestos/3/categorias');
+      const backend = TestBed.inject(HttpTestingController);
+      backend.expectOne('/api/v1/presupuestos').flush(PRESUPUESTOS);
+      await harness.fixture.whenStable();
+      backend
+        .expectOne((p) => p.url === '/api/v1/presupuestos/3/categorias')
+        .flush([{ id: 1, nombre: 'Facturas', orden: 0, oculto: false, categorias: [] }]);
+      await harness.fixture.whenStable();
+      backend.verify();
+
+      expect(url()).toBe('/presupuestos/3/categorias');
+      expect(texto()).toContain('Facturas');
+      expect(enlaceDelMenu('Categorías')).toBeDefined();
+    });
   });
 });
