@@ -1,0 +1,92 @@
+<main class="pagina">
+  <header class="encabezado">
+    <div>
+      <h1 class="titulo">Transacciones</h1>
+      @if (moneda(); as moneda) {
+        <p class="saldos" aria-live="polite">
+          <span class="saldo">
+            {{ cuentaFiltrada() ? 'Saldo de ' + cuentaFiltrada() : 'Saldo de todas las cuentas' }}:
+            <strong [class.negativo]="saldoMostrado().saldo < 0">{{
+              saldoMostrado().saldo | monto: moneda
+            }}</strong>
+          </span>
+          <span class="conciliado">
+            Conciliado: {{ saldoMostrado().conciliado | monto: moneda }}
+          </span>
+        </p>
+      }
+    </div>
+    <button mat-flat-button type="button" (click)="agregar()">
+      <mat-icon>add</mat-icon>
+      Agregar transacción
+    </button>
+  </header>
+
+  <app-filtros-transacciones
+    [filtros]="filtros()"
+    [cuentas]="cuentas()"
+    [grupos]="gruposVisibles()"
+    (cambiar)="cambiarFiltros($event)"
+    (limpiar)="limpiarFiltros()"
+  />
+
+  @if (seleccion().size > 0) {
+    <app-barra-lote
+      [cantidad]="seleccion().size"
+      [grupos]="gruposVisibles()"
+      (aprobar)="loteAprobar()"
+      (categorizar)="loteCategorizar($event)"
+      (borrar)="loteBorrar()"
+      (limpiar)="limpiarSeleccion()"
+    />
+  }
+
+  @switch (estado()) {
+    @case ('cargando') {
+      <div class="centrado">
+        <mat-progress-spinner mode="indeterminate" diameter="48" aria-label="Cargando" />
+      </div>
+    }
+    @case ('error') {
+      <div class="centrado">
+        <p class="error" role="alert">No pudimos cargar las transacciones.</p>
+        <button mat-stroked-button type="button" (click)="recargar()">Reintentar</button>
+      </div>
+    }
+    @case ('listo') {
+      @if (pagina(); as pagina) {
+        @if (pagina.contenido.length === 0) {
+          <div class="centrado">
+            @if (hayFiltros()) {
+              <p class="vacio">Ningún resultado con estos filtros</p>
+              <button mat-stroked-button type="button" (click)="limpiarFiltros()">
+                Limpiar filtros
+              </button>
+            } @else {
+              <p class="vacio">Aún no hay transacciones</p>
+            }
+          </div>
+        } @else if (moneda(); as moneda) {
+          <app-tabla-transacciones
+            [transacciones]="pagina.contenido"
+            [nombresCuenta]="nombresCuenta()"
+            [nombresCategoria]="nombresCategoria()"
+            [cuentasCerradas]="cuentasCerradas()"
+            [moneda]="moneda"
+            [seleccion]="seleccion()"
+            (alternarSeleccion)="alternarSeleccion($event)"
+            (seleccionarPagina)="seleccionarPagina($event)"
+            (accion)="manejarAccion($event)"
+          />
+        }
+        <mat-paginator
+          [length]="pagina.totalElementos"
+          [pageIndex]="pagina.pagina"
+          [pageSize]="pagina.tamano"
+          [pageSizeOptions]="tamanos"
+          (page)="paginar($event)"
+        />
+      }
+    }
+  }
+</main>

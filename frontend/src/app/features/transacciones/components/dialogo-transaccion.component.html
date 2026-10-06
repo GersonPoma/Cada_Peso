@@ -1,0 +1,105 @@
+<h2 mat-dialog-title>{{ esCrear ? 'Nueva transacción' : 'Editar transacción' }}</h2>
+<form [formGroup]="formulario" (ngSubmit)="enviar()" novalidate>
+  <mat-dialog-content class="contenido">
+    <div class="fila-doble">
+      <mat-form-field appearance="outline">
+        <mat-label>Cuenta</mat-label>
+        <mat-select formControlName="cuentaId" [required]="true">
+          @for (grupo of gruposCuentas; track grupo.etiqueta) {
+            <mat-optgroup [label]="grupo.etiqueta">
+              @for (cuenta of grupo.cuentas; track cuenta.id) {
+                <mat-option [value]="cuenta.id">{{ cuenta.nombre }}</mat-option>
+              }
+            </mat-optgroup>
+          }
+        </mat-select>
+        @if (mensaje('cuentaId'); as texto) {
+          <mat-error>{{ texto }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Fecha</mat-label>
+        <input matInput [matDatepicker]="selectorFecha" formControlName="fecha" required />
+        <mat-datepicker-toggle matSuffix [for]="selectorFecha" />
+        <mat-datepicker #selectorFecha />
+        @if (mensaje('fecha'); as texto) {
+          <mat-error>{{ texto }}</mat-error>
+        }
+      </mat-form-field>
+    </div>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Beneficiario</mat-label>
+      <input matInput type="text" formControlName="beneficiario" autocomplete="off" />
+      <mat-hint align="end">{{ largoBeneficiario() }}/{{ maximoBeneficiario }}</mat-hint>
+      @if (mensaje('beneficiario'); as texto) {
+        <mat-error>{{ texto }}</mat-error>
+      }
+    </mat-form-field>
+
+    <div class="fila-doble">
+      <mat-button-toggle-group formControlName="tipo" aria-label="Tipo de movimiento" class="tipo">
+        <mat-button-toggle value="salida">Salida</mat-button-toggle>
+        <mat-button-toggle value="entrada">Entrada</mat-button-toggle>
+      </mat-button-toggle-group>
+
+      <app-campo-monto
+        [control]="formulario.controls.monto"
+        etiqueta="Monto"
+        [requerido]="true"
+        [mensajes]="mensajesMonto"
+      />
+    </div>
+
+    <mat-slide-toggle formControlName="dividir">Dividir</mat-slide-toggle>
+
+    @if (dividida()) {
+      <app-editor-division
+        [partes]="partes"
+        [montoTotal]="montoActual()"
+        [grupos]="grupos"
+        [moneda]="moneda"
+      />
+    } @else {
+      <mat-form-field appearance="outline">
+        <mat-label>Categoría</mat-label>
+        <mat-select formControlName="categoriaId">
+          <mat-option [value]="null">Sin categoría</mat-option>
+          @for (grupo of grupos; track grupo.id) {
+            <mat-optgroup [label]="grupo.nombre">
+              @for (categoria of grupo.categorias; track categoria.id) {
+                <mat-option [value]="categoria.id">{{ categoria.nombre }}</mat-option>
+              }
+            </mat-optgroup>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
+
+    <mat-form-field appearance="outline">
+      <mat-label>Memo</mat-label>
+      <textarea matInput rows="2" formControlName="memo"></textarea>
+      <mat-hint align="end">{{ largoMemo() }}/{{ maximoMemo }}</mat-hint>
+      @if (mensaje('memo'); as texto) {
+        <mat-error>{{ texto }}</mat-error>
+      }
+    </mat-form-field>
+
+    @if (esCrear) {
+      <mat-checkbox formControlName="aprobada">Aprobada</mat-checkbox>
+    }
+
+    @if (errorGeneral(); as texto) {
+      <p class="error-general" role="alert">{{ texto }}</p>
+    }
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" [mat-dialog-close]="undefined" [disabled]="enviando()">
+      Cancelar
+    </button>
+    <button mat-flat-button type="submit" [disabled]="formulario.invalid || enviando()">
+      {{ esCrear ? 'Crear' : 'Guardar' }}
+    </button>
+  </mat-dialog-actions>
+</form>

@@ -1,0 +1,22 @@
+.barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+}
+
+.cantidad {
+  font: var(--mat-sys-title-small);
+}
+
+.categoria {
+  width: 14rem;
+}
+
+.borrar {
+  color: var(--mat-sys-error);
+}

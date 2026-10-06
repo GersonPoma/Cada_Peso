@@ -20,3 +20,18 @@ export function aFechaNegocio(fecha: Date | null | undefined): string | null {
   const dia = String(fecha.getDate()).padStart(2, '0');
   return `${anio}-${mes}-${dia}`;
 }
+
+/**
+ * Lo inverso de `aFechaNegocio`: el `Date` local (a medianoche) de una fecha `yyyy-MM-dd`, para
+ * mostrarla en un datepicker sin que se corra de día. `null` si el texto no es una fecha real.
+ */
+export function deFechaNegocio(texto: string | null | undefined): Date | null {
+  const partes = /^(\d{4})-(\d{2})-(\d{2})$/.exec(texto ?? '');
+  if (!partes) {
+    return null;
+  }
+  const [anio, mes, dia] = [Number(partes[1]), Number(partes[2]), Number(partes[3])];
+  const fecha = new Date(anio, mes - 1, dia);
+  fecha.setFullYear(anio);
+  return fecha.getMonth() === mes - 1 && fecha.getDate() === dia ? fecha : null;
+}

@@ -1,0 +1,202 @@
+<table mat-table [dataSource]="transacciones()" class="tabla">
+  <ng-container matColumnDef="seleccion">
+    <th mat-header-cell *matHeaderCellDef>
+      <mat-checkbox
+        aria-label="Seleccionar toda la página"
+        [checked]="todaLaPagina()"
+        [indeterminate]="parteDeLaPagina()"
+        (change)="seleccionarPagina.emit($event.checked)"
+      />
+    </th>
+    <td mat-cell *matCellDef="let t">
+      <mat-checkbox
+        [attr.aria-label]="'Seleccionar la transacción del ' + t.fecha"
+        [checked]="seleccion().has(t.id)"
+        (change)="alternarSeleccion.emit(t.id)"
+      />
+    </td>
+  </ng-container>
+
+  <ng-container matColumnDef="fecha">
+    <th mat-header-cell *matHeaderCellDef>Fecha</th>
+    <td mat-cell *matCellDef="let t" class="fecha">
+      <span class="etiqueta-columna">Fecha</span>{{ t.fecha | fecha }}
+    </td>
+  </ng-container>
+
+  <ng-container matColumnDef="cuenta">
+    <th mat-header-cell *matHeaderCellDef>Cuenta</th>
+    <td mat-cell *matCellDef="let t" class="cuenta">
+      <span class="etiqueta-columna">Cuenta</span>{{ nombresCuenta().get(t.cuentaId) ?? '' }}
+    </td>
+  </ng-container>
+
+  <ng-container matColumnDef="beneficiario">
+    <th mat-header-cell *matHeaderCellDef>Beneficiario</th>
+    <td mat-cell *matCellDef="let t" class="beneficiario">
+      <span class="etiqueta-columna">Beneficiario</span>
+      {{ t.beneficiario ?? '' }}
+      @if (esTransferencia(t)) {
+        <span class="insignia-transferencia">
+          <mat-icon aria-hidden="true">swap_horiz</mat-icon>Transferencia
+        </span>
+      }
+    </td>
+  </ng-container>
+
+  <ng-container matColumnDef="categoria">
+    <th mat-header-cell *matHeaderCellDef>Categoría</th>
+    <td mat-cell *matCellDef="let t" class="categoria">
+      <span class="etiqueta-columna">Categoría</span>{{ categoria(t) }}
+    </td>
+  </ng-container>
+
+  <ng-container matColumnDef="memo">
+    <th mat-header-cell *matHeaderCellDef>Memo</th>
+    <td mat-cell *matCellDef="let t" class="memo">
+      <span class="etiqueta-columna">Memo</span>{{ t.memo ?? '' }}
+    </td>
+  </ng-container>
+
+  <ng-container matColumnDef="salida">
+    <th mat-header-cell *matHeaderCellDef class="derecha">Salida</th>
+    <td mat-cell *matCellDef="let t" class="derecha salida">
+      <span class="etiqueta-columna">Salida</span>
+      @if (t.monto < 0) {
+        {{ -t.monto | monto: moneda() }}
+      }
+    </td>
+  </ng-container>
+
+  <ng-container matColumnDef="entrada">
+    <th mat-header-cell *matHeaderCellDef class="derecha">Entrada</th>
+    <td mat-cell *matCellDef="let t" class="derecha entrada">
+      <span class="etiqueta-columna">Entrada</span>
+      @if (t.monto > 0) {
+        {{ t.monto | monto: moneda() }}
+      }
+    </td>
+  </ng-container>
+
+  <ng-container matColumnDef="estado">
+    <th mat-header-cell *matHeaderCellDef>Estado</th>
+    <td mat-cell *matCellDef="let t" class="estado">
+      <mat-icon
+        class="icono-estado"
+        [class]="t.estado"
+        [attr.aria-label]="etiquetaEstado(t)"
+        [matTooltip]="etiquetaEstado(t)"
+        >{{ iconoEstado(t) }}</mat-icon
+      >
+      @if (!t.aprobada) {
+        <mat-icon class="sin-aprobar" aria-label="Sin aprobar" matTooltip="Sin aprobar"
+          >new_releases</mat-icon
+        >
+      }
+    </td>
+  </ng-container>
+
+  <ng-container matColumnDef="acciones">
+    <th mat-header-cell *matHeaderCellDef><span class="cdk-visually-hidden">Acciones</span></th>
+    <td mat-cell *matCellDef="let t">
+      <button
+        mat-icon-button
+        type="button"
+        [attr.aria-label]="'Acciones de la transacción del ' + t.fecha"
+        [matMenuTriggerFor]="menuFila"
+        [matMenuTriggerData]="{ t: t, a: acciones(t) }"
+      >
+        <mat-icon>more_vert</mat-icon>
+      </button>
+    </td>
+  </ng-container>
+
+  <tr mat-header-row *matHeaderRowDef="columnas"></tr>
+  <tr
+    mat-row
+    *matRowDef="let t; columns: columnas"
+    class="fila"
+    [class.fila-sin-aprobar]="!t.aprobada"
+    [class.fila-seleccionada]="seleccion().has(t.id)"
+  ></tr>
+</table>
+
+<mat-menu #menuFila="matMenu">
+  <ng-template matMenuContent let-t="t" let-a="a">
+    @if (a.editar.visible) {
+      <button
+        mat-menu-item
+        type="button"
+        class="accion-editar"
+        [disabled]="!a.editar.habilitada"
+        (click)="emitir('editar', t)"
+      >
+        <mat-icon>edit</mat-icon>
+        <span>Editar</span>
+        @if (a.editar.motivo) {
+          <span class="motivo">{{ a.editar.motivo }}</span>
+        }
+      </button>
+    }
+    <button
+      mat-menu-item
+      type="button"
+      class="accion-duplicar"
+      [disabled]="!a.duplicar.habilitada"
+      (click)="emitir('duplicar', t)"
+    >
+      <mat-icon>content_copy</mat-icon>
+      <span>Duplicar</span>
+      @if (a.duplicar.motivo) {
+        <span class="motivo">{{ a.duplicar.motivo }}</span>
+      }
+    </button>
+    <button
+      mat-menu-item
+      type="button"
+      class="accion-mover"
+      [disabled]="!a.mover.habilitada"
+      (click)="emitir('mover', t)"
+    >
+      <mat-icon>drive_file_move</mat-icon>
+      <span>Mover a otra cuenta</span>
+      @if (a.mover.motivo) {
+        <span class="motivo">{{ a.mover.motivo }}</span>
+      }
+    </button>
+    @if (a.aprobar.visible) {
+      <button mat-menu-item type="button" class="accion-aprobar" (click)="emitir('aprobar', t)">
+        <mat-icon>thumb_up</mat-icon>
+        <span>Aprobar</span>
+      </button>
+    }
+    <button
+      mat-menu-item
+      type="button"
+      class="accion-estado"
+      [disabled]="!a.estado.habilitada"
+      (click)="emitir('estado', t)"
+    >
+      <mat-icon>{{
+        t.estado === 'NO_CONCILIADA' ? 'check_circle' : 'radio_button_unchecked'
+      }}</mat-icon>
+      <span>{{ t.estado === 'NO_CONCILIADA' ? 'Marcar conciliada' : 'Marcar no conciliada' }}</span>
+      @if (a.estado.motivo) {
+        <span class="motivo">{{ a.estado.motivo }}</span>
+      }
+    </button>
+    <button
+      mat-menu-item
+      type="button"
+      class="accion-borrar"
+      [disabled]="!a.borrar.habilitada"
+      (click)="emitir('borrar', t)"
+    >
+      <mat-icon>delete</mat-icon>
+      <span>Borrar</span>
+      @if (a.borrar.motivo) {
+        <span class="motivo">{{ a.borrar.motivo }}</span>
+      }
+    </button>
+  </ng-template>
+</mat-menu>

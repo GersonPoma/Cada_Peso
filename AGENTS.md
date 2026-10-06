@@ -348,6 +348,11 @@ flotante. Nunca con `parseFloat`, `Number()` sobre el texto escrito ni multiplic
 campo donde se edita un monto (saldo inicial, asignado del mes, mover dinero y los que sigan):
 siempre `aMilliunits()`/`leerMonto()`, nunca otra conversión.
 
+En los formularios, un monto editable usa el componente `app-campo-monto`
+(`shared/calculadora/`): su control guarda milésimas y acepta expresiones (`30+20,5`) que evalúa
+`evaluarMonto()` con fracciones de `BigInt`, sin `eval`, `Function` ni coma flotante. La celda de
+asignado del presupuesto mensual, que se edita en el lugar, usa `leerMonto()` directamente.
+
 ## Fechas: `LocalDate` vs `Instant`
 
 - Las **fechas de negocio** sin hora (fecha de una transacción, mes del presupuesto) se modelan
@@ -532,6 +537,7 @@ src/app/
 ├── shared/
 │   ├── api/
 │   ├── cabecera/
+│   ├── calculadora/
 │   ├── fecha/
 │   ├── formato/
 │   ├── formulario/
@@ -566,6 +572,11 @@ src/app/
     │   ├── models/
     │   ├── pages/
     │   └── services/
+    ├── transacciones/
+    │   ├── components/
+    │   ├── models/
+    │   ├── pages/
+    │   └── services/
     └── <feature>/
         ├── pages/
         ├── components/
@@ -579,8 +590,9 @@ src/app/
   configuración global de Angular Material).
 - `shared/`: componentes, pipes, directivas y utilidades reutilizables entre features (hoy,
   `formato/` con los pipes de monto y fecha y las funciones de dinero `leerMonto()`,
-  `aMilliunits()` y `deMilliunits()`, `fecha/` con `aFechaNegocio()`, `api/` con la lectura de
-  errores del API, `cabecera/`, `formulario/` con los mensajes de error y `validacion/` con los
+  `aMilliunits()` y `deMilliunits()`, `fecha/` con `aFechaNegocio()` y `deFechaNegocio()`,
+  `api/` con la lectura de errores del API, `cabecera/`, `calculadora/` con `evaluarMonto()` y el
+  campo `app-campo-monto`, `formulario/` con los mensajes de error y `validacion/` con los
   validadores, entre ellos `montoValido()`).
 - `features/<feature>/`: una carpeta por feature de negocio (`cuentas/`, `categorias/`,
   `transacciones/`, etc.), con solo las subcarpetas que necesite:
@@ -590,6 +602,11 @@ src/app/
   - `models/`: interfaces que reflejan los DTO de request y response del backend.
 - **Dependencias**: `core/` y `shared/` nunca importan nada de `features/`; una feature puede
   importar de `core/` y `shared/`, pero no de otra feature.
+- **Datos de otra feature**: si una feature necesita leer datos que gestiona otra (ej.
+  `transacciones` necesita las cuentas y el árbol de categorías), crea en su propio `services/`
+  un servicio de **solo lectura** (solo GET) con sus propios modelos mínimos en `models/` (ej.
+  `CuentaLecturaService` y `CuentaResumen`). Es una duplicación pequeña y a propósito: nunca se
+  importan servicios ni modelos de otra feature.
 - **Nombres de archivo** en `kebab-case` con el sufijo técnico: `*.page.ts`, `*.component.ts`,
   `*.service.ts`, `*.model.ts`, `*.pipe.ts`, `*.guard.ts`, `*.interceptor.ts`,
   `*.validator.ts`. Los tests `*.spec.ts` van junto al archivo que

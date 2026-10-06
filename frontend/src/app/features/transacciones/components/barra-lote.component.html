@@ -1,0 +1,35 @@
+<section class="barra" role="region" aria-label="Acciones en lote">
+  <span class="cantidad" aria-live="polite">
+    {{ cantidad() }} {{ cantidad() === 1 ? 'seleccionada' : 'seleccionadas' }}
+  </span>
+  <button mat-stroked-button type="button" (click)="aprobar.emit()">
+    <mat-icon>thumb_up</mat-icon>
+    Aprobar
+  </button>
+  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="categoria">
+    <mat-label>Categoría</mat-label>
+    <mat-select [formControl]="categoria">
+      @for (grupo of grupos(); track grupo.id) {
+        <mat-optgroup [label]="grupo.nombre">
+          @for (c of grupo.categorias; track c.id) {
+            <mat-option [value]="c.id">{{ c.nombre }}</mat-option>
+          }
+        </mat-optgroup>
+      }
+    </mat-select>
+  </mat-form-field>
+  <button
+    mat-stroked-button
+    type="button"
+    [disabled]="categoria.value === null"
+    (click)="pedirCategorizar()"
+  >
+    <mat-icon>label</mat-icon>
+    Categorizar
+  </button>
+  <button mat-stroked-button type="button" class="borrar" (click)="borrar.emit()">
+    <mat-icon>delete</mat-icon>
+    Borrar
+  </button>
+  <button mat-button type="button" (click)="limpiar.emit()">Quitar selección</button>
+</section>

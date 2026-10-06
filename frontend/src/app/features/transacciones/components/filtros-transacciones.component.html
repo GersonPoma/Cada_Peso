@@ -1,0 +1,68 @@
+<form class="filtros" [formGroup]="formulario" aria-label="Filtros de transacciones">
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Cuenta</mat-label>
+    <mat-select formControlName="cuentaId">
+      <mat-option [value]="null">Todas</mat-option>
+      @for (grupo of gruposCuentas(); track grupo.etiqueta) {
+        @if (grupo.cuentas.length > 0) {
+          <mat-optgroup [label]="grupo.etiqueta">
+            @for (cuenta of grupo.cuentas; track cuenta.id) {
+              <mat-option [value]="cuenta.id">{{ cuenta.nombre }}</mat-option>
+            }
+          </mat-optgroup>
+        }
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Categoría</mat-label>
+    <mat-select formControlName="categoriaId">
+      <mat-option [value]="null">Todas</mat-option>
+      @for (grupo of grupos(); track grupo.id) {
+        <mat-optgroup [label]="grupo.nombre">
+          @for (categoria of grupo.categorias; track categoria.id) {
+            <mat-option [value]="categoria.id">{{ categoria.nombre }}</mat-option>
+          }
+        </mat-optgroup>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Desde</mat-label>
+    <input matInput [matDatepicker]="selectorDesde" formControlName="desde" />
+    <mat-datepicker-toggle matSuffix [for]="selectorDesde" />
+    <mat-datepicker #selectorDesde />
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Hasta</mat-label>
+    <input matInput [matDatepicker]="selectorHasta" formControlName="hasta" />
+    <mat-datepicker-toggle matSuffix [for]="selectorHasta" />
+    <mat-datepicker #selectorHasta />
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Estado</mat-label>
+    <mat-select formControlName="estado">
+      <mat-option [value]="null">Todos</mat-option>
+      @for (estado of estados; track estado) {
+        <mat-option [value]="estado">{{ etiquetasEstado[estado] }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="busqueda">
+    <mat-label>Buscar</mat-label>
+    <input matInput type="search" formControlName="q" autocomplete="off" />
+    <mat-icon matSuffix>search</mat-icon>
+  </mat-form-field>
+
+  <mat-checkbox formControlName="soloSinAprobar">Solo sin aprobar</mat-checkbox>
+
+  <button mat-button type="button" (click)="limpiar.emit()">
+    <mat-icon>filter_alt_off</mat-icon>
+    Limpiar filtros
+  </button>
+</form>

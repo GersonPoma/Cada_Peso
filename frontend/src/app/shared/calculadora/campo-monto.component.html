@@ -1,0 +1,20 @@
+<mat-form-field appearance="outline" class="campo">
+  <mat-label>{{ etiqueta() }}</mat-label>
+  <input
+    matInput
+    type="text"
+    inputmode="decimal"
+    autocomplete="off"
+    [required]="requerido()"
+    [formControl]="texto"
+    (input)="alEscribir()"
+    (blur)="confirmar()"
+    (keydown.enter)="confirmar()"
+  />
+  @if (pista(); as resultado) {
+    <mat-hint class="pista">= {{ resultado }}</mat-hint>
+  }
+  @if (mensaje(); as texto) {
+    <mat-error>{{ texto }}</mat-error>
+  }
+</mat-form-field>

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { aFechaNegocio } from './fecha-negocio';
+import { aFechaNegocio, deFechaNegocio } from './fecha-negocio';
 
 declare const process: { env: Record<string, string | undefined> };
 
@@ -56,4 +56,22 @@ describe('aFechaNegocio', () => {
   it('lanza un error con un Date inválido', () => {
     expect(() => aFechaNegocio(new Date('no es una fecha'))).toThrow();
   });
+});
+
+describe('deFechaNegocio', () => {
+  it('devuelve la medianoche local del día, que vuelve igual con aFechaNegocio', () => {
+    const fecha = deFechaNegocio('2026-10-01') as Date;
+
+    expect([fecha.getFullYear(), fecha.getMonth(), fecha.getDate(), fecha.getHours()]).toEqual([
+      2026, 9, 1, 0,
+    ]);
+    expect(aFechaNegocio(fecha)).toBe('2026-10-01');
+  });
+
+  it.each(['2026-02-30', '2026-13-01', 'ayer', '', null, undefined])(
+    '%s no es una fecha',
+    (texto) => {
+      expect(deFechaNegocio(texto)).toBeNull();
+    },
+  );
 });

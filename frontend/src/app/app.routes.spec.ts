@@ -194,7 +194,7 @@ describe('rutas', () => {
       const enlaces = Array.from(
         (harness.routeNativeElement as HTMLElement).querySelectorAll('mat-sidenav a'),
       ).map((a) => a.querySelector('[matListItemTitle]')?.textContent?.trim());
-      expect(enlaces).toEqual(['Presupuesto', 'Inicio', 'Cuentas', 'Categorías']);
+      expect(enlaces).toEqual(['Presupuesto', 'Inicio', 'Cuentas', 'Transacciones', 'Categorías']);
     });
 
     it('el enlace Cuentas del menú lleva a /presupuestos/3/cuentas', async () => {
@@ -226,6 +226,26 @@ describe('rutas', () => {
       expect(url()).toBe('/presupuestos/3/categorias');
       expect(texto()).toContain('Facturas');
       expect(enlaceDelMenu('Categorías')).toBeDefined();
+    });
+
+    it('/presupuestos/3/transacciones?cuentaId=5 muestra la pantalla filtrada', async () => {
+      await harness.navigateByUrl('/presupuestos/3/transacciones?cuentaId=5');
+      const backend = TestBed.inject(HttpTestingController);
+      backend.expectOne('/api/v1/presupuestos').flush(PRESUPUESTOS);
+      await harness.fixture.whenStable();
+      (await esperarPeticion('/api/v1/presupuestos/3/cuentas')).flush([
+        { id: 5, nombre: 'Banco', enPresupuesto: true, cerrada: false },
+      ]);
+      backend.expectOne((p) => p.url === '/api/v1/presupuestos/3/categorias').flush([]);
+      const lista = backend.expectOne((p) => p.url === '/api/v1/presupuestos/3/transacciones');
+      expect(lista.request.params.get('cuentaId')).toBe('5');
+      lista.flush({ contenido: [], pagina: 0, tamano: 20, totalElementos: 0, totalPaginas: 0 });
+      backend.expectOne('/api/v1/presupuestos/3/transacciones/saldos').flush([]);
+      await harness.fixture.whenStable();
+      backend.verify();
+
+      expect(texto()).toContain('Transacciones');
+      expect(enlaceDelMenu('Transacciones')).toBeDefined();
     });
   });
 });

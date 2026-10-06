@@ -1,0 +1,58 @@
+<section class="division" aria-label="Partes de la división">
+  @for (parte of partes().controls; track parte; let i = $index) {
+    <div class="parte" [formGroup]="parte">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Categoría {{ i + 1 }}</mat-label>
+        <mat-select formControlName="categoriaId">
+          <mat-option [value]="null">Sin categoría</mat-option>
+          @for (grupo of grupos(); track grupo.id) {
+            <mat-optgroup [label]="grupo.nombre">
+              @for (categoria of grupo.categorias; track categoria.id) {
+                <mat-option [value]="categoria.id">{{ categoria.nombre }}</mat-option>
+              }
+            </mat-optgroup>
+          }
+        </mat-select>
+      </mat-form-field>
+      <app-campo-monto
+        [control]="parte.controls.monto"
+        [etiqueta]="'Monto ' + (i + 1)"
+        [requerido]="true"
+        [mensajes]="mensajesParte"
+      />
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Memo {{ i + 1 }}</mat-label>
+        <input matInput type="text" formControlName="memo" autocomplete="off" />
+        @if (parte.controls.memo.hasError('maxlength')) {
+          <mat-error>El memo no puede superar los 500 caracteres</mat-error>
+        }
+      </mat-form-field>
+      <button
+        mat-icon-button
+        type="button"
+        [attr.aria-label]="'Quitar la parte ' + (i + 1)"
+        [disabled]="partes().length <= minimo"
+        (click)="quitar(i)"
+      >
+        <mat-icon>remove_circle_outline</mat-icon>
+      </button>
+    </div>
+  }
+
+  <div class="pie">
+    <button mat-button type="button" [disabled]="partes().length >= maximo" (click)="agregar()">
+      <mat-icon>add</mat-icon>
+      Agregar parte
+    </button>
+    <p class="resumen" role="status" [class.cuadra]="diferencia() === 0">
+      Total de las partes: {{ suma() | monto: moneda() }} ·
+      @if (diferencia() > 0) {
+        Falta asignar {{ diferencia() | monto: moneda() }}
+      } @else if (diferencia() < 0) {
+        Sobra {{ -diferencia() | monto: moneda() }}
+      } @else {
+        Las partes suman el monto
+      }
+    </p>
+  </div>
+</section>

@@ -58,6 +58,14 @@ export const routes: Routes = [
         data: seccion('Cuentas', 'account_balance'),
       },
       {
+        path: 'transacciones',
+        loadComponent: () =>
+          import('./features/transacciones/pages/transacciones.page').then(
+            (m) => m.TransaccionesPage,
+          ),
+        data: seccion('Transacciones', 'receipt_long'),
+      },
+      {
         path: 'categorias',
         loadComponent: () =>
           import('./features/categorias/pages/categorias.page').then((m) => m.CategoriasPage),

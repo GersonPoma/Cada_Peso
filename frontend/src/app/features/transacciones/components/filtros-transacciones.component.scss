@@ -1,0 +1,16 @@
+.filtros {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.busqueda {
+  grid-column: span 2;
+}
+
+@media (max-width: 599.98px) {
+  .busqueda {
+    grid-column: auto;
+  }
+}

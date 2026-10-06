@@ -1,0 +1,31 @@
+<h2 mat-dialog-title>Mover a otra cuenta</h2>
+<mat-dialog-content>
+  <mat-form-field appearance="outline" class="campo">
+    <mat-label>Cuenta destino</mat-label>
+    <mat-select [formControl]="destino">
+      @for (grupo of grupos; track grupo.etiqueta) {
+        <mat-optgroup [label]="grupo.etiqueta">
+          @for (cuenta of grupo.cuentas; track cuenta.id) {
+            <mat-option [value]="cuenta.id">{{ cuenta.nombre }}</mat-option>
+          }
+        </mat-optgroup>
+      }
+    </mat-select>
+  </mat-form-field>
+  @if (errorGeneral(); as texto) {
+    <p class="error-general" role="alert">{{ texto }}</p>
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button type="button" [mat-dialog-close]="undefined" [disabled]="enviando()">
+    Cancelar
+  </button>
+  <button
+    mat-flat-button
+    type="button"
+    [disabled]="destino.invalid || enviando()"
+    (click)="enviar()"
+  >
+    Mover
+  </button>
+</mat-dialog-actions>
