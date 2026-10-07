@@ -5,10 +5,10 @@ import java.time.YearMonth;
 import java.util.regex.Pattern;
 
 /** Interpreta el {@code mes} de la URL: {@code yyyy-MM} con año entre 2000 y 2100. */
-final class MesParametro {
+public final class MesParametro {
 
-    static final int ANIO_MINIMO = 2000;
-    static final int ANIO_MAXIMO = 2100;
+    public static final int ANIO_MINIMO = 2000;
+    public static final int ANIO_MAXIMO = 2100;
     static final String MENSAJE_MES_INVALIDO =
             "El mes debe tener el formato yyyy-MM, con año entre 2000 y 2100";
 
@@ -16,7 +16,7 @@ final class MesParametro {
 
     private MesParametro() {}
 
-    static YearMonth interpretar(String texto) {
+    public static YearMonth interpretar(String texto) {
         if (texto == null || !FORMATO.matcher(texto).matches()) {
             throw new DatosInvalidosException(MENSAJE_MES_INVALIDO);
         }

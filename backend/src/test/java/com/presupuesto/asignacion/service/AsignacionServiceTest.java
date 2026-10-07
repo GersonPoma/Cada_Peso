@@ -270,4 +270,60 @@ class AsignacionServiceTest {
     private static ArgumentCaptor<List<AsignacionMensual>> capturar() {
         return ArgumentCaptor.forClass(List.class);
     }
+
+    @Test
+    void fijarAsignadosCreaLasFilasQueFaltanYActualizaLasExistentes() {
+        AsignacionMensual existente = AsignacionMensual.builder()
+                .categoria(comida).mes(PRIMERO).asignado(5_000L).build();
+        when(categoriaRepository.findByGrupoPresupuestoIdAndIdInOrderByGrupoOrdenAscOrdenAsc(
+                any(), any())).thenReturn(List.of(comida, ocio));
+        when(asignacionRepository.findByCategoriaIdInAndMes(any(), any()))
+                .thenReturn(List.of(existente));
+
+        service.fijarAsignados(PRESUPUESTO_ID, ENERO, Map.of(COMIDA_ID, 70_000L, OCIO_ID, 0L));
+
+        assertThat(existente.getAsignado()).isEqualTo(70_000L);
+        ArgumentCaptor<List<AsignacionMensual>> guardadas = ArgumentCaptor.forClass(List.class);
+        verify(asignacionRepository).saveAllAndFlush(guardadas.capture());
+        assertThat(guardadas.getValue()).hasSize(2)
+                .anySatisfy(fila -> {
+                    assertThat(fila.getCategoria()).isSameAs(ocio);
+                    assertThat(fila.getMes()).isEqualTo(PRIMERO);
+                    assertThat(fila.getAsignado()).isZero();
+                });
+        verify(calculadora, never()).calcular(any(), any());
+    }
+
+    @Test
+    void fijarAsignadosConUnaCategoriaAjenaResponde404SinGuardarNada() {
+        when(categoriaRepository.findByGrupoPresupuestoIdAndIdInOrderByGrupoOrdenAscOrdenAsc(
+                any(), any())).thenReturn(List.of(comida));
+
+        NegocioException e = assertThrows(RecursoNoEncontradoException.class,
+                () -> service.fijarAsignados(
+                        PRESUPUESTO_ID, ENERO, Map.of(COMIDA_ID, 1L, 99L, 2L)));
+
+        assertThat(e.getCodigo()).isEqualTo(CodigoError.RECURSO_NO_ENCONTRADO);
+        verify(asignacionRepository, never()).saveAllAndFlush(anyList());
+    }
+
+    @Test
+    void fijarAsignadosConUnMapaVacioNoHaceNada() {
+        service.fijarAsignados(PRESUPUESTO_ID, ENERO, Map.of());
+
+        verify(asignacionRepository, never()).saveAllAndFlush(anyList());
+    }
+
+    @Test
+    void fijarAsignadosTraduceLaCarreraDeCreacionAConflicto() {
+        when(categoriaRepository.findByGrupoPresupuestoIdAndIdInOrderByGrupoOrdenAscOrdenAsc(
+                any(), any())).thenReturn(List.of(comida));
+        when(asignacionRepository.findByCategoriaIdInAndMes(any(), any()))
+                .thenReturn(List.of());
+        when(asignacionRepository.saveAllAndFlush(anyList()))
+                .thenThrow(new DataIntegrityViolationException("duplicada"));
+
+        assertThrows(ConflictoException.class,
+                () -> service.fijarAsignados(PRESUPUESTO_ID, ENERO, Map.of(COMIDA_ID, 1L)));
+    }
 }

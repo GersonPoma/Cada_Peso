@@ -16,7 +16,10 @@ import com.presupuesto.comun.excepcion.ReglaNegocioException;
 import com.presupuesto.presupuesto.service.PresupuestoService;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -87,6 +90,37 @@ public class AsignacionService {
         deDestino.sumarAsignado(monto);
         guardar(List.of(deOrigen, deDestino));
         return mesService.construir(presupuestoId, mes, true);
+    }
+
+    /**
+     * Fija el asignado del mes de varias categorías a la vez (crea las filas que falten) y no
+     * recalcula nada. Uso interno de otras features que ya validaron el presupuesto: todas las
+     * categorías deben ser del presupuesto, o responde 404 antes de escribir cualquier fila.
+     */
+    @Transactional
+    public void fijarAsignados(Long presupuestoId, YearMonth mes, Map<Long, Long> asignados) {
+        if (asignados.isEmpty()) {
+            return;
+        }
+        Map<Long, Categoria> categorias = new HashMap<>();
+        categoriaRepository
+                .findByGrupoPresupuestoIdAndIdInOrderByGrupoOrdenAscOrdenAsc(
+                        presupuestoId, asignados.keySet())
+                .forEach(categoria -> categorias.put(categoria.getId(), categoria));
+        if (categorias.size() != asignados.size()) {
+            throw new RecursoNoEncontradoException(MENSAJE_CATEGORIA_NO_ENCONTRADA);
+        }
+        Map<Long, AsignacionMensual> existentes = new HashMap<>();
+        asignacionRepository.findByCategoriaIdInAndMes(asignados.keySet(), mes.atDay(1))
+                .forEach(fila -> existentes.put(fila.getCategoria().getId(), fila));
+        List<AsignacionMensual> filas = new ArrayList<>();
+        asignados.forEach((categoriaId, asignado) -> {
+            AsignacionMensual fila = existentes.computeIfAbsent(
+                    categoriaId, clave -> nueva(categorias.get(categoriaId), mes, 0L));
+            fila.fijarAsignado(asignado);
+            filas.add(fila);
+        });
+        guardar(filas);
     }
 
     private Categoria buscarCategoria(Long categoriaId, Long presupuestoId) {

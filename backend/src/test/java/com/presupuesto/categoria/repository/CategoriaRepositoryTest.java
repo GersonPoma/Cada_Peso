@@ -9,6 +9,7 @@ import com.presupuesto.presupuesto.entity.Presupuesto;
 import com.presupuesto.presupuesto.repository.PresupuestoRepository;
 import com.presupuesto.usuario.entity.Usuario;
 import com.presupuesto.usuario.repository.UsuarioRepository;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -156,5 +157,29 @@ class CategoriaRepositoryTest {
                 .nombreNormalizado(Categoria.normalizar(nombre))
                 .orden(orden)
                 .build();
+    }
+
+    @Test
+    void lasConsultasEnOrdenDelArbolOrdenanPorGrupoYLuegoPorCategoria() {
+        Categoria mercado = categoriaRepository.save(nueva(comida, "Mercado", 0));
+        Categoria alquilerOculta = nueva(vivienda, "Alquiler", 1);
+        alquilerOculta.ocultar();
+        categoriaRepository.save(alquilerOculta);
+        Categoria luz = categoriaRepository.save(nueva(vivienda, "Luz", 0));
+        categoriaRepository.saveAndFlush(nueva(ajeno, "Vuelo", 0));
+
+        assertThat(categoriaRepository
+                .findByGrupoPresupuestoIdOrderByGrupoOrdenAscOrdenAsc(casa.getId()))
+                .extracting(Categoria::getNombre)
+                .containsExactly("Luz", "Alquiler", "Mercado");
+        assertThat(categoriaRepository
+                .findByGrupoPresupuestoIdAndOcultaFalseOrderByGrupoOrdenAscOrdenAsc(casa.getId()))
+                .extracting(Categoria::getNombre)
+                .containsExactly("Luz", "Mercado");
+        assertThat(categoriaRepository
+                .findByGrupoPresupuestoIdAndIdInOrderByGrupoOrdenAscOrdenAsc(
+                        casa.getId(), List.of(mercado.getId(), luz.getId(), Long.MAX_VALUE)))
+                .extracting(Categoria::getNombre)
+                .containsExactly("Luz", "Mercado");
     }
 }

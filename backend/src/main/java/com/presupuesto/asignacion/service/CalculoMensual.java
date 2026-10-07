@@ -18,18 +18,18 @@ import java.util.Set;
  * categoría y reduce el listo para asignar de los meses siguientes. El cálculo es acumulado
  * desde el primer mes con datos hasta el mes pedido.
  */
-final class CalculoMensual {
+public final class CalculoMensual {
 
     /** Cifras de una categoría en el mes pedido. */
-    record FilaMes(long asignado, long actividad, long disponible) {
+    public record FilaMes(long asignado, long actividad, long disponible) {
 
-        static final FilaMes CERO = new FilaMes(0L, 0L, 0L);
+        public static final FilaMes CERO = new FilaMes(0L, 0L, 0L);
     }
 
     /** Listo para asignar y la fila de cada categoría con datos (las demás valen CERO). */
-    record ResultadoMes(long listoParaAsignar, Map<Long, FilaMes> filas) {
+    public record ResultadoMes(long listoParaAsignar, Map<Long, FilaMes> filas) {
 
-        FilaMes fila(Long categoriaId) {
+        public FilaMes fila(Long categoriaId) {
             return filas.getOrDefault(categoriaId, FilaMes.CERO);
         }
     }

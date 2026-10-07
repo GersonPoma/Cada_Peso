@@ -139,4 +139,12 @@ class MesPresupuestoServiceTest {
                 () -> service.obtener(PRESUPUESTO_ID, USUARIO_ID, "2026-13", false));
         verify(calculadora, never()).calcular(any(), any());
     }
+
+    @Test
+    void calcularDevuelveElResultadoDeLaCalculadoraSinValidarElPresupuesto() {
+        ResultadoMes resultado = service.calcular(PRESUPUESTO_ID, ENERO);
+
+        assertThat(resultado.listoParaAsignar()).isEqualTo(380_000L);
+        verify(presupuestoService, never()).obtenerDelUsuario(any(), any());
+    }
 }

@@ -104,6 +104,15 @@ com/presupuesto/
 │   ├── entity/
 │   ├── repository/
 │   └── service/
+├── meta/
+│   ├── controller/
+│   ├── dto/
+│   │   ├── request/
+│   │   └── response/
+│   ├── entity/
+│   ├── repository/
+│   ├── service/
+│   └── validacion/
 ├── presupuesto/
 │   ├── controller/
 │   ├── dto/
@@ -141,7 +150,10 @@ depender de `presupuesto`, `cuenta`, `categoria`, `beneficiario` y `comun`; `asi
 depender de `presupuesto`, `cuenta`, `categoria`, `transaccion` y `comun`; nunca al revés
 (`presupuesto` y `cuenta` no importan `categoria`, y ninguna de ellas importa `transaccion` ni
 `asignacion`; `presupuesto`, `cuenta`, `categoria` y `asignacion` no importan `beneficiario`, y
-`beneficiario` no importa `transaccion` ni `asignacion`).
+`beneficiario` no importa `transaccion` ni `asignacion`). `meta` puede depender de `presupuesto`,
+`categoria`, `asignacion` y `comun` (lee el cálculo del mes y fija asignados por lote con
+`AsignacionService.fijarAsignados`); `presupuesto`, `categoria` y `asignacion` nunca importan
+`meta`.
 
 **Comunicación entre features: eventos.** Cuando una feature debe avisar a otra sin importarla
 (la dependencia iría al revés), publica un evento de Spring y la otra lo escucha. Hoy
@@ -197,7 +209,7 @@ procesador de anotaciones del `pom.xml`.
   `src/main` ni en `src/test`) importa `com.presupuesto.<feature>`. Si una clase de `comun/`
   necesita datos de una feature, los recibe como parámetros simples (ej.
   `JwtService.emitir(Long id, Rol rol)`, no la entidad `Usuario`). Se comprueba desde
-  `backend/src` con `grep -rnE "import com\.presupuesto\.(usuario|auth|presupuesto|cuenta|categoria|transaccion|asignacion|beneficiario)" <dir>` para
+  `backend/src` con `grep -rnE "import com\.presupuesto\.(usuario|auth|presupuesto|cuenta|categoria|transaccion|asignacion|beneficiario|meta)" <dir>` para
   `<dir>` = `main/java/com/presupuesto/comun` y `test/java/com/presupuesto/comun` (ampliando la
   alternancia con cada feature nueva); debe devolver cero líneas.
 

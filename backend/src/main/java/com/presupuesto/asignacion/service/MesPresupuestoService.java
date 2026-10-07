@@ -36,6 +36,15 @@ public class MesPresupuestoService {
         return construir(presupuestoId, MesParametro.interpretar(mes), incluirOcultas);
     }
 
+    /**
+     * Las cifras del mes de todas las categorías (ocultas incluidas). No valida la pertenencia:
+     * lo llama quien ya validó el presupuesto con {@code obtenerDelUsuario}.
+     */
+    @Transactional(readOnly = true)
+    public ResultadoMes calcular(Long presupuestoId, YearMonth mes) {
+        return calculadora.calcular(presupuestoId, mes);
+    }
+
     /** El mes ya calculado, con grupos y categorías en su orden (con o sin las ocultas). */
     MesPresupuestoResponse construir(
             Long presupuestoId, YearMonth mes, boolean incluirOcultas) {

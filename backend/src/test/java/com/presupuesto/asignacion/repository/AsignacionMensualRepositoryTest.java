@@ -136,4 +136,18 @@ class AsignacionMensualRepositoryTest {
                 .moneda("BOB")
                 .build();
     }
+
+    @Test
+    void findByCategoriaIdInAndMesTraeSoloLasCategoriasYElMesPedidos() {
+        AsignacionMensual deComida = repository.save(nueva(comida, ENERO, 10_000L));
+        repository.save(nueva(comida, FEBRERO, 20_000L));
+        AsignacionMensual deOcio = repository.save(nueva(ocio, ENERO, 30_000L));
+        repository.saveAndFlush(nueva(hotel, ENERO, 40_000L));
+
+        assertThat(repository.findByCategoriaIdInAndMes(
+                List.of(comida.getId(), ocio.getId()), ENERO))
+                .containsExactlyInAnyOrder(deComida, deOcio);
+        assertThat(repository.findByCategoriaIdInAndMes(List.of(ocio.getId()), FEBRERO))
+                .isEmpty();
+    }
 }
