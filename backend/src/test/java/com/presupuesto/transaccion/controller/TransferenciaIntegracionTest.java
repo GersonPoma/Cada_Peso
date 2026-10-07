@@ -157,6 +157,33 @@ class TransferenciaIntegracionTest {
     }
 
     @Test
+    void unaPataDeTransferenciaNoTieneBeneficiarioNiBeneficiarioId() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long banco = crearCuenta(ana, ana.presupuestoId, "Banco", true);
+        long ahorros = crearCuenta(ana, ana.presupuestoId, "Ahorros", true);
+        Transferencia t = crearOk(ana, banco, ahorros, 30000, null);
+
+        for (long pata : List.of(t.salida(), t.entrada())) {
+            mockMvc.perform(get(rutaTx(ana.presupuestoId) + "/" + pata)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(ana.token)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.beneficiario", nullValue()))
+                    .andExpect(jsonPath("$.beneficiarioId", nullValue()));
+        }
+        mockMvc.perform(get(rutaTx(ana.presupuestoId))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(ana.token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contenido[0].beneficiario", nullValue()))
+                .andExpect(jsonPath("$.contenido[0].beneficiarioId", nullValue()))
+                .andExpect(jsonPath("$.contenido[1].beneficiario", nullValue()))
+                .andExpect(jsonPath("$.contenido[1].beneficiarioId", nullValue()));
+        mockMvc.perform(get(RUTA_PRESUPUESTOS + "/" + ana.presupuestoId + "/beneficiarios")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(ana.token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
     void crearConMontoCeroNegativoOCamposAusentesDevuelve400() throws Exception {
         Sesion ana = registrar("ana@ejemplo.com");
         long banco = crearCuenta(ana, ana.presupuestoId, "Banco", true);

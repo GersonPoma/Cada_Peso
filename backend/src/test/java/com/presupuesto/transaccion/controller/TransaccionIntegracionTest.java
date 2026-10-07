@@ -843,6 +843,280 @@ class TransaccionIntegracionTest {
                 ana, Map.of()), "cuentaId");
     }
 
+    // ---------- beneficiario vinculado ----------
+
+    @Test
+    void crearConBeneficiarioNuevoLoCreaYLoVincula() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long cuenta = crearCuenta(ana, ana.presupuestoId, "Banco", 0);
+        Map<String, Object> cuerpo = cuerpo(cuenta, -2500);
+        cuerpo.put("beneficiario", "  Netflix ");
+
+        crear(ana, ana.presupuestoId, cuerpo)
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.beneficiario").value("Netflix"))
+                .andExpect(jsonPath("$.beneficiarioId").isNumber());
+
+        beneficiarios(ana, ana.presupuestoId)
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].nombre").value("Netflix"))
+                .andExpect(jsonPath("$[0].categoriaPredeterminadaId").value((Object) null));
+    }
+
+    @Test
+    void crearConUnBeneficiarioExistenteConOtrasMayusculasLoReutiliza() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long cuenta = crearCuenta(ana, ana.presupuestoId, "Banco", 0);
+        long existente = idDe(enviar(
+                post(RUTA_PRESUPUESTOS + "/" + ana.presupuestoId + "/beneficiarios"),
+                ana, Map.of("nombre", "Netflix")));
+        Map<String, Object> cuerpo = cuerpo(cuenta, -2500);
+        cuerpo.put("beneficiario", "NETFLIX");
+
+        crear(ana, ana.presupuestoId, cuerpo)
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.beneficiario").value("Netflix"))
+                .andExpect(jsonPath("$.beneficiarioId").value(existente));
+
+        beneficiarios(ana, ana.presupuestoId).andExpect(jsonPath("$", hasSize(1)));
+    }
+
+    @Test
+    void sinBeneficiarioLaTransaccionNoSeVinculaNiCreaBeneficiarios() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long cuenta = crearCuenta(ana, ana.presupuestoId, "Banco", 0);
+        Map<String, Object> conEspacios = cuerpo(cuenta, -1);
+        conEspacios.put("beneficiario", "   ");
+
+        crear(ana, ana.presupuestoId, cuerpo(cuenta, -1))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.beneficiario").value((Object) null))
+                .andExpect(jsonPath("$.beneficiarioId").value((Object) null));
+        crear(ana, ana.presupuestoId, conEspacios)
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.beneficiarioId").value((Object) null));
+
+        beneficiarios(ana, ana.presupuestoId).andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    void elDetalleYElListadoExponenElBeneficiarioId() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long cuenta = crearCuenta(ana, ana.presupuestoId, "Banco", 0);
+        Map<String, Object> cuerpo = cuerpo(cuenta, -2500);
+        cuerpo.put("beneficiario", "Netflix");
+        long id = idDe(crear(ana, ana.presupuestoId, cuerpo));
+        long beneficiarioId = objectMapper.readTree(
+                obtener(ana, ana.presupuestoId, id).andReturn().getResponse()
+                        .getContentAsString()).get("beneficiarioId").asLong();
+
+        obtener(ana, ana.presupuestoId, id)
+                .andExpect(jsonPath("$.beneficiarioId").value(beneficiarioId));
+        listar(ana, ana.presupuestoId, Map.of())
+                .andExpect(jsonPath("$.contenido[0].beneficiarioId").value(beneficiarioId));
+    }
+
+    @Test
+    void crearConCategoriaRecuerdaLaCategoriaDelBeneficiario() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long ocio = crearCategoria(ana, ana.presupuestoId, "Ocio");
+        long cuenta = crearCuenta(ana, ana.presupuestoId, "Banco", 0);
+        Map<String, Object> cuerpo = cuerpo(cuenta, -2500);
+        cuerpo.put("beneficiario", "Netflix");
+        cuerpo.put("categoriaId", ocio);
+
+        crear(ana, ana.presupuestoId, cuerpo).andExpect(status().isCreated());
+
+        beneficiarios(ana, ana.presupuestoId)
+                .andExpect(jsonPath("$[0].categoriaPredeterminadaId").value(ocio));
+    }
+
+    @Test
+    void editarConOtraCategoriaActualizaLaCategoriaDelBeneficiario() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long ocio = crearCategoria(ana, ana.presupuestoId, "Ocio");
+        long comida = crearCategoria(ana, ana.presupuestoId, "Comida");
+        long cuenta = crearCuenta(ana, ana.presupuestoId, "Banco", 0);
+        Map<String, Object> cuerpo = cuerpo(cuenta, -2500);
+        cuerpo.put("beneficiario", "Netflix");
+        cuerpo.put("categoriaId", ocio);
+        long id = idDe(crear(ana, ana.presupuestoId, cuerpo));
+        Map<String, Object> cambio = edicion(-2500);
+        cambio.put("beneficiario", "Netflix");
+        cambio.put("categoriaId", comida);
+
+        editar(ana, ana.presupuestoId, id, cambio).andExpect(status().isOk());
+
+        beneficiarios(ana, ana.presupuestoId)
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].categoriaPredeterminadaId").value(comida));
+    }
+
+    @Test
+    void editarPuedeCambiarElBeneficiarioYQuitarloSinBorrarBeneficiarios() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long cuenta = crearCuenta(ana, ana.presupuestoId, "Banco", 0);
+        Map<String, Object> cuerpo = cuerpo(cuenta, -2500);
+        cuerpo.put("beneficiario", "Netflix");
+        long id = idDe(crear(ana, ana.presupuestoId, cuerpo));
+        Map<String, Object> aSpotify = edicion(-2500);
+        aSpotify.put("beneficiario", "Spotify");
+
+        editar(ana, ana.presupuestoId, id, aSpotify)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.beneficiario").value("Spotify"))
+                .andExpect(jsonPath("$.beneficiarioId").isNumber());
+        editar(ana, ana.presupuestoId, id, edicion(-2500))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.beneficiario").value((Object) null))
+                .andExpect(jsonPath("$.beneficiarioId").value((Object) null));
+
+        beneficiarios(ana, ana.presupuestoId).andExpect(jsonPath("$", hasSize(2)));
+    }
+
+    @Test
+    void unaTransaccionDivididaNoCambiaLaCategoriaDelBeneficiario() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long ocio = crearCategoria(ana, ana.presupuestoId, "Ocio");
+        long comida = crearCategoria(ana, ana.presupuestoId, "Comida");
+        long cuenta = crearCuenta(ana, ana.presupuestoId, "Banco", 0);
+        Map<String, Object> simple = cuerpo(cuenta, -1000);
+        simple.put("beneficiario", "Hipermaxi");
+        simple.put("categoriaId", ocio);
+        crear(ana, ana.presupuestoId, simple).andExpect(status().isCreated());
+        Map<String, Object> dividida = cuerpo(cuenta, -3000);
+        dividida.put("beneficiario", "Hipermaxi");
+        dividida.put("subtransacciones", List.of(sub(comida, -1000), sub(comida, -2000)));
+
+        crear(ana, ana.presupuestoId, dividida)
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.beneficiarioId").isNumber());
+
+        beneficiarios(ana, ana.presupuestoId)
+                .andExpect(jsonPath("$[0].categoriaPredeterminadaId").value(ocio));
+    }
+
+    @Test
+    void crearConCategoriaAjenaDevuelve404YNoCreaElBeneficiario() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        Sesion beto = registrar("beto@ejemplo.com");
+        long deBeto = crearCategoria(beto, beto.presupuestoId, "Comida");
+        long cuenta = crearCuenta(ana, ana.presupuestoId, "Banco", 0);
+        Map<String, Object> cuerpo = cuerpo(cuenta, -2500);
+        cuerpo.put("beneficiario", "Netflix");
+        cuerpo.put("categoriaId", deBeto);
+
+        esperarNoEncontrado(crear(ana, ana.presupuestoId, cuerpo));
+
+        beneficiarios(ana, ana.presupuestoId).andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    void elMismoBeneficiarioEnOtroPresupuestoSeCreaAparte() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long viajes = idDe(enviar(post(RUTA_PRESUPUESTOS), ana, Map.of("nombre", "Viajes")));
+        long cuentaCasa = crearCuenta(ana, ana.presupuestoId, "Banco", 0);
+        long cuentaViajes = crearCuenta(ana, viajes, "Banco", 0);
+        Map<String, Object> enCasa = cuerpo(cuentaCasa, -1);
+        enCasa.put("beneficiario", "Netflix");
+        Map<String, Object> enViajes = cuerpo(cuentaViajes, -1);
+        enViajes.put("beneficiario", "Netflix");
+
+        crear(ana, ana.presupuestoId, enCasa).andExpect(status().isCreated());
+        crear(ana, viajes, enViajes).andExpect(status().isCreated());
+
+        beneficiarios(ana, ana.presupuestoId).andExpect(jsonPath("$", hasSize(1)));
+        beneficiarios(ana, viajes).andExpect(jsonPath("$", hasSize(1)));
+    }
+
+    @Test
+    void unaTransaccionAnteriorConTextoYSinVinculoSigueFuncionandoYSeVinculaAlEditarla()
+            throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long cuenta = crearCuenta(ana, ana.presupuestoId, "Banco", 0);
+        long id = idDe(crear(ana, ana.presupuestoId, cuerpo(cuenta, -2500)));
+        transaccionRepository.saveAndFlush(
+                transaccionAnteriorConTexto(transaccionRepository.findById(id).orElseThrow()));
+
+        obtener(ana, ana.presupuestoId, id)
+                .andExpect(jsonPath("$.beneficiario").value("Tienda"))
+                .andExpect(jsonPath("$.beneficiarioId").value((Object) null));
+        accion(ana, ana.presupuestoId, "transacciones", id, "aprobar")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.beneficiario").value("Tienda"))
+                .andExpect(jsonPath("$.beneficiarioId").value((Object) null));
+        beneficiarios(ana, ana.presupuestoId).andExpect(jsonPath("$", hasSize(0)));
+
+        Map<String, Object> cambio = edicion(-2500);
+        cambio.put("beneficiario", "Tienda");
+        editar(ana, ana.presupuestoId, id, cambio)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.beneficiarioId").isNumber());
+        beneficiarios(ana, ana.presupuestoId).andExpect(jsonPath("$", hasSize(1)));
+    }
+
+    @Test
+    void duplicarConservaElVinculoSinCrearOtroBeneficiario() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long cuenta = crearCuenta(ana, ana.presupuestoId, "Banco", 0);
+        Map<String, Object> cuerpo = cuerpo(cuenta, -2500);
+        cuerpo.put("beneficiario", "Netflix");
+        long id = idDe(crear(ana, ana.presupuestoId, cuerpo));
+        long beneficiarioId = objectMapper.readTree(
+                obtener(ana, ana.presupuestoId, id).andReturn().getResponse()
+                        .getContentAsString()).get("beneficiarioId").asLong();
+
+        accion(ana, ana.presupuestoId, "transacciones", id, "duplicar")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.beneficiario").value("Netflix"))
+                .andExpect(jsonPath("$.beneficiarioId").value(beneficiarioId));
+
+        beneficiarios(ana, ana.presupuestoId).andExpect(jsonPath("$", hasSize(1)));
+    }
+
+    @Test
+    void moverDeCuentaYAprobarNoCambianElBeneficiario() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long banco = crearCuenta(ana, ana.presupuestoId, "Banco", 0);
+        long efectivo = crearCuenta(ana, ana.presupuestoId, "Efectivo", 0);
+        Map<String, Object> cuerpo = cuerpo(banco, -2500);
+        cuerpo.put("beneficiario", "Netflix");
+        cuerpo.put("aprobada", false);
+        long id = idDe(crear(ana, ana.presupuestoId, cuerpo));
+
+        mover(ana, ana.presupuestoId, id, efectivo)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.beneficiario").value("Netflix"))
+                .andExpect(jsonPath("$.beneficiarioId").isNumber());
+        accion(ana, ana.presupuestoId, "transacciones", id, "aprobar")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.beneficiario").value("Netflix"))
+                .andExpect(jsonPath("$.beneficiarioId").isNumber());
+    }
+
+    @Test
+    void categorizarEnLoteActualizaLaCategoriaDeLosBeneficiariosVinculados() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long ocio = crearCategoria(ana, ana.presupuestoId, "Ocio");
+        long cuenta = crearCuenta(ana, ana.presupuestoId, "Banco", 0);
+        Map<String, Object> deNetflix = cuerpo(cuenta, -1000);
+        deNetflix.put("beneficiario", "Netflix");
+        Map<String, Object> deSpotify = cuerpo(cuenta, -2000);
+        deSpotify.put("beneficiario", "Spotify");
+        long a = idDe(crear(ana, ana.presupuestoId, deNetflix));
+        long b = idDe(crear(ana, ana.presupuestoId, deSpotify));
+        long c = idDe(crear(ana, ana.presupuestoId, cuerpo(cuenta, -3000)));
+
+        lote(ana, ana.presupuestoId, List.of(a, b, c), "CATEGORIZAR", ocio)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.afectadas").value(3));
+
+        beneficiarios(ana, ana.presupuestoId)
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].categoriaPredeterminadaId").value(ocio))
+                .andExpect(jsonPath("$[1].categoriaPredeterminadaId").value(ocio));
+    }
+
     // ---------- duplicar ----------
 
     @Test
@@ -1373,6 +1647,25 @@ class TransaccionIntegracionTest {
             cuerpo.put("categoriaId", categoriaId);
         }
         return enviar(post(ruta(presupuestoId) + "/lote"), sesion, cuerpo);
+    }
+
+    private ResultActions beneficiarios(Sesion sesion, long presupuestoId) throws Exception {
+        return mockMvc.perform(get(RUTA_PRESUPUESTOS + "/" + presupuestoId + "/beneficiarios")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(sesion.token)))
+                .andExpect(status().isOk());
+    }
+
+    /** Una transacción de antes de los beneficiarios: con texto y sin vínculo. */
+    private Transaccion transaccionAnteriorConTexto(Transaccion transaccion) {
+        return transaccion.getBeneficiarioVinculado() == null
+                ? conTexto(transaccion, "Tienda")
+                : transaccion;
+    }
+
+    private static Transaccion conTexto(Transaccion transaccion, String texto) {
+        org.springframework.test.util.ReflectionTestUtils
+                .setField(transaccion, "beneficiario", texto);
+        return transaccion;
     }
 
     private ResultActions saldos(Sesion sesion, long presupuestoId) throws Exception {

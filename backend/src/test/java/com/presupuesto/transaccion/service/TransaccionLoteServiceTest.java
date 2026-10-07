@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.presupuesto.beneficiario.entity.Beneficiario;
 import com.presupuesto.categoria.entity.Categoria;
 import com.presupuesto.categoria.repository.CategoriaRepository;
 import com.presupuesto.comun.excepcion.CodigoError;
@@ -84,6 +85,48 @@ class TransaccionLoteServiceTest {
         assertThat(b.getCategoria()).isSameAs(comida);
         verify(transaccionRepository).saveAllAndFlush(List.of(a, b));
         verify(presupuestoService).obtenerDelUsuario(PRESUPUESTO_ID, USUARIO_ID);
+    }
+
+    @Test
+    void categorizarRecuerdaLaCategoriaDeLosBeneficiariosVinculados() {
+        Beneficiario netflix = Beneficiario.builder().nombre("Netflix").build();
+        Beneficiario spotify = Beneficiario.builder().nombre("Spotify").build();
+        Transaccion c = nueva(3L);
+        a.editar(a.getFecha(), a.getMonto(), null, netflix, null);
+        b.editar(b.getFecha(), b.getMonto(), null, spotify, null);
+        devolver(a, b, c);
+
+        ejecutar(OperacionLote.CATEGORIZAR, CATEGORIA_ID, 1L, 2L, 3L);
+
+        assertThat(netflix.getCategoriaPredeterminada()).isSameAs(comida);
+        assertThat(spotify.getCategoriaPredeterminada()).isSameAs(comida);
+        assertThat(c.getCategoria()).isSameAs(comida);
+        assertThat(c.getBeneficiarioVinculado()).isNull();
+    }
+
+    @Test
+    void unLoteRechazadoNoTocaLaCategoriaDeLosBeneficiarios() {
+        Beneficiario netflix = Beneficiario.builder().nombre("Netflix").build();
+        a.editar(a.getFecha(), a.getMonto(), null, netflix, null);
+        b.reemplazarSubtransacciones(List.of(
+                SubTransaccion.builder().monto(-400L).build(),
+                SubTransaccion.builder().monto(-600L).build()));
+
+        assertThrows(ReglaNegocioException.class,
+                () -> ejecutar(OperacionLote.CATEGORIZAR, CATEGORIA_ID, 1L, 2L));
+
+        assertThat(netflix.getCategoriaPredeterminada()).isNull();
+    }
+
+    @Test
+    void aprobarYBorrarNoTocanLaCategoriaDeLosBeneficiarios() {
+        Beneficiario netflix = Beneficiario.builder().nombre("Netflix").build();
+        a.editar(a.getFecha(), a.getMonto(), null, netflix, null);
+
+        ejecutar(OperacionLote.APROBAR, null, 1L);
+        ejecutar(OperacionLote.BORRAR, null, 1L);
+
+        assertThat(netflix.getCategoriaPredeterminada()).isNull();
     }
 
     @Test

@@ -80,9 +80,17 @@ public class TransferenciaService {
         referencias.exigirAbierta(entrada.getCuenta());
         exigirReglaDeCategoria(salida.getCuenta(), entrada.getCuenta(), categoria);
         salida.editar(
-                request.fecha(), -request.monto(), null, salida.getBeneficiario(), request.memo());
+                request.fecha(),
+                -request.monto(),
+                null,
+                salida.getBeneficiarioVinculado(),
+                request.memo());
         entrada.editar(
-                request.fecha(), request.monto(), null, entrada.getBeneficiario(), request.memo());
+                request.fecha(),
+                request.monto(),
+                null,
+                entrada.getBeneficiarioVinculado(),
+                request.memo());
         asignarCategoria(salida, entrada, categoria);
         transaccionRepository.saveAllAndFlush(List.of(salida, entrada));
         return TransferenciaResponse.desde(salida, entrada);

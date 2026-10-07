@@ -61,6 +61,9 @@ public class TransaccionLoteService {
             case CATEGORIZAR -> {
                 for (Transaccion transaccion : transacciones) {
                     transaccion.categorizar(categoria);
+                    if (transaccion.getBeneficiarioVinculado() != null) {
+                        transaccion.getBeneficiarioVinculado().recordarCategoria(categoria);
+                    }
                 }
                 transaccionRepository.saveAllAndFlush(transacciones);
             }

@@ -4,10 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.AdditionalAnswers.returnsFirstArg;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.presupuesto.beneficiario.entity.Beneficiario;
+import com.presupuesto.beneficiario.service.BeneficiarioService;
 import com.presupuesto.categoria.entity.Categoria;
 import com.presupuesto.categoria.repository.CategoriaRepository;
 import com.presupuesto.comun.config.RelojDePrueba;
@@ -32,7 +35,9 @@ import com.presupuesto.transaccion.entity.SubTransaccion;
 import com.presupuesto.transaccion.entity.Transaccion;
 import com.presupuesto.transaccion.repository.TransaccionRepository;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
@@ -74,6 +79,10 @@ class TransaccionServiceTest {
     @Mock
     private PresupuestoService presupuestoService;
 
+    @Mock
+    private BeneficiarioService beneficiarioService;
+
+    private final Map<String, Beneficiario> beneficiarios = new HashMap<>();
     private RelojDePrueba reloj;
     private TransaccionService service;
     private Cuenta banco;
@@ -89,7 +98,13 @@ class TransaccionServiceTest {
                 transaccionRepository,
                 new TransaccionReferencias(cuentaRepository, categoriaRepository),
                 presupuestoService,
+                beneficiarioService,
                 reloj);
+        when(beneficiarioService.obtenerOCrear(any(), anyString())).thenAnswer(inv -> {
+            String nombre = inv.getArgument(1);
+            return beneficiarios.computeIfAbsent(Beneficiario.normalizar(nombre), clave ->
+                    Beneficiario.builder().nombre(nombre).nombreNormalizado(clave).build());
+        });
         banco = Cuenta.builder().id(CUENTA_ID).build();
         otraCuenta = Cuenta.builder().id(OTRA_CUENTA_ID).build();
         cerrada = Cuenta.builder().id(CERRADA_ID).build();
@@ -507,6 +522,171 @@ class TransaccionServiceTest {
         assertThrows(ReglaNegocioException.class,
                 () -> service.duplicar(PRESUPUESTO_ID, USUARIO_ID, TRANSACCION_ID));
         verify(transaccionRepository, never()).saveAndFlush(any());
+    }
+
+    // ---------- beneficiario vinculado ----------
+
+    @Test
+    void crearConBeneficiarioNuevoLoCreaLoVinculaYUsaSuNombre() {
+        TransaccionResponse respuesta = service.crear(PRESUPUESTO_ID, USUARIO_ID,
+                new CrearTransaccionRequest(
+                        CUENTA_ID, FECHA, -2500L, null, "Netflix", null, null, null));
+
+        ArgumentCaptor<Transaccion> captura = ArgumentCaptor.forClass(Transaccion.class);
+        verify(transaccionRepository).saveAndFlush(captura.capture());
+        Beneficiario netflix = beneficiarios.get("netflix");
+        assertThat(captura.getValue().getBeneficiarioVinculado()).isSameAs(netflix);
+        assertThat(respuesta.beneficiario()).isEqualTo("Netflix");
+        verify(beneficiarioService).obtenerOCrear(any(), org.mockito.ArgumentMatchers.eq("Netflix"));
+    }
+
+    @Test
+    void crearConUnBeneficiarioExistenteConOtrasMayusculasUsaSuNombre() {
+        Beneficiario existente = Beneficiario.builder()
+                .nombre("Netflix").nombreNormalizado("netflix").build();
+        beneficiarios.put("netflix", existente);
+
+        TransaccionResponse respuesta = service.crear(PRESUPUESTO_ID, USUARIO_ID,
+                new CrearTransaccionRequest(
+                        CUENTA_ID, FECHA, -2500L, null, "NETFLIX", null, null, null));
+
+        assertThat(respuesta.beneficiario()).isEqualTo("Netflix");
+        assertThat(beneficiarios).hasSize(1);
+    }
+
+    @Test
+    void crearSinBeneficiarioNoLoBuscaNiLoVincula() {
+        TransaccionResponse respuesta = service.crear(
+                PRESUPUESTO_ID, USUARIO_ID, crearSimple(CUENTA_ID));
+
+        assertThat(respuesta.beneficiario()).isNull();
+        assertThat(respuesta.beneficiarioId()).isNull();
+        verify(beneficiarioService, never()).obtenerOCrear(any(), anyString());
+    }
+
+    @Test
+    void crearConCategoriaRecuerdaLaCategoriaDelBeneficiario() {
+        service.crear(PRESUPUESTO_ID, USUARIO_ID, new CrearTransaccionRequest(
+                CUENTA_ID, FECHA, -2500L, CATEGORIA_ID, "Netflix", null, null, null));
+
+        assertThat(beneficiarios.get("netflix").getCategoriaPredeterminada()).isSameAs(comida);
+    }
+
+    @Test
+    void crearSinCategoriaNoCambiaLaCategoriaDelBeneficiario() {
+        Beneficiario existente = Beneficiario.builder()
+                .nombre("Netflix").nombreNormalizado("netflix").categoriaPredeterminada(comida)
+                .build();
+        beneficiarios.put("netflix", existente);
+
+        service.crear(PRESUPUESTO_ID, USUARIO_ID, new CrearTransaccionRequest(
+                CUENTA_ID, FECHA, -2500L, null, "Netflix", null, null, null));
+
+        assertThat(existente.getCategoriaPredeterminada()).isSameAs(comida);
+    }
+
+    @Test
+    void crearUnaDivisionNoCambiaLaCategoriaDelBeneficiario() {
+        service.crear(PRESUPUESTO_ID, USUARIO_ID, new CrearTransaccionRequest(
+                CUENTA_ID, FECHA, -3000L, null, "Hipermaxi", null, null,
+                List.of(new SubTransaccionRequest(CATEGORIA_ID, -1000L, null),
+                        new SubTransaccionRequest(null, -2000L, null))));
+
+        assertThat(beneficiarios.get("hipermaxi").getCategoriaPredeterminada()).isNull();
+    }
+
+    @Test
+    void crearConCategoriaAjenaNoCreaElBeneficiario() {
+        assertThrows(RecursoNoEncontradoException.class, () -> service.crear(
+                PRESUPUESTO_ID, USUARIO_ID, new CrearTransaccionRequest(
+                        CUENTA_ID, FECHA, -2500L, 999L, "Netflix", null, null, null)));
+
+        verify(beneficiarioService, never()).obtenerOCrear(any(), anyString());
+        verify(transaccionRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void actualizarVinculaAlBeneficiarioYRecuerdaLaCategoria() {
+        TransaccionResponse respuesta = service.actualizar(PRESUPUESTO_ID, USUARIO_ID,
+                TRANSACCION_ID, new ActualizarTransaccionRequest(
+                        FECHA, -1000L, CATEGORIA_ID, "Spotify", null, null));
+
+        Beneficiario spotify = beneficiarios.get("spotify");
+        assertThat(existente.getBeneficiarioVinculado()).isSameAs(spotify);
+        assertThat(respuesta.beneficiario()).isEqualTo("Spotify");
+        assertThat(spotify.getCategoriaPredeterminada()).isSameAs(comida);
+    }
+
+    @Test
+    void actualizarUnaDivisionNoCambiaLaCategoriaDelBeneficiario() {
+        service.actualizar(PRESUPUESTO_ID, USUARIO_ID, TRANSACCION_ID,
+                new ActualizarTransaccionRequest(FECHA, -3000L, null, "Spotify", null,
+                        List.of(new SubTransaccionRequest(CATEGORIA_ID, -1000L, null),
+                                new SubTransaccionRequest(null, -2000L, null))));
+
+        assertThat(beneficiarios.get("spotify").getCategoriaPredeterminada()).isNull();
+    }
+
+    @Test
+    void actualizarSinBeneficiarioQuitaElVinculo() {
+        existente.editar(FECHA, -1000L, null,
+                Beneficiario.builder().nombre("Netflix").build(), null);
+
+        TransaccionResponse respuesta = service.actualizar(
+                PRESUPUESTO_ID, USUARIO_ID, TRANSACCION_ID, edicion(-1000L));
+
+        assertThat(respuesta.beneficiario()).isNull();
+        assertThat(respuesta.beneficiarioId()).isNull();
+        assertThat(existente.getBeneficiarioVinculado()).isNull();
+    }
+
+    @Test
+    void actualizarUnaTransaccionAnteriorSinVinculoLaVinculaAlEditarla() {
+        Transaccion anterior = Transaccion.builder()
+                .id(TRANSACCION_ID).cuenta(banco).fecha(FECHA).monto(-1000L)
+                .beneficiario("Tienda").build();
+        when(transaccionRepository.findByIdAndCuentaPresupuestoId(TRANSACCION_ID, PRESUPUESTO_ID))
+                .thenReturn(Optional.of(anterior));
+
+        service.actualizar(PRESUPUESTO_ID, USUARIO_ID, TRANSACCION_ID,
+                new ActualizarTransaccionRequest(FECHA, -1000L, null, "Tienda", null, null));
+
+        assertThat(anterior.getBeneficiarioVinculado()).isSameAs(beneficiarios.get("tienda"));
+    }
+
+    @Test
+    void duplicarCopiaElVinculoSinCrearNiCambiarBeneficiarios() {
+        Beneficiario netflix = Beneficiario.builder()
+                .nombre("Netflix").nombreNormalizado("netflix").build();
+        Transaccion original = Transaccion.builder()
+                .id(TRANSACCION_ID).cuenta(banco).fecha(FECHA).monto(-1000L)
+                .beneficiario("Netflix").beneficiarioVinculado(netflix).categoria(comida).build();
+        when(transaccionRepository.findByIdAndCuentaPresupuestoId(TRANSACCION_ID, PRESUPUESTO_ID))
+                .thenReturn(Optional.of(original));
+
+        service.duplicar(PRESUPUESTO_ID, USUARIO_ID, TRANSACCION_ID);
+
+        ArgumentCaptor<Transaccion> captura = ArgumentCaptor.forClass(Transaccion.class);
+        verify(transaccionRepository).saveAndFlush(captura.capture());
+        assertThat(captura.getValue().getBeneficiarioVinculado()).isSameAs(netflix);
+        assertThat(captura.getValue().getBeneficiario()).isEqualTo("Netflix");
+        assertThat(netflix.getCategoriaPredeterminada()).isNull();
+        verify(beneficiarioService, never()).obtenerOCrear(any(), anyString());
+    }
+
+    @Test
+    void aprobarCambiarEstadoYMoverCuentaNoTocanElBeneficiario() {
+        Beneficiario netflix = Beneficiario.builder().nombre("Netflix").build();
+        existente.editar(FECHA, -1000L, null, netflix, null);
+
+        service.aprobar(PRESUPUESTO_ID, USUARIO_ID, TRANSACCION_ID);
+        cambiarEstado(EstadoTransaccion.CONCILIADA);
+        service.moverCuenta(PRESUPUESTO_ID, USUARIO_ID, TRANSACCION_ID,
+                new MoverCuentaRequest(OTRA_CUENTA_ID));
+
+        assertThat(existente.getBeneficiarioVinculado()).isSameAs(netflix);
+        assertThat(existente.getBeneficiario()).isEqualTo("Netflix");
+        verify(beneficiarioService, never()).obtenerOCrear(any(), anyString());
     }
 
     // ---------- ayudas ----------

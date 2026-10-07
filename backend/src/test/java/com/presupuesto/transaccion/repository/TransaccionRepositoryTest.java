@@ -152,9 +152,12 @@ class TransaccionRepositoryTest {
         assertThat(transaccionRepository.sumarPorCuenta(casa.getId())).isEmpty();
     }
 
+    /** Solo las del presupuesto del test: la base puede tener datos de otras personas. */
     private long contarSubtransacciones() {
         return entityManager
-                .createQuery("select count(s) from SubTransaccion s", Long.class)
+                .createQuery("select count(s) from SubTransaccion s "
+                        + "where s.transaccion.cuenta.presupuesto.id = :presupuestoId", Long.class)
+                .setParameter("presupuestoId", casa.getId())
                 .getSingleResult();
     }
 

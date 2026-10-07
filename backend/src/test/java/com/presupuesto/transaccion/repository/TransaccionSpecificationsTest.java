@@ -189,8 +189,10 @@ class TransaccionSpecificationsTest {
         assertThat(pagina.getTotalElements()).isEqualTo(3);
     }
 
+    /** Siempre dentro del presupuesto del test: la base puede tener datos de otras personas. */
     private List<Transaccion> buscar(Specification<Transaccion> filtro) {
-        return transaccionRepository.findAll(filtro);
+        return transaccionRepository.findAll(
+                TransaccionSpecifications.delPresupuesto(casa.getId()).and(filtro));
     }
 
     private Transaccion guardar(

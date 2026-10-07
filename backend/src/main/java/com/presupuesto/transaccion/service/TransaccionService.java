@@ -1,11 +1,14 @@
 package com.presupuesto.transaccion.service;
 
+import com.presupuesto.beneficiario.entity.Beneficiario;
+import com.presupuesto.beneficiario.service.BeneficiarioService;
 import com.presupuesto.categoria.entity.Categoria;
 import com.presupuesto.comun.excepcion.DatosInvalidosException;
 import com.presupuesto.comun.excepcion.RecursoNoEncontradoException;
 import com.presupuesto.comun.excepcion.ReglaNegocioException;
 import com.presupuesto.comun.paginacion.PaginaResponse;
 import com.presupuesto.cuenta.entity.Cuenta;
+import com.presupuesto.presupuesto.entity.Presupuesto;
 import com.presupuesto.presupuesto.service.PresupuestoService;
 import com.presupuesto.transaccion.dto.request.ActualizarTransaccionRequest;
 import com.presupuesto.transaccion.dto.request.CambiarEstadoRequest;
@@ -53,22 +56,25 @@ public class TransaccionService {
     private final TransaccionRepository transaccionRepository;
     private final TransaccionReferencias referencias;
     private final PresupuestoService presupuestoService;
+    private final BeneficiarioService beneficiarioService;
     private final Clock clock;
 
     @Transactional
     public TransaccionResponse crear(
             Long presupuestoId, Long usuarioId, CrearTransaccionRequest request) {
-        presupuestoService.obtenerDelUsuario(presupuestoId, usuarioId);
+        Presupuesto presupuesto = presupuestoService.obtenerDelUsuario(presupuestoId, usuarioId);
         Cuenta cuenta = referencias.cuenta(request.cuentaId(), presupuestoId);
         TransaccionReferencias.Division division = referencias.dividir(
                 presupuestoId, request.categoriaId(), request.monto(), request.subtransacciones());
         referencias.exigirAbierta(cuenta);
+        Beneficiario beneficiario = vincular(presupuesto, request.beneficiario(), division);
         Transaccion transaccion = Transaccion.builder()
                 .cuenta(cuenta)
                 .fecha(request.fecha())
                 .monto(request.monto())
                 .categoria(division.categoria())
-                .beneficiario(request.beneficiario())
+                .beneficiario(beneficiario == null ? null : beneficiario.getNombre())
+                .beneficiarioVinculado(beneficiario)
                 .memo(request.memo())
                 .aprobada(request.aprobada())
                 .build();
@@ -112,11 +118,13 @@ public class TransaccionService {
                 presupuestoId, request.categoriaId(), request.monto(), request.subtransacciones());
         exigirNoReconciliada(transaccion);
         referencias.exigirAbierta(transaccion.getCuenta());
+        Beneficiario beneficiario = vincular(
+                transaccion.getCuenta().getPresupuesto(), request.beneficiario(), division);
         transaccion.editar(
                 request.fecha(),
                 request.monto(),
                 division.categoria(),
-                request.beneficiario(),
+                beneficiario,
                 request.memo());
         transaccion.reemplazarSubtransacciones(division.partes());
         return TransaccionResponse.desde(transaccionRepository.saveAndFlush(transaccion));
@@ -175,6 +183,7 @@ public class TransaccionService {
                 .monto(original.getMonto())
                 .categoria(original.getCategoria())
                 .beneficiario(original.getBeneficiario())
+                .beneficiarioVinculado(original.getBeneficiarioVinculado())
                 .memo(original.getMemo())
                 .estado(EstadoTransaccion.NO_CONCILIADA)
                 .aprobada(true)
@@ -189,6 +198,26 @@ public class TransaccionService {
         }
         copia.reemplazarSubtransacciones(partes);
         return TransaccionResponse.desde(transaccionRepository.saveAndFlush(copia));
+    }
+
+    /**
+     * Beneficiario de la transacción ({@code null} si no llegó texto), creado si no existía. Si
+     * la transacción queda con categoría propia (no dividida) se recuerda como la última usada con
+     * él. Se llama después de todas las validaciones para no dejar beneficiarios de una petición
+     * rechazada.
+     */
+    private Beneficiario vincular(
+            Presupuesto presupuesto,
+            String texto,
+            TransaccionReferencias.Division division) {
+        if (texto == null) {
+            return null;
+        }
+        Beneficiario beneficiario = beneficiarioService.obtenerOCrear(presupuesto, texto);
+        if (division.categoria() != null) {
+            beneficiario.recordarCategoria(division.categoria());
+        }
+        return beneficiario;
     }
 
     private Transaccion buscar(Long presupuestoId, Long usuarioId, Long id) {

@@ -2,6 +2,7 @@ package com.presupuesto.transaccion.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.presupuesto.beneficiario.entity.Beneficiario;
 import com.presupuesto.categoria.entity.Categoria;
 import com.presupuesto.cuenta.entity.Cuenta;
 import java.lang.reflect.Method;
@@ -40,14 +41,54 @@ class TransaccionTest {
     void editarCambiaFechaMontoCategoriaBeneficiarioYMemo() {
         Transaccion transaccion = nueva();
         Categoria categoria = Categoria.builder().build();
+        Beneficiario tienda = Beneficiario.builder().nombre("Tienda").build();
 
-        transaccion.editar(HOY.plusDays(1), 2500L, categoria, "Tienda", "nota");
+        transaccion.editar(HOY.plusDays(1), 2500L, categoria, tienda, "nota");
 
         assertThat(transaccion.getFecha()).isEqualTo(HOY.plusDays(1));
         assertThat(transaccion.getMonto()).isEqualTo(2500L);
         assertThat(transaccion.getCategoria()).isSameAs(categoria);
         assertThat(transaccion.getBeneficiario()).isEqualTo("Tienda");
+        assertThat(transaccion.getBeneficiarioVinculado()).isSameAs(tienda);
         assertThat(transaccion.getMemo()).isEqualTo("nota");
+    }
+
+    @Test
+    void editarSinBeneficiarioQuitaElVinculoYElTexto() {
+        Beneficiario tienda = Beneficiario.builder().nombre("Tienda").build();
+        Transaccion transaccion = Transaccion.builder()
+                .cuenta(Cuenta.builder().build())
+                .fecha(HOY)
+                .monto(-1000L)
+                .beneficiario("Tienda")
+                .beneficiarioVinculado(tienda)
+                .build();
+
+        transaccion.editar(HOY, -1000L, null, null, null);
+
+        assertThat(transaccion.getBeneficiario()).isNull();
+        assertThat(transaccion.getBeneficiarioVinculado()).isNull();
+    }
+
+    @Test
+    void editarDeriveElTextoDelNombreDelBeneficiarioVinculado() {
+        Transaccion transaccion = Transaccion.builder()
+                .cuenta(Cuenta.builder().build())
+                .fecha(HOY)
+                .monto(-1000L)
+                .beneficiario("texto anterior sin vinculo")
+                .build();
+        Beneficiario netflix = Beneficiario.builder().nombre("Netflix").build();
+
+        transaccion.editar(HOY, -1000L, null, netflix, null);
+
+        assertThat(transaccion.getBeneficiario()).isEqualTo("Netflix");
+        assertThat(transaccion.getBeneficiarioVinculado()).isSameAs(netflix);
+    }
+
+    @Test
+    void sinVinculoElBeneficiarioVinculadoEsNulo() {
+        assertThat(nueva().getBeneficiarioVinculado()).isNull();
     }
 
     @Test

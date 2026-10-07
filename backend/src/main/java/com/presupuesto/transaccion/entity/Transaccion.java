@@ -1,5 +1,6 @@
 package com.presupuesto.transaccion.entity;
 
+import com.presupuesto.beneficiario.entity.Beneficiario;
 import com.presupuesto.categoria.entity.Categoria;
 import com.presupuesto.comun.EntidadBase;
 import com.presupuesto.cuenta.entity.Cuenta;
@@ -65,9 +66,20 @@ public class Transaccion extends EntidadBase {
     @JoinColumn(name = "categoria_id")
     private Categoria categoria;
 
+    /**
+     * Texto del beneficiario. Con vínculo es el nombre de {@link #beneficiarioVinculado}; en las
+     * transacciones anteriores puede haber texto sin vínculo. Sin setter: solo cambia con
+     * {@link #editar}.
+     */
     @Setter(AccessLevel.NONE)
     @Column(length = 100)
     private String beneficiario;
+
+    /** Beneficiario del presupuesto al que apunta, o {@code null}. Sin setter: {@link #editar}. */
+    @Setter(AccessLevel.NONE)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "beneficiario_id")
+    private Beneficiario beneficiarioVinculado;
 
     @Setter(AccessLevel.NONE)
     @Column(length = 500)
@@ -103,17 +115,21 @@ public class Transaccion extends EntidadBase {
     @Builder.Default
     private List<SubTransaccion> subtransacciones = new ArrayList<>();
 
-    /** Beneficiario y memo ya llegan recortados y en {@code null} si quedaron vacíos. */
+    /**
+     * El memo ya llega recortado y en {@code null} si quedó vacío. Sin beneficiario
+     * ({@code null}) se quita el vínculo y el texto; con él, el texto pasa a ser su nombre.
+     */
     public void editar(
             LocalDate nuevaFecha,
             long nuevoMonto,
             Categoria nuevaCategoria,
-            String nuevoBeneficiario,
+            Beneficiario nuevoBeneficiario,
             String nuevoMemo) {
         this.fecha = nuevaFecha;
         this.monto = nuevoMonto;
         this.categoria = nuevaCategoria;
-        this.beneficiario = nuevoBeneficiario;
+        this.beneficiarioVinculado = nuevoBeneficiario;
+        this.beneficiario = nuevoBeneficiario == null ? null : nuevoBeneficiario.getNombre();
         this.memo = nuevoMemo;
     }
 

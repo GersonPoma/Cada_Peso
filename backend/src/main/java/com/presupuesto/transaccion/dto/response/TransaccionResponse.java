@@ -13,6 +13,7 @@ public record TransaccionResponse(
         long monto,
         Long categoriaId,
         String beneficiario,
+        Long beneficiarioId,
         String memo,
         EstadoTransaccion estado,
         boolean aprobada,
@@ -29,6 +30,9 @@ public record TransaccionResponse(
                 transaccion.getMonto(),
                 transaccion.getCategoria() == null ? null : transaccion.getCategoria().getId(),
                 transaccion.getBeneficiario(),
+                transaccion.getBeneficiarioVinculado() == null
+                        ? null
+                        : transaccion.getBeneficiarioVinculado().getId(),
                 transaccion.getMemo(),
                 transaccion.getEstado(),
                 transaccion.isAprobada(),

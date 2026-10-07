@@ -2,6 +2,7 @@ package com.presupuesto.transaccion.dto.response;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.presupuesto.beneficiario.entity.Beneficiario;
 import com.presupuesto.categoria.entity.Categoria;
 import com.presupuesto.cuenta.entity.Cuenta;
 import com.presupuesto.transaccion.entity.EstadoTransaccion;
@@ -42,6 +43,7 @@ class TransaccionResponseTest {
         assertThat(respuesta.monto()).isEqualTo(-2500L);
         assertThat(respuesta.categoriaId()).isEqualTo(7L);
         assertThat(respuesta.beneficiario()).isEqualTo("Tienda");
+        assertThat(respuesta.beneficiarioId()).isNull();
         assertThat(respuesta.memo()).isEqualTo("nota");
         assertThat(respuesta.estado()).isEqualTo(EstadoTransaccion.CONCILIADA);
         assertThat(respuesta.aprobada()).isFalse();
@@ -49,6 +51,22 @@ class TransaccionResponseTest {
         assertThat(respuesta.transaccionParId()).isNull();
         assertThat(respuesta.fechaCreacion()).isEqualTo(CREADA);
         assertThat(respuesta.fechaActualizacion()).isEqualTo(ACTUALIZADA);
+    }
+
+    @Test
+    void conBeneficiarioVinculadoExponeSuId() {
+        Transaccion transaccion = Transaccion.builder()
+                .cuenta(Cuenta.builder().id(3L).build())
+                .fecha(LocalDate.of(2026, 10, 2))
+                .monto(-2500L)
+                .beneficiario("Netflix")
+                .beneficiarioVinculado(Beneficiario.builder().id(12L).nombre("Netflix").build())
+                .build();
+
+        TransaccionResponse respuesta = TransaccionResponse.desde(transaccion);
+
+        assertThat(respuesta.beneficiario()).isEqualTo("Netflix");
+        assertThat(respuesta.beneficiarioId()).isEqualTo(12L);
     }
 
     @Test
