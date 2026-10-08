@@ -7,4 +7,8 @@ export interface CategoriaMesResponse {
   actividad: number;
   disponible: number;
   sobregastada: boolean;
+  /** Es la categoría de pago de una tarjeta de crédito. */
+  esPagoTarjeta: boolean;
+  /** La tarjeta de una categoría de pago; `null` en las demás. */
+  cuentaId: number | null;
 }

@@ -1,0 +1,70 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.indicador {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 2px 12px;
+  padding: 2px 0 6px;
+  font: var(--mat-sys-label-medium);
+}
+
+.estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.icono {
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+}
+
+.necesidad {
+  overflow: hidden;
+  color: var(--mat-sys-on-surface-variant);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.barra {
+  grid-column: 1 / -1;
+}
+
+.tono-ok {
+  --mat-progress-bar-active-indicator-color: var(--mat-sys-primary);
+
+  .estado {
+    color: var(--mat-sys-primary);
+  }
+}
+
+.tono-falta {
+  --mat-progress-bar-active-indicator-color: var(--mat-sys-tertiary);
+
+  .estado {
+    color: var(--mat-sys-tertiary);
+  }
+}
+
+.tono-neutro {
+  --mat-progress-bar-active-indicator-color: var(--mat-sys-outline);
+
+  .estado {
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+.tono-error {
+  --mat-progress-bar-active-indicator-color: var(--mat-sys-error);
+
+  .estado {
+    color: var(--mat-sys-error);
+  }
+}

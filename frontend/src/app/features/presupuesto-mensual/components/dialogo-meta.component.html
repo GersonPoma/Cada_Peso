@@ -1,0 +1,134 @@
+<h2 mat-dialog-title>{{ datos.tieneMeta ? 'Editar meta' : 'Agregar meta' }}</h2>
+<form [formGroup]="formulario" (ngSubmit)="enviar()" novalidate>
+  <mat-dialog-content class="contenido">
+    <p class="categoria">{{ datos.nombre }}</p>
+    @if (cargando()) {
+      <mat-progress-bar mode="indeterminate" aria-label="Cargando la meta" />
+    }
+
+    <mat-form-field appearance="outline">
+      <mat-label>Tipo</mat-label>
+      <mat-select formControlName="tipo" cdkFocusInitial>
+        @for (opcion of tipos; track opcion.valor) {
+          <mat-option [value]="opcion.valor">{{ opcion.texto }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <app-campo-monto
+      [control]="formulario.controls.monto"
+      etiqueta="Monto"
+      [requerido]="true"
+      [mensajes]="mensajesMonto"
+    />
+
+    @if (tipo() === 'MONTO_MENSUAL') {
+      <mat-form-field appearance="outline">
+        <mat-label>Frecuencia</mat-label>
+        <mat-select formControlName="frecuencia">
+          @for (opcion of frecuencias; track opcion.valor) {
+            <mat-option [value]="opcion.valor">{{ opcion.texto }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      @if (frecuencia() === 'SEMANAL') {
+        <mat-form-field appearance="outline">
+          <mat-label>Día de la semana</mat-label>
+          <mat-select formControlName="diaSemana" [required]="true">
+            @for (dia of diasSemana; track dia.valor) {
+              <mat-option [value]="dia.valor">{{ dia.texto }}</mat-option>
+            }
+          </mat-select>
+          @if (mensaje('diaSemana'); as texto) {
+            <mat-error>{{ texto }}</mat-error>
+          }
+        </mat-form-field>
+      }
+
+      @if (frecuencia() === 'PERSONALIZADA') {
+        <div class="fila-doble">
+          <mat-form-field appearance="outline">
+            <mat-label>Cada cuántos días</mat-label>
+            <input
+              matInput
+              type="number"
+              inputmode="numeric"
+              min="2"
+              max="365"
+              step="1"
+              autocomplete="off"
+              formControlName="intervaloDias"
+              required
+            />
+            @if (mensaje('intervaloDias'); as texto) {
+              <mat-error>{{ texto }}</mat-error>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Fecha de inicio</mat-label>
+            <input
+              matInput
+              [matDatepicker]="selectorInicio"
+              formControlName="fechaInicio"
+              required
+            />
+            <mat-datepicker-toggle matSuffix [for]="selectorInicio" />
+            <mat-datepicker #selectorInicio />
+            @if (mensaje('fechaInicio'); as texto) {
+              <mat-error>{{ texto }}</mat-error>
+            }
+          </mat-form-field>
+        </div>
+      }
+    }
+
+    @if (tipo() === 'MONTO_PARA_FECHA') {
+      <mat-form-field appearance="outline">
+        <mat-label>Fecha objetivo</mat-label>
+        <input
+          matInput
+          [matDatepicker]="selectorObjetivo"
+          formControlName="fechaObjetivo"
+          required
+        />
+        <mat-datepicker-toggle matSuffix [for]="selectorObjetivo" />
+        <mat-datepicker #selectorObjetivo />
+        @if (mensaje('fechaObjetivo'); as texto) {
+          <mat-error>{{ texto }}</mat-error>
+        }
+      </mat-form-field>
+    }
+
+    <p class="ayuda">{{ ayuda }}</p>
+
+    @if (errorGeneral(); as texto) {
+      <p class="error-general" role="alert">{{ texto }}</p>
+    }
+  </mat-dialog-content>
+  <mat-dialog-actions class="acciones">
+    @if (datos.tieneMeta) {
+      <button
+        mat-button
+        type="button"
+        class="quitar"
+        [disabled]="enviando() || cargando()"
+        (click)="quitar()"
+      >
+        Quitar meta
+      </button>
+    }
+    <span class="espacio"></span>
+    <button mat-button type="button" [mat-dialog-close]="undefined" [disabled]="enviando()">
+      Cancelar
+    </button>
+    <button
+      mat-flat-button
+      type="submit"
+      [disabled]="formulario.invalid || enviando() || cargando()"
+    >
+      Guardar
+    </button>
+  </mat-dialog-actions>
+</form>

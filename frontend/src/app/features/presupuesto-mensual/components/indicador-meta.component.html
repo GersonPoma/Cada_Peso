@@ -1,0 +1,26 @@
+@let p = presentacion();
+<div class="indicador" [class]="'tono-' + p.tono">
+  <span class="estado">
+    <mat-icon class="icono" aria-hidden="true">{{ p.icono }}</mat-icon>
+    <span class="texto-estado">
+      {{ p.texto }}
+      @if (p.monto !== null) {
+        {{ p.monto | monto: moneda() }}
+      }
+    </span>
+  </span>
+  <span class="necesidad">Meta del mes: {{ meta().necesidad | monto: moneda() }}</span>
+  <mat-progress-bar
+    class="barra"
+    mode="determinate"
+    [value]="p.progreso"
+    [attr.aria-label]="
+      'Progreso de la meta de ' +
+      meta().nombre +
+      ': ' +
+      (meta().asignado | monto: moneda()) +
+      ' asignado de ' +
+      (meta().necesidad | monto: moneda())
+    "
+  />
+</div>

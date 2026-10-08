@@ -1,0 +1,42 @@
+.contenido {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+}
+
+.categoria {
+  margin: 0 0 8px;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-title-small);
+}
+
+.fila-doble {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12em, 1fr));
+  gap: 0 12px;
+}
+
+.ayuda {
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-small);
+}
+
+.error-general {
+  margin: 0;
+  color: var(--mat-sys-error);
+  font: var(--mat-sys-body-medium);
+}
+
+.acciones {
+  display: flex;
+}
+
+.espacio {
+  flex: 1;
+}
+
+.quitar {
+  color: var(--mat-sys-error);
+}

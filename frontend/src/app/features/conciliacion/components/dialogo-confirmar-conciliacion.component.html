@@ -1,0 +1,29 @@
+<h2 mat-dialog-title>Reconciliar {{ datos.cuenta }}</h2>
+<mat-dialog-content>
+  <dl class="resumen">
+    <div class="dato">
+      <dt>Fecha del extracto</dt>
+      <dd class="fecha">{{ datos.fecha | fecha }}</dd>
+    </div>
+    <div class="dato">
+      <dt>Saldo del extracto</dt>
+      <dd class="saldo">{{ datos.saldoExtracto | monto: datos.moneda }}</dd>
+    </div>
+    <div class="dato">
+      <dt>Ajuste</dt>
+      <dd class="ajuste">
+        @if (datos.ajuste === null) {
+          Sin ajuste
+        } @else {
+          {{ datos.ajuste | monto: datos.moneda }}
+          ({{ datos.ajuste > 0 ? 'entrada' : 'salida' }})
+        }
+      </dd>
+    </div>
+  </dl>
+  <p class="aviso">{{ aviso }}</p>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button type="button" cdkFocusInitial [mat-dialog-close]="false">Cancelar</button>
+  <button mat-flat-button type="button" [mat-dialog-close]="true">Reconciliar</button>
+</mat-dialog-actions>
