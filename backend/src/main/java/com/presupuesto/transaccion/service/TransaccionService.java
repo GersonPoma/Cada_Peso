@@ -25,7 +25,9 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -83,6 +85,45 @@ public class TransaccionService {
                 presupuesto.getId(), presupuesto, request, programadaId, fechaOcurrencia);
     }
 
+    /**
+     * Crea varias transacciones de una misma cuenta en la transacción actual (todas o ninguna),
+     * con las mismas reglas que {@link #crear}: cuenta abierta (422) y categoría válida. No valida
+     * el usuario: quien llama ya resolvió presupuesto y cuenta. Los beneficiarios se crean si no
+     * existen y se reutilizan dentro del lote; hace un solo {@code flush} al final.
+     */
+    @Transactional
+    public List<Transaccion> crearLote(
+            Presupuesto presupuesto, Cuenta cuenta, List<CrearTransaccionRequest> requests) {
+        referencias.exigirAbierta(cuenta);
+        Map<String, Beneficiario> beneficiarios = new HashMap<>();
+        List<Transaccion> nuevas = new ArrayList<>(requests.size());
+        for (CrearTransaccionRequest request : requests) {
+            nuevas.add(construir(
+                    presupuesto.getId(), presupuesto, cuenta, request, null, null, beneficiarios));
+        }
+        List<Transaccion> guardadas = transaccionRepository.saveAll(nuevas);
+        transaccionRepository.flush();
+        return guardadas;
+    }
+
+    /**
+     * Cuántas transacciones de la cuenta hay por clave, entre {@code desde} y {@code hasta}. El
+     * beneficiario se normaliza aquí (no en la base) para comparar igual que al crearlo.
+     */
+    @Transactional(readOnly = true)
+    public Map<ClaveMovimiento, Integer> contarExistentesPorClave(
+            Long cuentaId, LocalDate desde, LocalDate hasta) {
+        Map<ClaveMovimiento, Integer> conteo = new HashMap<>();
+        for (TransaccionRepository.ConteoPorClave fila :
+                transaccionRepository.contarPorClave(cuentaId, desde, hasta)) {
+            conteo.merge(
+                    ClaveMovimiento.de(fila.getFecha(), fila.getMonto(), fila.getBeneficiario()),
+                    Math.toIntExact(fila.getCantidad()),
+                    Integer::sum);
+        }
+        return conteo;
+    }
+
     /** Cuenta abierta y categoría que no sea de pago de tarjeta (422); sin categoría, la omite. */
     public void exigirRegistrable(Cuenta cuenta, Categoria categoria) {
         referencias.exigirAbierta(cuenta);
@@ -101,10 +142,27 @@ public class TransaccionService {
             Long programadaId,
             LocalDate fechaOcurrencia) {
         Cuenta cuenta = referencias.cuenta(request.cuentaId(), presupuestoId);
+        return transaccionRepository.saveAndFlush(construir(
+                presupuestoId, presupuesto, cuenta, request, programadaId, fechaOcurrencia, null));
+    }
+
+    /**
+     * Arma la transacción sin guardarla. {@code beneficiarios} es una caché opcional (por nombre
+     * normalizado) que evita consultar el mismo beneficiario varias veces en un lote.
+     */
+    private Transaccion construir(
+            Long presupuestoId,
+            Presupuesto presupuesto,
+            Cuenta cuenta,
+            CrearTransaccionRequest request,
+            Long programadaId,
+            LocalDate fechaOcurrencia,
+            Map<String, Beneficiario> beneficiarios) {
         TransaccionReferencias.Division division = referencias.dividir(
                 presupuestoId, request.categoriaId(), request.monto(), request.subtransacciones());
         referencias.exigirAbierta(cuenta);
-        Beneficiario beneficiario = vincular(presupuesto, request.beneficiario(), division);
+        Beneficiario beneficiario =
+                vincular(presupuesto, request.beneficiario(), division, beneficiarios);
         Transaccion transaccion = Transaccion.builder()
                 .cuenta(cuenta)
                 .fecha(request.fecha())
@@ -118,7 +176,7 @@ public class TransaccionService {
                 .fechaOcurrencia(fechaOcurrencia)
                 .build();
         transaccion.reemplazarSubtransacciones(division.partes());
-        return transaccionRepository.saveAndFlush(transaccion);
+        return transaccion;
     }
 
     /** Beneficiario de los ajustes de conciliación. */
@@ -295,10 +353,25 @@ public class TransaccionService {
             Presupuesto presupuesto,
             String texto,
             TransaccionReferencias.Division division) {
+        return vincular(presupuesto, texto, division, null);
+    }
+
+    private Beneficiario vincular(
+            Presupuesto presupuesto,
+            String texto,
+            TransaccionReferencias.Division division,
+            Map<String, Beneficiario> cache) {
         if (texto == null) {
             return null;
         }
-        Beneficiario beneficiario = beneficiarioService.obtenerOCrear(presupuesto, texto);
+        Beneficiario beneficiario;
+        if (cache == null) {
+            beneficiario = beneficiarioService.obtenerOCrear(presupuesto, texto);
+        } else {
+            beneficiario = cache.computeIfAbsent(
+                    Beneficiario.normalizar(texto),
+                    clave -> beneficiarioService.obtenerOCrear(presupuesto, texto));
+        }
         if (division.categoria() != null) {
             beneficiario.recordarCategoria(division.categoria());
         }

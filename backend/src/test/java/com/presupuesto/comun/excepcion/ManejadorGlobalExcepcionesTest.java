@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -16,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -146,5 +148,37 @@ class ManejadorGlobalExcepcionesTest {
                 .getContentAsString(StandardCharsets.UTF_8);
 
         assertThat(respuesta).doesNotContain("abc").doesNotContain("VERDE").doesNotContain("ayer");
+    }
+
+    @Test
+    @WithMockUser
+    void archivoQueSuperaElTechoMultipartDevuelve400ConMensajeFijo() throws Exception {
+        String respuesta = mockMvc.perform(
+                        post("/prueba/multipart-demasiado-grande").with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.codigo").value("DATOS_INVALIDOS"))
+                .andExpect(jsonPath("$.detail").value("El archivo supera el tamaño permitido"))
+                .andExpect(jsonPath("$.errores").doesNotExist())
+                .andReturn()
+                .getResponse()
+                .getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(respuesta).doesNotContain("4194304").doesNotContain("MaxUpload");
+    }
+
+    @Test
+    @WithMockUser
+    void peticionMultipartSinLaParteObligatoriaDevuelve400ConMensajeFijo() throws Exception {
+        String respuesta = mockMvc.perform(multipart("/prueba/multipart-obligatorio")
+                        .file(new MockMultipartFile("otra", "x.csv", "text/csv", new byte[] {1}))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.codigo").value("DATOS_INVALIDOS"))
+                .andExpect(jsonPath("$.detail").value("Falta una parte obligatoria de la petición"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(respuesta).doesNotContain("archivo");
     }
 }

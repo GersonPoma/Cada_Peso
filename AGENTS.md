@@ -112,6 +112,12 @@ com/presupuesto/
 │   ├── entity/
 │   ├── repository/
 │   └── service/
+├── importacion/
+│   ├── controller/
+│   ├── dto/
+│   │   ├── request/
+│   │   └── response/
+│   └── service/
 ├── meta/
 │   ├── controller/
 │   ├── dto/
@@ -173,7 +179,10 @@ depender de `presupuesto`, `cuenta`, `categoria`, `transaccion` y `comun`; nunca
 `transaccion` y `comun`; ninguna otra feature la importa (`transaccion` guarda el id de la
 plantilla en un `Long`, sin relación JPA). `conciliacion` puede depender de `presupuesto`,
 `cuenta`, `transaccion` y `comun`; ninguna otra feature la importa (guarda el id del ajuste en un
-`Long`, sin relación JPA).
+`Long`, sin relación JPA). `importacion` puede depender de `presupuesto`, `cuenta`, `transaccion` y
+`comun` (no de `beneficiario` ni `categoria`: la normalización del beneficiario y la creación por
+lote viven en `transaccion`); ninguna otra feature la importa. No tiene `entity` ni `repository`:
+no hay tablas propias.
 
 **Comunicación entre features: eventos.** Cuando una feature debe avisar a otra sin importarla
 (la dependencia iría al revés), publica un evento de Spring y la otra lo escucha. Hoy
@@ -229,7 +238,7 @@ procesador de anotaciones del `pom.xml`.
   `src/main` ni en `src/test`) importa `com.presupuesto.<feature>`. Si una clase de `comun/`
   necesita datos de una feature, los recibe como parámetros simples (ej.
   `JwtService.emitir(Long id, Rol rol)`, no la entidad `Usuario`). Se comprueba desde
-  `backend/src` con `grep -rnE "import com\.presupuesto\.(usuario|auth|presupuesto|cuenta|categoria|transaccion|transaccionprogramada|asignacion|beneficiario|meta|conciliacion)" <dir>` para
+  `backend/src` con `grep -rnE "import com\.presupuesto\.(usuario|auth|presupuesto|cuenta|categoria|transaccion|transaccionprogramada|asignacion|beneficiario|meta|conciliacion|importacion)" <dir>` para
   `<dir>` = `main/java/com/presupuesto/comun` y `test/java/com/presupuesto/comun` (ampliando la
   alternancia con cada feature nueva); debe devolver cero líneas.
 
@@ -326,6 +335,49 @@ programadas, las frecuencias personalizadas y las subtransacciones quedan fuera 
 - **Borrado**: no hay clave foránea entre `transacciones.programada_id` y la plantilla; el único
   camino de borrado es `TransaccionProgramadaService.borrar`, que antes deja en `null` el vínculo
   de las ya generadas.
+
+## Importación de CSV
+
+`importacion` (`/api/v1/presupuestos/{presupuestoId}/cuentas/{cuentaId}/importacion`) importa las
+transacciones de un CSV de banco a una cuenta, con `POST /vista-previa` (no guarda nada) y `POST`
+(crea, responde 201 con `importadas`, `duplicadas`, `omitidas` y `sinCategoria`). Ambos son
+`multipart/form-data`: la parte `archivo` y el mapeo como campos de texto (`separador`,
+`tieneEncabezado`, `columnaFecha`, `formatoFecha`, `columnaMonto` o `columnaDebito` y
+`columnaCredito`, `separadorDecimal`, `separadorMiles`, `columnaDescripcion`, `columnaMemo`,
+`omitirInvalidas`). El mapeo **no se guarda**: el cliente lo reenvía en cada llamada. Los campos
+llegan como texto y los valida el service (`ParametrosImportacion`), no Bean Validation ni Spring,
+para que el orden de errores sea: presupuesto 404, cuenta 404, archivo y parámetros 400, cuenta
+cerrada 422, filas inválidas 422. El único error que llega antes que los 404 es el archivo mayor
+que el techo multipart, que lo corta Tomcat antes del controller.
+
+- **Límites** (`importacion.max-bytes`, 2 MB, e `importacion.max-filas`, 5000; ambos 400). Los
+  tres `spring.servlet.multipart.*` (techo y umbral de 4 MB) se suben juntos con `max-bytes`: el
+  techo debe ser mayor que `max-bytes` y el umbral igual al techo, porque con umbral 0 Tomcat
+  vuelca cada parte a un temporal en disco. El archivo se procesa en memoria; solo UTF-8 (con o
+  sin BOM); sin dependencia de CSV (`LectorCsv`).
+- **Repite el parseo**: la importación nunca confía en una vista previa anterior; interpreta de
+  nuevo y recalcula los duplicados dentro de una sola transacción de base de datos.
+- **Duplicados por ocurrencias**: clave = fecha, monto y beneficiario normalizado
+  (`ClaveMovimiento`). Si la cuenta tiene `E` movimientos con la clave y el archivo `F` filas
+  válidas, las primeras `E` (en orden de archivo) son `DUPLICADA` y se crean `max(0, F - E)`; así
+  reimportar crea 0 y dos cafés iguales el mismo día siguen siendo legítimos. Sin filas válidas
+  no se consulta la base.
+- **Reglas de transacción**: las filas pasan por `TransaccionService.crearLote` (mismas reglas que
+  una manual: cuenta cerrada 422, beneficiario autocreado sin recordar categoría), nacen
+  `NO_CONCILIADA`, `aprobada=false` y sin categoría. Se admiten cuentas fuera del presupuesto y
+  tarjetas. Beneficiario y memo se recortan y truncan a 100 y 500 caracteres antes de calcular la
+  clave.
+- **Todo o nada**: con una fila `INVALIDA` responde 422 sin crear nada, salvo `omitirInvalidas=true`.
+- **`listoParaAsignar`**: no se toca `asignacion`. Las entradas sin categoría en una cuenta del
+  presupuesto (no tarjeta) cuentan como ingreso y los gastos sin categoría no afectan a ningún
+  `disponible`, así que importar un extracto infla `listoParaAsignar` hasta categorizar los gastos
+  (ejemplo: sueldo +5.000, gastos -3.000: el saldo sube 2.000 y `listoParaAsignar` 5.000).
+  Al categorizar, el `disponible` de la categoría baja y el invariante se recompone;
+  `sinCategoria` en la respuesta avisa cuántas faltan.
+- **Concurrencia**: la importación toma `PESSIMISTIC_WRITE` sobre la cuenta (un solo bloqueo por
+  transacción) para que dos importaciones simultáneas del mismo archivo no dupliquen; la segunda
+  espera y ve las filas de la primera. Un `POST /transacciones` manual no toma ese bloqueo. La
+  carrera real no tiene test automático.
 
 ## Paginación
 

@@ -11,6 +11,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 @RestControllerAdvice
 public class ManejadorGlobalExcepciones {
@@ -18,6 +20,8 @@ public class ManejadorGlobalExcepciones {
     static final String MENSAJE_CAMPOS_INVALIDOS = "Uno o más campos no son válidos";
     static final String MENSAJE_CUERPO_ILEGIBLE = "El cuerpo de la petición no es válido";
     static final String MENSAJE_PARAMETRO_INVALIDO = "Un parámetro de la petición no es válido";
+    static final String MENSAJE_ARCHIVO_DEMASIADO_GRANDE = "El archivo supera el tamaño permitido";
+    static final String MENSAJE_PARTE_AUSENTE = "Falta una parte obligatoria de la petición";
 
     @ExceptionHandler(RecursoNoEncontradoException.class)
     public ProblemDetail manejarRecursoNoEncontrado(RecursoNoEncontradoException excepcion) {
@@ -76,6 +80,25 @@ public class ManejadorGlobalExcepciones {
     public ProblemDetail manejarParametroInvalido(MethodArgumentTypeMismatchException excepcion) {
         return construirProblemDetail(
                 HttpStatus.BAD_REQUEST, CodigoError.DATOS_INVALIDOS, MENSAJE_PARAMETRO_INVALIDO);
+    }
+
+    /**
+     * Archivo que supera el techo del transporte multipart. Mensaje fijo, sin el límite ni el
+     * nombre del archivo.
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ProblemDetail manejarArchivoDemasiadoGrande(MaxUploadSizeExceededException excepcion) {
+        return construirProblemDetail(
+                HttpStatus.BAD_REQUEST,
+                CodigoError.DATOS_INVALIDOS,
+                MENSAJE_ARCHIVO_DEMASIADO_GRANDE);
+    }
+
+    /** Petición multipart sin una parte obligatoria. Mensaje fijo, sin el nombre de la parte. */
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ProblemDetail manejarParteAusente(MissingServletRequestPartException excepcion) {
+        return construirProblemDetail(
+                HttpStatus.BAD_REQUEST, CodigoError.DATOS_INVALIDOS, MENSAJE_PARTE_AUSENTE);
     }
 
     private Map<String, String> extraerErroresPorCampo(MethodArgumentNotValidException excepcion) {

@@ -8,6 +8,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -44,6 +47,14 @@ class ControladorDePrueba {
     void lanzarNoAutenticado() {
         throw new NoAutenticadoException(
                 CodigoError.CREDENCIALES_INVALIDAS, "Credenciales de prueba incorrectas");
+    }
+
+    @PostMapping("/prueba/multipart-obligatorio")
+    void recibirArchivoObligatorio(@RequestPart("archivo") MultipartFile archivo) {}
+
+    @PostMapping("/prueba/multipart-demasiado-grande")
+    void lanzarArchivoDemasiadoGrande() {
+        throw new MaxUploadSizeExceededException(4L * 1024 * 1024);
     }
 
     enum ColorDePrueba { ROJO, AZUL }

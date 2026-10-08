@@ -95,6 +95,34 @@ public interface TransaccionRepository
             """)
     long contarNoConciliadasDeCuenta(@Param("cuentaId") Long cuentaId);
 
+    /**
+     * Cantidad de transacciones de la cuenta por fecha, monto y beneficiario (texto tal como se
+     * guardó), dentro del rango de fechas. Quien llama normaliza y suma.
+     */
+    @Query("""
+            select t.fecha as fecha, t.monto as monto, t.beneficiario as beneficiario,
+                   count(t) as cantidad
+            from Transaccion t
+            where t.cuenta.id = :cuentaId
+              and t.fecha between :desde and :hasta
+            group by t.fecha, t.monto, t.beneficiario
+            """)
+    List<ConteoPorClave> contarPorClave(
+            @Param("cuentaId") Long cuentaId,
+            @Param("desde") LocalDate desde,
+            @Param("hasta") LocalDate hasta);
+
+    interface ConteoPorClave {
+
+        LocalDate getFecha();
+
+        Long getMonto();
+
+        String getBeneficiario();
+
+        Long getCantidad();
+    }
+
     interface SumaPorCuenta {
 
         Long getCuentaId();
