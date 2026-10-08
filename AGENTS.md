@@ -862,6 +862,11 @@ src/app/
     │   ├── models/
     │   ├── pages/
     │   └── services/
+    ├── transacciones-programadas/
+    │   ├── components/
+    │   ├── models/
+    │   ├── pages/
+    │   └── services/
     └── <feature>/
         ├── pages/
         ├── components/
@@ -945,6 +950,15 @@ como same-origin, evitando configurar CORS en el backend.
   `ng2-charts@11` exige Angular 22 y Chart.js dibuja en `<canvas>`), con colores de los tokens,
   patrones o trazos además del color y su tabla con las mismas cifras. Los porcentajes llegan en
   centésimas de punto y se pasan a texto solo al mostrar (`textoPorcentaje`).
+- Las **transacciones programadas** viven en `features/transacciones-programadas`, en la ruta
+  hija `programadas` (entrada `Programadas` del menú): lista con estado (`No se pudo generar`,
+  `Pausada`, `Finalizada`, `Activa`, en ese orden), diálogo de crear y editar (la cuenta y la
+  fecha de inicio en solo lectura al editar; el `PUT` no las lleva), pausar, reanudar, borrar
+  con confirmación y `Generar ahora`. El cliente **no calcula fechas de ocurrencias** (no se
+  duplica `CalendarioProgramado`): muestra la `proximaFecha` del servidor y solo describe la
+  regla de fin de mes. El beneficiario es texto libre, sin autocompletado
+  (`app-campo-beneficiario` es de `transacciones`), y la lista de Transacciones no marca las
+  generadas (el dato `programadaId` ya llega; mostrarlo exige tocar `tabla-transacciones`).
 
 ## Sesión y autenticación del frontend
 

@@ -1,0 +1,143 @@
+<main class="pagina">
+  <header class="encabezado">
+    <h1 class="titulo">Transacciones programadas</h1>
+    <div class="botones">
+      <button
+        mat-stroked-button
+        type="button"
+        (click)="generar()"
+        [disabled]="generando() || estado().tipo !== 'listo'"
+      >
+        <mat-icon>autorenew</mat-icon>
+        Generar ahora
+      </button>
+      <button
+        mat-flat-button
+        type="button"
+        (click)="crear()"
+        [disabled]="estado().tipo !== 'listo'"
+      >
+        <mat-icon>add</mat-icon>
+        Nueva programada
+      </button>
+    </div>
+  </header>
+
+  <div class="resultado" role="status" aria-live="polite">
+    @if (resultadoGeneracion(); as texto) {
+      <p>{{ texto }}</p>
+    }
+  </div>
+
+  @switch (estado().tipo) {
+    @case ('cargando') {
+      <div class="centrado">
+        <mat-progress-spinner mode="indeterminate" diameter="48" aria-label="Cargando" />
+      </div>
+    }
+    @case ('error') {
+      <div class="centrado">
+        <p class="error" role="alert">{{ errorCarga }}</p>
+        <button mat-stroked-button type="button" (click)="recargar()">Reintentar</button>
+      </div>
+    }
+    @case ('listo') {
+      @if (filas().length === 0) {
+        <div class="centrado">
+          <p class="vacio">{{ sinProgramadas }}</p>
+          <button mat-stroked-button type="button" (click)="crear()">Nueva programada</button>
+        </div>
+      } @else {
+        <ul class="lista">
+          @for (fila of filas(); track fila.programada.id) {
+            <li class="programada" [attr.aria-label]="fila.beneficiario + ', ' + fila.cuenta">
+              <div class="cabecera-programada">
+                <div class="identidad">
+                  <span class="beneficiario">{{ fila.beneficiario }}</span>
+                  <span class="cuenta">{{ fila.cuenta }} · {{ fila.categoria }}</span>
+                </div>
+                <span [class]="'estado tono-' + fila.estado.tono">
+                  <mat-icon aria-hidden="true">{{ fila.estado.icono }}</mat-icon>
+                  {{ fila.estado.texto }}
+                </span>
+                <button
+                  mat-icon-button
+                  type="button"
+                  [matMenuTriggerFor]="menu"
+                  [matMenuTriggerData]="{ fila: fila }"
+                  [disabled]="ocupada(fila.programada.id)"
+                  [attr.aria-label]="'Acciones de ' + fila.beneficiario + ' en ' + fila.cuenta"
+                >
+                  <mat-icon>more_vert</mat-icon>
+                </button>
+              </div>
+
+              <dl class="datos">
+                <div>
+                  <dt>Monto</dt>
+                  <dd [class.salida]="fila.tipo === 'Salida'">
+                    {{ fila.monto | monto: moneda() }} · {{ fila.tipo }}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Frecuencia</dt>
+                  <dd>
+                    {{ fila.frecuencia }}
+                    @if (fila.programada.fechaFin) {
+                      hasta {{ fila.programada.fechaFin | fecha }}
+                    }
+                  </dd>
+                </div>
+                <div>
+                  <dt>Próxima fecha</dt>
+                  <dd>
+                    @if (fila.programada.proximaFecha) {
+                      {{ fila.programada.proximaFecha | fecha }}
+                    } @else {
+                      —
+                    }
+                  </dd>
+                </div>
+              </dl>
+
+              @if (fila.estado.estado === 'error') {
+                <div class="ultimo-error">
+                  <p>{{ prefijoError }} {{ fila.programada.ultimoError }}</p>
+                  <p class="sugerencia">{{ sugerenciaError }}</p>
+                </div>
+              }
+            </li>
+          }
+        </ul>
+
+        <mat-menu #menu="matMenu">
+          <ng-template matMenuContent let-fila="fila">
+            <button mat-menu-item type="button" (click)="editar(fila.programada)">
+              <mat-icon>edit</mat-icon>
+              Editar
+            </button>
+            @if (fila.programada.activa) {
+              <button mat-menu-item type="button" (click)="pausar(fila.programada)">
+                <mat-icon>pause</mat-icon>
+                Pausar
+              </button>
+            } @else {
+              <button mat-menu-item type="button" (click)="reanudar(fila.programada)">
+                <mat-icon>play_arrow</mat-icon>
+                Reanudar
+              </button>
+            }
+            <button
+              mat-menu-item
+              type="button"
+              (click)="borrar(fila.programada, fila.beneficiario + ' (' + fila.cuenta + ')')"
+            >
+              <mat-icon>delete</mat-icon>
+              Borrar
+            </button>
+          </ng-template>
+        </mat-menu>
+      }
+    }
+  }
+</main>

@@ -72,6 +72,14 @@ export const routes: Routes = [
         data: seccion('Transacciones', 'receipt_long'),
       },
       {
+        path: 'programadas',
+        loadComponent: () =>
+          import('./features/transacciones-programadas/pages/programadas.page').then(
+            (m) => m.ProgramadasPage,
+          ),
+        data: seccion('Programadas', 'event_repeat'),
+      },
+      {
         path: 'categorias',
         loadComponent: () =>
           import('./features/categorias/pages/categorias.page').then((m) => m.CategoriasPage),

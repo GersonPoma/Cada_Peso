@@ -205,6 +205,7 @@ describe('rutas', () => {
         'Inicio',
         'Cuentas',
         'Transacciones',
+        'Programadas',
         'Categorías',
         'Beneficiarios',
         'Reportes',
@@ -239,6 +240,7 @@ describe('rutas', () => {
         'Inicio',
         'Cuentas',
         'Transacciones',
+        'Programadas',
         'Categorías',
         'Beneficiarios',
         'Reportes',
@@ -335,6 +337,22 @@ describe('rutas', () => {
       expect(url()).toBe('/presupuestos/3/reportes?desde=2026-05&hasta=2026-10');
       expect(texto()).toContain('Sin movimientos en este rango');
       expect(enlaceDelMenu('Reportes')).toBeDefined();
+    });
+
+    it('/presupuestos/3/programadas muestra la lista con el enlace Programadas', async () => {
+      await harness.navigateByUrl('/presupuestos/3/programadas');
+      const backend = TestBed.inject(HttpTestingController);
+      backend.expectOne('/api/v1/presupuestos').flush(PRESUPUESTOS);
+      await harness.fixture.whenStable();
+      (await esperarPeticion('/api/v1/presupuestos/3/transacciones-programadas')).flush([]);
+      backend.expectOne((p) => p.url === '/api/v1/presupuestos/3/cuentas').flush([]);
+      backend.expectOne((p) => p.url === '/api/v1/presupuestos/3/categorias').flush([]);
+      await harness.fixture.whenStable();
+      backend.verify();
+
+      expect(url()).toBe('/presupuestos/3/programadas');
+      expect(texto()).toContain('No hay transacciones programadas');
+      expect(enlaceDelMenu('Programadas')).toBeDefined();
     });
   });
 });

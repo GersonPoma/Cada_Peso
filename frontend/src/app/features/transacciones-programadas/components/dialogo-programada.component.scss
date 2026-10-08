@@ -1,0 +1,51 @@
+.contenido {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fila-doble {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  align-items: start;
+  gap: 0 16px;
+}
+
+.tipo {
+  align-self: center;
+  margin-bottom: 20px;
+}
+
+.nota,
+.pista {
+  margin: 0 0 12px;
+  font: var(--mat-sys-body-small);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.solo-lectura {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px 16px;
+  margin: 0 0 8px;
+
+  dt {
+    font: var(--mat-sys-label-medium);
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  dd {
+    margin: 0;
+  }
+}
+
+.aviso {
+  margin: 0 0 12px;
+  font: var(--mat-sys-body-small);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.error-general {
+  margin: 0;
+  color: var(--mat-sys-error);
+}
