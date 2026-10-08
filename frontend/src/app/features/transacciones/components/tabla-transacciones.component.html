@@ -35,7 +35,7 @@
     <th mat-header-cell *matHeaderCellDef>Beneficiario</th>
     <td mat-cell *matCellDef="let t" class="beneficiario">
       <span class="etiqueta-columna">Beneficiario</span>
-      {{ t.beneficiario ?? '' }}
+      {{ descripcion(t) }}
       @if (esTransferencia(t)) {
         <span class="insignia-transferencia">
           <mat-icon aria-hidden="true">swap_horiz</mat-icon>Transferencia
@@ -138,6 +138,22 @@
         }
       </button>
     }
+    @if (a.editarTransferencia.visible) {
+      <button
+        mat-menu-item
+        type="button"
+        class="accion-editar-transferencia"
+        [disabled]="!a.editarTransferencia.habilitada"
+        [matTooltip]="a.editarTransferencia.motivo ?? ''"
+        (click)="emitir('editarTransferencia', t)"
+      >
+        <mat-icon>edit</mat-icon>
+        <span>Editar transferencia</span>
+        @if (a.editarTransferencia.motivo) {
+          <span class="motivo">{{ a.editarTransferencia.motivo }}</span>
+        }
+      </button>
+    }
     <button
       mat-menu-item
       type="button"
@@ -185,18 +201,36 @@
         <span class="motivo">{{ a.estado.motivo }}</span>
       }
     </button>
-    <button
-      mat-menu-item
-      type="button"
-      class="accion-borrar"
-      [disabled]="!a.borrar.habilitada"
-      (click)="emitir('borrar', t)"
-    >
-      <mat-icon>delete</mat-icon>
-      <span>Borrar</span>
-      @if (a.borrar.motivo) {
-        <span class="motivo">{{ a.borrar.motivo }}</span>
-      }
-    </button>
+    @if (a.borrar.visible) {
+      <button
+        mat-menu-item
+        type="button"
+        class="accion-borrar"
+        [disabled]="!a.borrar.habilitada"
+        (click)="emitir('borrar', t)"
+      >
+        <mat-icon>delete</mat-icon>
+        <span>Borrar</span>
+        @if (a.borrar.motivo) {
+          <span class="motivo">{{ a.borrar.motivo }}</span>
+        }
+      </button>
+    }
+    @if (a.borrarTransferencia.visible) {
+      <button
+        mat-menu-item
+        type="button"
+        class="accion-borrar-transferencia"
+        [disabled]="!a.borrarTransferencia.habilitada"
+        [matTooltip]="a.borrarTransferencia.motivo ?? ''"
+        (click)="emitir('borrarTransferencia', t)"
+      >
+        <mat-icon>delete</mat-icon>
+        <span>Borrar transferencia</span>
+        @if (a.borrarTransferencia.motivo) {
+          <span class="motivo">{{ a.borrarTransferencia.motivo }}</span>
+        }
+      </button>
+    }
   </ng-template>
 </mat-menu>

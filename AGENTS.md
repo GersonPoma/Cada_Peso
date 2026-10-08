@@ -313,6 +313,13 @@ misma fecha, el mismo valor absoluto y el mismo memo. Cada fila apunta a la otra
 - `asignacion` no cuenta como ingreso la entrada de una transferencia cuya pata par está en una
   cuenta del presupuesto (`ActividadMensualRepository.ingresosSinCategoria`); la que viene de
   una cuenta externa sin categoría sí es ingreso.
+- **Frontend**: igual que en el backend, las transferencias viven en `features/transacciones`
+  (`TransferenciaService` y `DialogoTransferenciaComponent`), sin feature aparte. La regla de
+  categoría según `enPresupuesto` está en la función pura `reglaCategoriaTransferencia`: ambas
+  del mismo lado, sin campo ni `categoriaId`; del presupuesto a una externa, obligatoria; de una
+  externa al presupuesto, opcional. El menú de una pata ofrece `Editar transferencia` y `Borrar
+  transferencia` (bloqueadas si una pata está reconciliada o una cuenta cerrada, con lo que hay
+  en la página) y la columna dice `Transferencia a/desde {cuenta}` sin peticiones por fila.
 
 ## Transacciones programadas
 
@@ -780,6 +787,11 @@ src/app/
     │   ├── models/
     │   ├── pages/
     │   └── services/
+    ├── beneficiarios/
+    │   ├── components/
+    │   ├── models/
+    │   ├── pages/
+    │   └── services/
     ├── categorias/
     │   ├── components/
     │   ├── models/
@@ -839,6 +851,13 @@ src/app/
   un servicio de **solo lectura** (solo GET) con sus propios modelos mínimos en `models/` (ej.
   `CuentaLecturaService` y `CuentaResumen`). Es una duplicación pequeña y a propósito: nunca se
   importan servicios ni modelos de otra feature.
+- **Beneficiarios**: la pantalla de gestión (`/presupuestos/:id/beneficiarios`) vive en
+  `features/beneficiarios`, pero el autocompletado del diálogo de transacción
+  (`app-campo-beneficiario`) y el nombre vinculado de la tabla viven en `features/transacciones`,
+  con su propio `BeneficiarioLecturaService` y su modelo `BeneficiarioSugerido`; ninguna de las
+  dos importa a la otra. El campo acepta texto libre: el backend crea o vincula el beneficiario
+  al guardar. El filtro de texto de transacciones (`q`) busca en el texto guardado, así que una
+  transacción de un beneficiario renombrado solo se encuentra por su texto original.
 - **Nombres de archivo** en `kebab-case` con el sufijo técnico: `*.page.ts`, `*.component.ts`,
   `*.service.ts`, `*.model.ts`, `*.pipe.ts`, `*.guard.ts`, `*.interceptor.ts`,
   `*.validator.ts`. Los tests `*.spec.ts` van junto al archivo que

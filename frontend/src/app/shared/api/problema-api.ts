@@ -13,6 +13,7 @@ export const CODIGOS_API = {
   CATEGORIA_YA_EXISTE: 'CATEGORIA_YA_EXISTE',
   CONFLICTO: 'CONFLICTO',
   RECURSO_NO_ENCONTRADO: 'RECURSO_NO_ENCONTRADO',
+  BENEFICIARIO_YA_EXISTE: 'BENEFICIARIO_YA_EXISTE',
 } as const;
 
 /** Aviso para cualquier error que el frontend no sabe mostrar de otra forma. */

@@ -1,0 +1,71 @@
+<main class="pagina">
+  <header class="encabezado">
+    <h1 class="titulo">Beneficiarios</h1>
+    <button mat-flat-button type="button" (click)="agregar()">
+      <mat-icon>add</mat-icon>
+      Agregar beneficiario
+    </button>
+  </header>
+
+  @switch (estado()) {
+    @case ('cargando') {
+      <div class="centrado">
+        <mat-progress-spinner mode="indeterminate" diameter="48" aria-label="Cargando" />
+      </div>
+    }
+    @case ('error') {
+      <div class="centrado">
+        <p class="error" role="alert">No pudimos cargar tus beneficiarios.</p>
+        <button mat-stroked-button type="button" (click)="recargar()">Reintentar</button>
+      </div>
+    }
+    @case ('listo') {
+      @if (sinBeneficiarios()) {
+        <div class="centrado">
+          <p class="vacio">
+            Aún no tienes beneficiarios; se crean solos al registrar transacciones
+          </p>
+          <button mat-stroked-button type="button" (click)="agregar()">Agregar beneficiario</button>
+        </div>
+      } @else {
+        <mat-form-field appearance="outline" class="buscador">
+          <mat-label>Buscar beneficiario</mat-label>
+          <mat-icon matPrefix>search</mat-icon>
+          <input matInput type="search" autocomplete="off" [formControl]="busqueda" />
+        </mat-form-field>
+
+        @if (filtrados().length === 0) {
+          <p class="sin-coincidencias">Ningún beneficiario coincide con la búsqueda.</p>
+        } @else {
+          <table mat-table [dataSource]="filtrados()" class="tabla">
+            <ng-container matColumnDef="nombre">
+              <th mat-header-cell *matHeaderCellDef>Nombre</th>
+              <td mat-cell *matCellDef="let b" class="nombre">{{ b.nombre }}</td>
+            </ng-container>
+            <ng-container matColumnDef="categoria">
+              <th mat-header-cell *matHeaderCellDef>Categoría predeterminada</th>
+              <td mat-cell *matCellDef="let b" class="categoria">{{ categoria(b) }}</td>
+            </ng-container>
+            <ng-container matColumnDef="acciones">
+              <th mat-header-cell *matHeaderCellDef>
+                <span class="oculto">Acciones</span>
+              </th>
+              <td mat-cell *matCellDef="let b" class="acciones">
+                <button
+                  mat-icon-button
+                  type="button"
+                  [attr.aria-label]="'Editar ' + b.nombre"
+                  (click)="editar(b)"
+                >
+                  <mat-icon>edit</mat-icon>
+                </button>
+              </td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="columnas"></tr>
+            <tr mat-row *matRowDef="let fila; columns: columnas" class="fila"></tr>
+          </table>
+        }
+      }
+    }
+  }
+</main>

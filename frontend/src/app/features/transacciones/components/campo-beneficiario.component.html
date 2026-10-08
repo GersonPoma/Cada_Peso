@@ -1,0 +1,31 @@
+<mat-form-field appearance="outline" class="campo">
+  <mat-label>Beneficiario</mat-label>
+  <input
+    matInput
+    type="text"
+    autocomplete="off"
+    aria-label="Beneficiario"
+    [formControl]="control()"
+    [matAutocomplete]="sugerencias"
+  />
+  <mat-autocomplete #sugerencias="matAutocomplete" (optionSelected)="elegir($event)">
+    @for (opcion of opciones(); track opcion.sugerencia.id) {
+      <mat-option [value]="opcion.sugerencia.nombre">
+        <span class="nombre"
+          ><strong>{{ opcion.coincide }}</strong
+          >{{ opcion.resto }}</span
+        >
+        @if (opcion.categoria; as categoria) {
+          <span class="categoria">{{ categoria }}</span>
+        }
+      </mat-option>
+    }
+  </mat-autocomplete>
+  @if (esNuevo()) {
+    <mat-hint class="pista-nuevo">{{ pistaNuevo }}</mat-hint>
+  }
+  <mat-hint align="end">{{ largo() }}/{{ maximo }}</mat-hint>
+  @if (mensaje(); as texto) {
+    <mat-error>{{ texto }}</mat-error>
+  }
+</mat-form-field>

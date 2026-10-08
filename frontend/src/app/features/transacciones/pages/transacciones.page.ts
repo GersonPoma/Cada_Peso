@@ -28,16 +28,19 @@ import { BarraLoteComponent } from '../components/barra-lote.component';
 import { DialogoConfirmacionComponent } from '../components/dialogo-confirmacion.component';
 import { DialogoMoverCuentaComponent } from '../components/dialogo-mover-cuenta.component';
 import { DialogoTransaccionComponent } from '../components/dialogo-transaccion.component';
+import { DialogoTransferenciaComponent } from '../components/dialogo-transferencia.component';
 import { FiltrosTransaccionesComponent } from '../components/filtros-transacciones.component';
 import {
   AccionFila,
   TablaTransaccionesComponent,
 } from '../components/tabla-transacciones.component';
+import { BeneficiarioSugerido } from '../models/beneficiario-sugerido.model';
 import { CuentaResumen } from '../models/cuenta-resumen.model';
 import {
   DatosDialogoConfirmacion,
   DatosDialogoMoverCuenta,
   DatosDialogoTransaccion,
+  DatosDialogoTransferencia,
   ResultadoDialogoTransaccion,
 } from '../models/datos-dialogos-transacciones.model';
 import { FiltrosTransacciones } from '../models/filtros-transacciones.model';
@@ -47,6 +50,7 @@ import { PaginaTransacciones } from '../models/pagina-transacciones.model';
 import { SaldoCuenta } from '../models/saldo-cuenta.model';
 import { TransaccionResponse } from '../models/transaccion-response.model';
 import { filtrarLote } from '../services/acciones-transaccion';
+import { BeneficiarioLecturaService } from '../services/beneficiario-lectura.service';
 import { CategoriaLecturaService } from '../services/categoria-lectura.service';
 import { CuentaLecturaService } from '../services/cuenta-lectura.service';
 import {
@@ -57,6 +61,7 @@ import {
   leerFiltros,
 } from '../services/filtros-url';
 import { TransaccionService } from '../services/transaccion.service';
+import { TransferenciaService } from '../services/transferencia.service';
 
 type Estado = 'cargando' | 'listo' | 'error';
 
@@ -68,6 +73,9 @@ export const MENSAJE_ACCION_NO_PERMITIDA =
 export const MENSAJE_TRANSACCION_INEXISTENTE =
   'La transacción ya no existe. Actualizamos la lista.';
 export const MENSAJE_LOTE_SIN_APLICABLES = 'Ninguna de las seleccionadas admite esta acción.';
+export const MENSAJE_BORRAR_TRANSFERENCIA =
+  'Se borrarán las dos transacciones de esta transferencia (la salida y la entrada). No se puede ' +
+  'deshacer.';
 
 const NOMBRE_OPERACION: Readonly<Record<OperacionLote, string>> = {
   APROBAR: 'aprobar',
@@ -100,8 +108,10 @@ export class TransaccionesPage {
   private readonly ruta = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly servicio = inject(TransaccionService);
+  private readonly transferencias = inject(TransferenciaService);
   private readonly cuentasServicio = inject(CuentaLecturaService);
   private readonly categoriasServicio = inject(CategoriaLecturaService);
+  private readonly beneficiariosServicio = inject(BeneficiarioLecturaService);
   private readonly presupuestoActivo = inject(PresupuestoActivoService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
@@ -119,9 +129,11 @@ export class TransaccionesPage {
   protected readonly saldos = signal<SaldoCuenta[]>([]);
   protected readonly cuentas = signal<CuentaResumen[]>([]);
   protected readonly gruposTodos = signal<GrupoCategoriasResumen[]>([]);
+  private readonly beneficiarios = signal<BeneficiarioSugerido[]>([]);
   protected readonly seleccion = signal<ReadonlySet<number>>(new Set());
   private readonly recargas = signal(0);
   private readonly recargasListas = signal(0);
+  private readonly recargasBeneficiarios = signal(0);
 
   protected readonly nombresCuenta = computed(
     () => new Map(this.cuentas().map((c) => [c.id, c.nombre] as const)),
@@ -139,6 +151,10 @@ export class TransaccionesPage {
       new Map(
         this.gruposTodos().flatMap((g) => g.categorias.map((c) => [c.id, c.nombre] as const)),
       ),
+  );
+  /** Nombre actual de cada beneficiario, para la columna de la tabla. */
+  protected readonly nombresBeneficiario = computed(
+    () => new Map(this.beneficiarios().map((b) => [b.id, b.nombre] as const)),
   );
   /** Grupos y categorías visibles, para elegir en filtros y en lote. */
   protected readonly gruposVisibles = computed(() =>
@@ -180,6 +196,17 @@ export class TransaccionesPage {
         this.cuentas.set(cuentas);
         this.gruposTodos.set(grupos);
       },
+    );
+    // Beneficiarios (nombre actual en la tabla): al entrar y tras guardar desde el diálogo. Si
+    // fallan, la columna muestra el texto de cada transacción.
+    this.cargar(
+      computed(() => ({
+        presupuestoId: this.presupuestoId(),
+        r: this.recargasBeneficiarios(),
+      })),
+      (id) => this.beneficiariosServicio.listar(id),
+      (beneficiarios) => this.beneficiarios.set(beneficiarios),
+      () => this.beneficiarios.set([]),
     );
     // La página: cada vez que cambian los filtros de la URL o se recarga. switchMap ignora las
     // respuestas atrasadas.
@@ -234,6 +261,13 @@ export class TransaccionesPage {
     this.abrirDialogoTransaccion(null);
   }
 
+  /** Con un filtro de cuenta abierta, esa cuenta es el origen propuesto. */
+  protected agregarTransferencia(): void {
+    const cuentaId = this.filtros().cuentaId;
+    const abierta = cuentaId !== null && !this.cuentasCerradas().has(cuentaId);
+    this.abrirDialogoTransferencia(null, abierta ? cuentaId : null);
+  }
+
   protected alternarSeleccion(id: number): void {
     this.seleccion.update((actual) => {
       const nueva = new Set(actual);
@@ -285,6 +319,16 @@ export class TransaccionesPage {
             transaccion.estado === 'NO_CONCILIADA' ? 'CONCILIADA' : 'NO_CONCILIADA',
           ),
         );
+        break;
+      case 'editarTransferencia':
+        this.abrirDialogoTransferencia(transaccion.id, null);
+        break;
+      case 'borrarTransferencia':
+        this.confirmar({
+          titulo: 'Borrar transferencia',
+          mensaje: MENSAJE_BORRAR_TRANSFERENCIA,
+          confirmar: 'Borrar',
+        }).subscribe((ok) => ok && this.ejecutar(this.transferencias.borrar(id, transaccion.id)));
         break;
       case 'borrar':
         this.confirmar({
@@ -369,10 +413,30 @@ export class TransaccionesPage {
       { transaccion, cuentas: this.cuentas(), grupos: this.gruposTodos() },
       '640px',
     ).subscribe((resultado) => {
+      if (resultado) {
+        // Guardar puede haber creado un beneficiario nuevo.
+        this.recargasBeneficiarios.update((v) => v + 1);
+      }
       if (resultado?.tipo === 'guardada') {
         this.recargar();
       } else if (resultado?.tipo === 'recargar') {
         this.recargasListas.update((v) => v + 1);
+        this.recargar();
+      }
+    });
+  }
+
+  /** Crear (`transaccionId` nulo) o editar una transferencia por el id de una de sus patas. */
+  private abrirDialogoTransferencia(transaccionId: number | null, cuentaOrigenId: number | null) {
+    this.abrir<DatosDialogoTransferencia, ResultadoDialogoTransaccion>(
+      DialogoTransferenciaComponent,
+      { transaccionId, cuentaOrigenId, cuentas: this.cuentas(), grupos: this.gruposTodos() },
+      '640px',
+    ).subscribe((resultado) => {
+      if (resultado?.tipo === 'recargar') {
+        this.recargasListas.update((v) => v + 1);
+      }
+      if (resultado) {
         this.recargar();
       }
     });

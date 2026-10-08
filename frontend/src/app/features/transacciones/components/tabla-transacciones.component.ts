@@ -23,7 +23,15 @@ import { TransaccionResponse } from '../models/transaccion-response.model';
 import { AccionesTransaccion, accionesDe, esTransferencia } from '../services/acciones-transaccion';
 
 /** Acción pedida desde el menú de una fila. */
-export type TipoAccion = 'editar' | 'duplicar' | 'mover' | 'aprobar' | 'estado' | 'borrar';
+export type TipoAccion =
+  | 'editar'
+  | 'duplicar'
+  | 'mover'
+  | 'aprobar'
+  | 'estado'
+  | 'borrar'
+  | 'editarTransferencia'
+  | 'borrarTransferencia';
 
 export interface AccionFila {
   tipo: TipoAccion;
@@ -73,6 +81,8 @@ export class TablaTransaccionesComponent {
   readonly transacciones = input.required<TransaccionResponse[]>();
   readonly nombresCuenta = input<ReadonlyMap<number, string>>(new Map());
   readonly nombresCategoria = input<ReadonlyMap<number, string>>(new Map());
+  /** Nombre actual de cada beneficiario por id (si se renombró, prevalece sobre el texto). */
+  readonly nombresBeneficiario = input<ReadonlyMap<number, string>>(new Map());
   readonly cuentasCerradas = input<ReadonlySet<number>>(new Set());
   readonly moneda = input.required<string>();
   readonly seleccion = input<ReadonlySet<number>>(new Set());
@@ -101,12 +111,48 @@ export class TablaTransaccionesComponent {
       this.transacciones().length > 0 &&
       this.transacciones().every((t) => this.seleccion().has(t.id)),
   );
+  /** Transacciones de la página por id, para encontrar la pata par sin pedir nada. */
+  private readonly porId = computed(
+    () => new Map(this.transacciones().map((t) => [t.id, t] as const)),
+  );
+
   protected readonly parteDeLaPagina = computed(
     () => !this.todaLaPagina() && this.transacciones().some((t) => this.seleccion().has(t.id)),
   );
 
   protected acciones(transaccion: TransaccionResponse): AccionesTransaccion {
-    return accionesDe(transaccion, this.cuentasCerradas().has(transaccion.cuentaId));
+    const par = this.par(transaccion);
+    return accionesDe(
+      transaccion,
+      this.cuentasCerradas().has(transaccion.cuentaId),
+      par,
+      par !== undefined && this.cuentasCerradas().has(par.cuentaId),
+    );
+  }
+
+  /**
+   * Una pata dice a qué cuenta va o de cuál viene si su par está en la página (`Transferencia` si
+   * no); las demás, el beneficiario.
+   */
+  protected descripcion(transaccion: TransaccionResponse): string {
+    if (!esTransferencia(transaccion)) {
+      return this.beneficiario(transaccion);
+    }
+    const par = this.par(transaccion);
+    const cuenta = par === undefined ? undefined : this.nombresCuenta().get(par.cuentaId);
+    if (cuenta === undefined) {
+      return 'Transferencia';
+    }
+    return transaccion.monto < 0 ? `Transferencia a ${cuenta}` : `Transferencia desde ${cuenta}`;
+  }
+
+  /** Nombre actual del beneficiario vinculado o, sin vínculo conocido, el texto guardado. */
+  private beneficiario(transaccion: TransaccionResponse): string {
+    const vinculado =
+      transaccion.beneficiarioId === null
+        ? undefined
+        : this.nombresBeneficiario().get(transaccion.beneficiarioId);
+    return vinculado ?? transaccion.beneficiario ?? '';
   }
 
   /** Nombre de la categoría, "Dividida: ..." con las partes, o vacío sin categoría. */
@@ -130,6 +176,12 @@ export class TablaTransaccionesComponent {
 
   protected emitir(tipo: TipoAccion, transaccion: TransaccionResponse): void {
     this.accion.emit({ tipo, transaccion });
+  }
+
+  private par(transaccion: TransaccionResponse): TransaccionResponse | undefined {
+    return transaccion.transaccionParId === null
+      ? undefined
+      : this.porId().get(transaccion.transaccionParId);
   }
 
   private nombreCategoria(id: number): string {

@@ -16,10 +16,16 @@
         </p>
       }
     </div>
-    <button mat-flat-button type="button" (click)="agregar()">
-      <mat-icon>add</mat-icon>
-      Agregar transacción
-    </button>
+    <div class="botones-encabezado">
+      <button mat-stroked-button type="button" (click)="agregarTransferencia()">
+        <mat-icon>swap_horiz</mat-icon>
+        Agregar transferencia
+      </button>
+      <button mat-flat-button type="button" (click)="agregar()">
+        <mat-icon>add</mat-icon>
+        Agregar transacción
+      </button>
+    </div>
   </header>
 
   <app-filtros-transacciones
@@ -71,6 +77,7 @@
             [transacciones]="pagina.contenido"
             [nombresCuenta]="nombresCuenta()"
             [nombresCategoria]="nombresCategoria()"
+            [nombresBeneficiario]="nombresBeneficiario()"
             [cuentasCerradas]="cuentasCerradas()"
             [moneda]="moneda"
             [seleccion]="seleccion()"

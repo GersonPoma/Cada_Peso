@@ -29,14 +29,11 @@
       </mat-form-field>
     </div>
 
-    <mat-form-field appearance="outline">
-      <mat-label>Beneficiario</mat-label>
-      <input matInput type="text" formControlName="beneficiario" autocomplete="off" />
-      <mat-hint align="end">{{ largoBeneficiario() }}/{{ maximoBeneficiario }}</mat-hint>
-      @if (mensaje('beneficiario'); as texto) {
-        <mat-error>{{ texto }}</mat-error>
-      }
-    </mat-form-field>
+    <app-campo-beneficiario
+      [control]="formulario.controls.beneficiario"
+      [grupos]="arbol"
+      (elegido)="alElegirBeneficiario($event)"
+    />
 
     <div class="fila-doble">
       <mat-button-toggle-group formControlName="tipo" aria-label="Tipo de movimiento" class="tipo">
@@ -58,7 +55,7 @@
       <app-editor-division
         [partes]="partes"
         [montoTotal]="montoActual()"
-        [grupos]="grupos"
+        [grupos]="grupos()"
         [moneda]="moneda"
       />
     } @else {
@@ -66,7 +63,7 @@
         <mat-label>Categoría</mat-label>
         <mat-select formControlName="categoriaId">
           <mat-option [value]="null">Sin categoría</mat-option>
-          @for (grupo of grupos; track grupo.id) {
+          @for (grupo of grupos(); track grupo.id) {
             <mat-optgroup [label]="grupo.nombre">
               @for (categoria of grupo.categorias; track categoria.id) {
                 <mat-option [value]="categoria.id">{{ categoria.nombre }}</mat-option>
@@ -74,6 +71,9 @@
             </mat-optgroup>
           }
         </mat-select>
+        @if (hayCategoriaSugerida()) {
+          <mat-hint>{{ pistaCategoriaSugerida }}</mat-hint>
+        }
       </mat-form-field>
     }
 

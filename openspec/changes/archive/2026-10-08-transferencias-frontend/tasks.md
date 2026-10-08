@@ -5,21 +5,21 @@ Rutas desde `frontend/src/app/`; cada test junto a su archivo; comandos en `fron
 
 ## 1. Línea base
 
-- [ ] 1.1 `npx ng build` y `npx ng test --watch=false`; anotar el total de tests.
+- [x] 1.1 `npx ng build` y `npx ng test --watch=false`; anotar el total de tests.
 
 ## 2. Modelos y servicios
 
-- [ ] 2.1 Modelos `features/transacciones/models/crear-transferencia-request.model.ts`,
+- [x] 2.1 Modelos `features/transacciones/models/crear-transferencia-request.model.ts`,
       `actualizar-transferencia-request.model.ts` y `transferencia-response.model.ts` con los
       nombres exactos de los records, y `DatosDialogoTransferencia` en
       `datos-dialogos-transacciones.model.ts` (sin test; verificar con `npx ng build`).
-- [ ] 2.2 `features/transacciones/services/transferencia.service.ts` (test
+- [x] 2.2 `features/transacciones/services/transferencia.service.ts` (test
       `features/transacciones/services/transferencia.service.spec.ts`): URL, método y cuerpo de
       `crear`, `obtener`, `actualizar` y `borrar`.
-- [ ] 2.3 `features/transacciones/services/regla-categoria-transferencia.ts` (test
+- [x] 2.3 `features/transacciones/services/regla-categoria-transferencia.ts` (test
       `features/transacciones/services/regla-categoria-transferencia.spec.ts`): las cuatro
       combinaciones de `enPresupuesto` y `pendiente` con una cuenta vacía.
-- [ ] 2.4 `features/transacciones/services/acciones-transaccion.ts` (test
+- [x] 2.4 `features/transacciones/services/acciones-transaccion.ts` (test
       `features/transacciones/services/acciones-transaccion.spec.ts`): `editarTransferencia` y
       `borrarTransferencia` en una pata normal, reconciliada, con par reconciliada, cuenta
       cerrada y cuenta par cerrada (prioridad de la reconciliada); ocultas en una transacción
@@ -27,7 +27,7 @@ Rutas desde `frontend/src/app/`; cada test junto a su archivo; comandos en `fron
 
 ## 3. Diálogo de transferencia
 
-- [ ] 3.1 `features/transacciones/components/dialogo-transferencia.component.ts` (+ html, scss;
+- [x] 3.1 `features/transacciones/components/dialogo-transferencia.component.ts` (+ html, scss;
       test `features/transacciones/components/dialogo-transferencia.component.spec.ts`, con
       `MatSelectHarness` y `vi.useFakeTimers({ toFake: ['Date'] })`):
       - Crear: solo cuentas abiertas, agrupadas, exclusión mutua, `Invertir`, origen
@@ -43,13 +43,13 @@ Rutas desde `frontend/src/app/`; cada test junto a su archivo; comandos en `fron
 
 ## 4. Tabla y página
 
-- [ ] 4.1 `features/transacciones/components/tabla-transacciones.component.ts` (+ html; test
+- [x] 4.1 `features/transacciones/components/tabla-transacciones.component.ts` (+ html; test
       `features/transacciones/components/tabla-transacciones.component.spec.ts`): menú de una
       pata (normal, reconciliada, cuenta cerrada) con `Editar transferencia` y `Borrar
       transferencia` y sus motivos; emisión con la transacción de la fila; `Transferencia a` y
       `Transferencia desde` con la pata par en la página y `Transferencia` sin ella. Ajustar los
       tests del menú de la pata.
-- [ ] 4.2 `features/transacciones/pages/transacciones.page.ts` (+ html; test
+- [x] 4.2 `features/transacciones/pages/transacciones.page.ts` (+ html; test
       `features/transacciones/pages/transacciones.page.spec.ts`): botón `Agregar transferencia`
       con origen del filtro de cuenta; editar abre el diálogo con el id de la pata; borrar
       confirma con el mensaje de las dos transacciones y llama a `DELETE` con el id de la pata;
@@ -58,10 +58,10 @@ Rutas desde `frontend/src/app/`; cada test junto a su archivo; comandos en `fron
 
 ## 5. Documentación y verificación
 
-- [ ] 5.1 `AGENTS.md`: las transferencias del frontend viven en `features/transacciones`
+- [x] 5.1 `AGENTS.md`: las transferencias del frontend viven en `features/transacciones`
       (`TransferenciaService`, `DialogoTransferenciaComponent`) y la regla de categoría según
       `enPresupuesto` (`reglaCategoriaTransferencia`).
-- [ ] 5.2 Comprobar con `grep` que `core/` y `shared/` no importan `features/` y que
+- [x] 5.2 Comprobar con `grep` que `core/` y `shared/` no importan `features/` y que
       `features/transacciones` no importa otra feature.
-- [ ] 5.3 `npx prettier --check` sobre los archivos tocados, `npx ng build` y
+- [x] 5.3 `npx prettier --check` sobre los archivos tocados, `npx ng build` y
       `npx ng test --watch=false`; anotar el total de tests.

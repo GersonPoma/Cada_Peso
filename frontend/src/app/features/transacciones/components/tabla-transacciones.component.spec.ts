@@ -6,7 +6,12 @@ import { MatMenuHarness } from '@angular/material/menu/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { proveerMaterial } from '../../../core/material/proveer-material';
 import { TransaccionResponse } from '../models/transaccion-response.model';
-import { MOTIVO_RECONCILIADA, MOTIVO_TRANSFERENCIA } from '../services/acciones-transaccion';
+import {
+  MOTIVO_CUENTA_CERRADA,
+  MOTIVO_RECONCILIADA,
+  MOTIVO_TRANSFERENCIA,
+  MOTIVO_TRANSFERENCIA_RECONCILIADA,
+} from '../services/acciones-transaccion';
 import { AccionFila, TablaTransaccionesComponent } from './tabla-transacciones.component';
 
 function transaccion(id: number, cambios: Partial<TransaccionResponse> = {}): TransaccionResponse {
@@ -17,11 +22,13 @@ function transaccion(id: number, cambios: Partial<TransaccionResponse> = {}): Tr
     monto: -25000,
     categoriaId: 7,
     beneficiario: `Beneficiario ${id}`,
+    beneficiarioId: null,
     memo: null,
     estado: 'NO_CONCILIADA',
     aprobada: true,
     subtransacciones: [],
     transaccionParId: null,
+    programadaId: null,
     fechaCreacion: '',
     fechaActualizacion: '',
     ...cambios,
@@ -136,11 +143,61 @@ describe('TablaTransaccionesComponent', () => {
     );
   });
 
+  describe('beneficiario', () => {
+    beforeEach(() => {
+      fixture.componentRef.setInput(
+        'nombresBeneficiario',
+        new Map([
+          [4, 'Netflix Premium'],
+          [5, 'Tienda Sol'],
+        ]),
+      );
+    });
+
+    it('muestra el nombre actual del beneficiario vinculado aunque se haya renombrado', async () => {
+      await con([transaccion(1, { beneficiario: 'Netflix', beneficiarioId: 4 })]);
+
+      expect(celda(0, 'beneficiario')).toBe('Beneficiario Netflix Premium');
+    });
+
+    it('sin vínculo muestra el texto de la transacción', async () => {
+      await con([transaccion(1, { beneficiario: 'Tienda', beneficiarioId: null })]);
+
+      expect(celda(0, 'beneficiario')).toBe('Beneficiario Tienda');
+    });
+
+    it('con un id que no está en la lista muestra el texto de la transacción', async () => {
+      await con([transaccion(1, { beneficiario: 'Viejo', beneficiarioId: 9 })]);
+
+      expect(celda(0, 'beneficiario')).toBe('Beneficiario Viejo');
+    });
+  });
+
   it('las patas de transferencia llevan la insignia "Transferencia"', async () => {
     await con([transaccion(1), transaccion(2, { transaccionParId: 3 })]);
 
     expect(filas()[0].querySelector('.insignia-transferencia')).toBeNull();
-    expect(celda(1, 'beneficiario')).toContain('Transferencia');
+    expect(filas()[1].querySelector('.insignia-transferencia')).not.toBeNull();
+  });
+
+  it('una pata dice a qué cuenta va o de cuál viene si su par está en la página', async () => {
+    await con([
+      transaccion(1, { cuentaId: 5, monto: -10000, transaccionParId: 2, beneficiario: null }),
+      transaccion(2, { cuentaId: 6, monto: 10000, transaccionParId: 1, beneficiario: null }),
+    ]);
+
+    expect(celda(0, 'beneficiario')).toBe(
+      'Beneficiario Transferencia a Efectivo swap_horizTransferencia',
+    );
+    expect(celda(1, 'beneficiario')).toBe(
+      'Beneficiario Transferencia desde Banco swap_horizTransferencia',
+    );
+  });
+
+  it('sin la pata par en la página solo dice Transferencia', async () => {
+    await con([transaccion(1, { transaccionParId: 99, beneficiario: null })]);
+
+    expect(celda(0, 'beneficiario')).toBe('Beneficiario Transferencia swap_horizTransferencia');
   });
 
   it('el menú de una normal sin aprobar ofrece todas las acciones y emite la elegida', async () => {
@@ -177,20 +234,77 @@ describe('TablaTransaccionesComponent', () => {
     expect(estados.find(([t]) => t.includes('Duplicar'))?.[1]).toBe(false);
   });
 
-  it('una pata solo deja aprobar y cambiar el estado', async () => {
-    await con([transaccion(1, { transaccionParId: 2, aprobada: false })]);
-
-    const items = await itemsDelMenu(0);
-    const habilitados: string[] = [];
-    for (const item of items) {
-      const texto = await item.getText();
-      if (await item.isDisabled()) {
-        expect(texto).toContain(MOTIVO_TRANSFERENCIA);
-      } else {
-        habilitados.push(texto.replace(/^[a-z_]+/, ''));
-      }
+  describe('menú de una pata de transferencia', () => {
+    async function estadosDelMenu(fila: number) {
+      const items = await itemsDelMenu(fila);
+      return Promise.all(
+        items.map(
+          async (i) => [(await i.getText()).replace(/^[a-z_]+/, ''), await i.isDisabled()] as const,
+        ),
+      );
     }
-    expect(habilitados).toEqual(['Aprobar', 'Marcar conciliada']);
+
+    it('ofrece editar y borrar la transferencia; no duplica ni mueve', async () => {
+      await con([transaccion(1, { transaccionParId: 2, aprobada: false })]);
+
+      const estados = await estadosDelMenu(0);
+      expect(estados).toEqual([
+        ['Editar transferencia', false],
+        [`Duplicar${MOTIVO_TRANSFERENCIA}`, true],
+        [`Mover a otra cuenta${MOTIVO_TRANSFERENCIA}`, true],
+        ['Aprobar', false],
+        ['Marcar conciliada', false],
+        ['Borrar transferencia', false],
+      ]);
+    });
+
+    it('emite editar y borrar la transferencia con la transacción de la fila', async () => {
+      const pata = transaccion(1, { transaccionParId: 2 });
+      await con([pata]);
+      await (await itemsDelMenu(0))[0].click();
+      const items = await itemsDelMenu(0);
+      await items[items.length - 1].click();
+
+      expect(acciones).toEqual([
+        { tipo: 'editarTransferencia', transaccion: pata },
+        { tipo: 'borrarTransferencia', transaccion: pata },
+      ]);
+    });
+
+    it('reconciliada: editar y borrar la transferencia deshabilitados con el motivo', async () => {
+      await con([transaccion(1, { transaccionParId: 2, estado: 'RECONCILIADA' })]);
+
+      const estados = await estadosDelMenu(0);
+      expect(estados[0]).toEqual([
+        `Editar transferencia${MOTIVO_TRANSFERENCIA_RECONCILIADA}`,
+        true,
+      ]);
+      expect(estados.at(-1)).toEqual([
+        `Borrar transferencia${MOTIVO_TRANSFERENCIA_RECONCILIADA}`,
+        true,
+      ]);
+    });
+
+    it('con la pata par reconciliada en la página también se bloquea', async () => {
+      await con([
+        transaccion(1, { transaccionParId: 2 }),
+        transaccion(2, { transaccionParId: 1, cuentaId: 6, estado: 'RECONCILIADA' }),
+      ]);
+
+      expect((await estadosDelMenu(0))[0]).toEqual([
+        `Editar transferencia${MOTIVO_TRANSFERENCIA_RECONCILIADA}`,
+        true,
+      ]);
+    });
+
+    it('con la cuenta cerrada se bloquea con su motivo', async () => {
+      fixture.componentRef.setInput('cuentasCerradas', new Set([5]));
+      await con([transaccion(1, { transaccionParId: 2 })]);
+
+      const estados = await estadosDelMenu(0);
+      expect(estados[0]).toEqual([`Editar transferencia${MOTIVO_CUENTA_CERRADA}`, true]);
+      expect(estados.at(-1)).toEqual([`Borrar transferencia${MOTIVO_CUENTA_CERRADA}`, true]);
+    });
   });
 
   it('con la cuenta cerrada no ofrece Editar', async () => {

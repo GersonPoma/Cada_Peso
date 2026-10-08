@@ -19,16 +19,21 @@ import { MENSAJE_ERROR_GENERICO } from '../../../shared/api/problema-api';
 import { DialogoConfirmacionComponent } from '../components/dialogo-confirmacion.component';
 import { DialogoMoverCuentaComponent } from '../components/dialogo-mover-cuenta.component';
 import { DialogoTransaccionComponent } from '../components/dialogo-transaccion.component';
+import { DialogoTransferenciaComponent } from '../components/dialogo-transferencia.component';
+import { BeneficiarioSugerido } from '../models/beneficiario-sugerido.model';
 import { TransaccionResponse } from '../models/transaccion-response.model';
 import { filtrosVacios } from '../services/filtros-url';
 import {
   MENSAJE_ACCION_NO_PERMITIDA,
+  MENSAJE_BORRAR_TRANSFERENCIA,
   MENSAJE_LOTE_SIN_APLICABLES,
   TransaccionesPage,
 } from './transacciones.page';
 
 const BASE = '/api/v1/presupuestos/3';
 const URL_TX = `${BASE}/transacciones`;
+const URL_BENEFICIARIOS = `${BASE}/beneficiarios`;
+const URL_TRANSFERENCIAS = `${BASE}/transferencias`;
 
 function transaccion(id: number, cambios: Partial<TransaccionResponse> = {}): TransaccionResponse {
   return {
@@ -38,11 +43,13 @@ function transaccion(id: number, cambios: Partial<TransaccionResponse> = {}): Tr
     monto: -25000,
     categoriaId: 7,
     beneficiario: `Beneficiario ${id}`,
+    beneficiarioId: null,
     memo: null,
     estado: 'NO_CONCILIADA',
     aprobada: true,
     subtransacciones: [],
     transaccionParId: null,
+    programadaId: null,
     fechaCreacion: '',
     fechaActualizacion: '',
     ...cambios,
@@ -91,8 +98,16 @@ describe('TransaccionesPage', () => {
     return backend.expectOne((p) => p.url === URL_TX);
   }
 
-  /** Responde las listas de cuentas y categorías (solo la primera vez). */
-  function responderListas(): void {
+  /** Responde la lista completa de beneficiarios (al entrar y tras guardar desde el diálogo). */
+  function responderBeneficiarios(lista: BeneficiarioSugerido[] = []): void {
+    const peticion = backend.expectOne((p) => p.url === URL_BENEFICIARIOS);
+    expect(peticion.request.params.keys()).toEqual([]);
+    peticion.flush(lista);
+  }
+
+  /** Responde las listas de cuentas, categorías y beneficiarios (solo la primera vez). */
+  function responderListas(beneficiarios: BeneficiarioSugerido[] = []): void {
+    responderBeneficiarios(beneficiarios);
     backend
       .expectOne((p) => p.url === `${BASE}/cuentas`)
       .flush([
@@ -327,6 +342,17 @@ describe('TransaccionesPage', () => {
         DialogoTransaccionComponent,
         expect.objectContaining({ data: expect.objectContaining({ transaccion: null }) }),
       );
+      // Guardar pudo crear un beneficiario: la lista se vuelve a pedir con la página y los saldos.
+      responderBeneficiarios();
+      await responder();
+    });
+
+    it('si el diálogo pide recargar, también vuelve a pedir los beneficiarios', async () => {
+      resultadosDialogo.set(DialogoTransaccionComponent, { tipo: 'recargar' });
+      accion('editar', transaccion(1));
+      await estable();
+
+      responderListas();
       await responder();
     });
 
@@ -401,6 +427,133 @@ describe('TransaccionesPage', () => {
         duration: 6000,
       });
       await responder();
+    });
+  });
+
+  describe('transferencias', () => {
+    const pata = transaccion(2, { transaccionParId: 3 });
+
+    function botonCon(contenido: string): HTMLButtonElement | undefined {
+      return Array.from(elemento().querySelectorAll('button')).find((b) =>
+        b.textContent?.includes(contenido),
+      );
+    }
+
+    it('Agregar transferencia sin filtro abre el diálogo vacío y recarga al guardar', async () => {
+      await entrar();
+      resultadosDialogo.set(DialogoTransferenciaComponent, { tipo: 'guardada' });
+
+      botonCon('Agregar transferencia')?.click();
+      await estable();
+
+      expect(abrirDialogo).toHaveBeenCalledWith(
+        DialogoTransferenciaComponent,
+        expect.objectContaining({
+          data: expect.objectContaining({ transaccionId: null, cuentaOrigenId: null }),
+        }),
+      );
+      await responder();
+    });
+
+    it('con el filtro de una cuenta abierta la propone como origen', async () => {
+      await entrar('?cuentaId=5');
+
+      botonCon('Agregar transferencia')?.click();
+      await estable();
+
+      expect(abrirDialogo).toHaveBeenCalledWith(
+        DialogoTransferenciaComponent,
+        expect.objectContaining({ data: expect.objectContaining({ cuentaOrigenId: 5 }) }),
+      );
+    });
+
+    it('Editar transferencia abre el diálogo con el id de la pata', async () => {
+      await entrar();
+      resultadosDialogo.set(DialogoTransferenciaComponent, { tipo: 'guardada' });
+
+      accion('editarTransferencia', pata);
+      await estable();
+
+      expect(abrirDialogo).toHaveBeenCalledWith(
+        DialogoTransferenciaComponent,
+        expect.objectContaining({
+          data: expect.objectContaining({ transaccionId: 2, cuentaOrigenId: null }),
+        }),
+      );
+      // El foco vuelve al botón de la fila: MatDialog lo restaura salvo que se desactive.
+      expect(abrirDialogo.mock.calls.at(-1)?.[1]).not.toHaveProperty('restoreFocus', false);
+      await responder();
+    });
+
+    it('si el diálogo pide recargar, vuelve a pedir cuentas, categorías, página y saldos', async () => {
+      await entrar();
+      resultadosDialogo.set(DialogoTransferenciaComponent, { tipo: 'recargar' });
+
+      accion('editarTransferencia', pata);
+      await estable();
+
+      backend.expectOne((p) => p.url === `${BASE}/cuentas`).flush([]);
+      backend.expectOne((p) => p.url === `${BASE}/categorias`).flush([]);
+      await responder();
+    });
+
+    it('Borrar transferencia confirma con su mensaje y borra con el id de la pata', async () => {
+      await entrar();
+      resultadosDialogo.set(DialogoConfirmacionComponent, true);
+
+      accion('borrarTransferencia', pata);
+      await estable();
+
+      expect(abrirDialogo).toHaveBeenCalledWith(
+        DialogoConfirmacionComponent,
+        expect.objectContaining({
+          data: expect.objectContaining({ mensaje: MENSAJE_BORRAR_TRANSFERENCIA }),
+        }),
+      );
+      const peticion = backend.expectOne(`${URL_TRANSFERENCIAS}/2`);
+      expect(peticion.request.method).toBe('DELETE');
+      peticion.flush(null);
+      await estable();
+      await responder();
+    });
+
+    it('cancelar el borrado no envía nada', async () => {
+      await entrar();
+      resultadosDialogo.set(DialogoConfirmacionComponent, false);
+
+      accion('borrarTransferencia', pata);
+      await estable();
+
+      backend.expectNone(`${URL_TRANSFERENCIAS}/2`);
+    });
+  });
+
+  describe('beneficiarios', () => {
+    it('la columna muestra el nombre actual del beneficiario vinculado', async () => {
+      await harness.navigateByUrl('/presupuestos/3/transacciones');
+      responderListas([{ id: 4, nombre: 'Netflix Premium', categoriaPredeterminadaId: null }]);
+      await responder([
+        transaccion(1, { beneficiario: 'Netflix', beneficiarioId: 4 }),
+        transaccion(2, { beneficiario: 'Tienda', beneficiarioId: null }),
+      ]);
+
+      expect(texto()).toContain('Netflix Premium');
+      expect(texto()).toContain('Tienda');
+    });
+
+    it('si la lista falla, la columna muestra el texto de cada transacción', async () => {
+      await harness.navigateByUrl('/presupuestos/3/transacciones');
+      backend
+        .expectOne((p) => p.url === URL_BENEFICIARIOS)
+        .flush(null, { status: 500, statusText: 'Error' });
+      backend
+        .expectOne((p) => p.url === `${BASE}/cuentas`)
+        .flush([{ id: 5, nombre: 'Banco', enPresupuesto: true, cerrada: false }]);
+      backend.expectOne((p) => p.url === `${BASE}/categorias`).flush([]);
+      await responder([transaccion(1, { beneficiario: 'Netflix', beneficiarioId: 4 })]);
+
+      expect(texto()).toContain('Netflix');
+      expect(abrirAviso).not.toHaveBeenCalled();
     });
   });
 

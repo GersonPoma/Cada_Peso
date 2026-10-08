@@ -71,6 +71,14 @@ export const routes: Routes = [
           import('./features/categorias/pages/categorias.page').then((m) => m.CategoriasPage),
         data: seccion('Categorías', 'category'),
       },
+      {
+        path: 'beneficiarios',
+        loadComponent: () =>
+          import('./features/beneficiarios/pages/beneficiarios.page').then(
+            (m) => m.BeneficiariosPage,
+          ),
+        data: seccion('Beneficiarios', 'storefront'),
+      },
     ],
   },
   {

@@ -31,7 +31,7 @@ import { MatInput } from '@angular/material/input';
 import { MatSelect } from '@angular/material/select';
 import { MatSlideToggle } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { Observable } from 'rxjs';
+import { Observable, of, retry, throwError } from 'rxjs';
 import { PresupuestoActivoService } from '../../../core/presupuesto-activo/presupuesto-activo.service';
 import {
   CODIGOS_API,
@@ -41,11 +41,13 @@ import {
 import { CampoMontoComponent } from '../../../shared/calculadora/campo-monto.component';
 import { aFechaNegocio, deFechaNegocio } from '../../../shared/fecha/fecha-negocio';
 import {
+  CLAVE_ERROR_SERVIDOR,
   MensajesDeError,
   aplicarErroresDeCampos,
   mensajeDeError,
 } from '../../../shared/formulario/errores-formulario';
 import { sobreTextoRecortado } from '../../../shared/validacion/sobre-texto-recortado.validator';
+import { BeneficiarioSugerido } from '../models/beneficiario-sugerido.model';
 import {
   DatosDialogoTransaccion,
   ResultadoDialogoTransaccion,
@@ -53,7 +55,9 @@ import {
 import { GrupoCategoriasResumen } from '../models/grupo-categorias-resumen.model';
 import { SubtransaccionRequest } from '../models/subtransaccion-request.model';
 import { TransaccionResponse } from '../models/transaccion-response.model';
+import { categoriaRecordada } from '../services/categoria-recordada';
 import { TransaccionService } from '../services/transaccion.service';
+import { CampoBeneficiarioComponent, MAXIMO_BENEFICIARIO } from './campo-beneficiario.component';
 import {
   EditorDivisionComponent,
   FormularioParte,
@@ -61,13 +65,14 @@ import {
   divisionExacta,
 } from './editor-division.component';
 
-export const MAXIMO_BENEFICIARIO = 100;
 export const MAXIMO_MEMO = 500;
 export const MENSAJE_REGLA_TRANSACCION =
   'No se pudo guardar: la cuenta está cerrada, la transacción está reconciliada o las partes no ' +
   'suman el monto.';
 export const MENSAJE_REFERENCIA_INEXISTENTE =
   'Una cuenta o categoría ya no existe. Actualizamos las listas.';
+export const MENSAJE_BENEFICIARIO_DUPLICADO = 'Ya existe un beneficiario con ese nombre';
+export const PISTA_CATEGORIA_SUGERIDA = 'Sugerida por el beneficiario';
 
 type Tipo = 'salida' | 'entrada';
 
@@ -78,6 +83,10 @@ const MENSAJES_TEXTO = (maximo: number, campo: string): MensajesDeError => ({
 
 const mayorQueCero = (control: AbstractControl): ValidationErrors | null =>
   control.value !== null && control.value <= 0 ? { noPositivo: true } : null;
+
+/** Dos peticiones crearon a la vez el mismo beneficiario: repetir la petición lo resuelve. */
+const esBeneficiarioDuplicado = (error: unknown): boolean =>
+  leerProblemaApi(error)?.codigo === CODIGOS_API.BENEFICIARIO_YA_EXISTE;
 
 /** Fecha local de hoy a medianoche (nunca a partir de UTC). */
 function hoy(): Date {
@@ -115,6 +124,7 @@ function hoy(): Date {
     MatSelect,
     MatSlideToggle,
     MatSuffix,
+    CampoBeneficiarioComponent,
     CampoMontoComponent,
     EditorDivisionComponent,
   ],
@@ -133,7 +143,6 @@ export class DialogoTransaccionComponent {
   private readonly original: TransaccionResponse | null = this.datos.transaccion;
   protected readonly esCrear = this.original === null;
   protected readonly moneda = this.presupuestoActivo.presupuesto()?.moneda ?? 'USD';
-  protected readonly maximoBeneficiario = MAXIMO_BENEFICIARIO;
   protected readonly maximoMemo = MAXIMO_MEMO;
   protected readonly mensajesMonto = MENSAJES_MONTO;
 
@@ -148,8 +157,19 @@ export class DialogoTransaccionComponent {
     ].filter((grupo) => grupo.cuentas.length > 0);
   })();
 
-  /** Categorías visibles, más las ocultas que la transacción ya usa. */
-  protected readonly grupos: GrupoCategoriasResumen[] = (() => {
+  /** Árbol completo (ocultas incluidas), para el autocompletado del beneficiario. */
+  protected readonly arbol = this.datos.grupos;
+  private readonly idsCategorias = new Set(
+    this.datos.grupos.flatMap((grupo) => grupo.categorias.map((c) => c.id)),
+  );
+
+  /** Categoría que puso el beneficiario elegido; `null` si no hay o la persona la cambió. */
+  private readonly categoriaSugerida = signal<number | null>(null);
+  protected readonly hayCategoriaSugerida = computed(() => this.categoriaSugerida() !== null);
+  protected readonly pistaCategoriaSugerida = PISTA_CATEGORIA_SUGERIDA;
+
+  /** Categorías visibles, más las ocultas que la transacción ya usa o sugirió el beneficiario. */
+  protected readonly grupos = computed<GrupoCategoriasResumen[]>(() => {
     const usadas = new Set<number>();
     if (this.original?.categoriaId != null) {
       usadas.add(this.original.categoriaId);
@@ -159,6 +179,10 @@ export class DialogoTransaccionComponent {
         usadas.add(parte.categoriaId);
       }
     }
+    const sugerida = this.categoriaSugerida();
+    if (sugerida !== null) {
+      usadas.add(sugerida);
+    }
     return this.datos.grupos
       .map((grupo) => ({
         ...grupo,
@@ -167,7 +191,7 @@ export class DialogoTransaccionComponent {
         ),
       }))
       .filter((grupo) => grupo.categorias.length > 0);
-  })();
+  });
 
   private readonly signo = this.original && this.original.monto > 0 ? 1 : -1;
 
@@ -223,14 +247,9 @@ export class DialogoTransaccionComponent {
   protected readonly montoActual = toSignal(this.formulario.controls.monto.valueChanges, {
     initialValue: this.formulario.controls.monto.value,
   });
-  private readonly beneficiarioActual = toSignal(
-    this.formulario.controls.beneficiario.valueChanges,
-    { initialValue: this.formulario.controls.beneficiario.value },
-  );
   private readonly memoActual = toSignal(this.formulario.controls.memo.valueChanges, {
     initialValue: this.formulario.controls.memo.value,
   });
-  protected readonly largoBeneficiario = computed(() => this.beneficiarioActual().trim().length);
   protected readonly largoMemo = computed(() => this.memoActual().trim().length);
 
   protected readonly enviando = signal(false);
@@ -245,12 +264,38 @@ export class DialogoTransaccionComponent {
     this.formulario.controls.monto.valueChanges
       .pipe(takeUntilDestroyed())
       .subscribe(() => this.partes.updateValueAndValidity());
+    // La pista de categoría sugerida desaparece en cuanto la persona elige otra.
+    this.formulario.controls.categoriaId.valueChanges
+      .pipe(takeUntilDestroyed())
+      .subscribe((valor) => {
+        if (valor !== this.categoriaSugerida()) {
+          this.categoriaSugerida.set(null);
+        }
+      });
   }
 
-  protected mensaje(campo: 'beneficiario' | 'memo' | 'cuentaId' | 'fecha'): string | null {
+  /** Al elegir una sugerencia, rellena la categoría con la del beneficiario si corresponde. */
+  protected alElegirBeneficiario(beneficiario: BeneficiarioSugerido): void {
+    const { categoriaId, dividir } = this.formulario.controls;
+    const id = categoriaRecordada({
+      creando: this.esCrear,
+      dividida: dividir.value,
+      categoriaPristine: categoriaId.pristine,
+      categoriaActual: categoriaId.value,
+      sugerida: beneficiario.categoriaPredeterminadaId,
+      idsExistentes: this.idsCategorias,
+    });
+    if (id !== null) {
+      // Primero la señal, para que el select ya tenga la opción si está oculta. El control sigue
+      // `pristine`: la persona no lo tocó.
+      this.categoriaSugerida.set(id);
+      categoriaId.setValue(id);
+    }
+  }
+
+  protected mensaje(campo: 'memo' | 'cuentaId' | 'fecha'): string | null {
     const control = this.formulario.controls[campo];
     const mensajes: Record<typeof campo, MensajesDeError> = {
-      beneficiario: MENSAJES_TEXTO(MAXIMO_BENEFICIARIO, 'El beneficiario'),
       memo: MENSAJES_TEXTO(MAXIMO_MEMO, 'El memo'),
       cuentaId: { required: 'La cuenta es obligatoria' },
       fecha: { required: 'La fecha es obligatoria', matDatepickerParse: 'La fecha no es válida' },
@@ -265,14 +310,19 @@ export class DialogoTransaccionComponent {
     this.enviando.set(true);
     this.errorGeneral.set(null);
     this.dialogRef.disableClose = true;
-    this.peticion().subscribe({
-      next: () => this.dialogRef.close({ tipo: 'guardada' }),
-      error: (error: unknown) => {
-        this.enviando.set(false);
-        this.dialogRef.disableClose = false;
-        this.mostrarError(error);
-      },
-    });
+    // Ante `BENEFICIARIO_YA_EXISTE`, una sola repetición de la misma petición.
+    const reintentar = (error: unknown) =>
+      esBeneficiarioDuplicado(error) ? of(0) : throwError(() => error);
+    this.peticion()
+      .pipe(retry({ count: 1, delay: reintentar }))
+      .subscribe({
+        next: () => this.dialogRef.close({ tipo: 'guardada' }),
+        error: (error: unknown) => {
+          this.enviando.set(false);
+          this.dialogRef.disableClose = false;
+          this.mostrarError(error);
+        },
+      });
   }
 
   /** Con "Dividir", las partes reemplazan a la categoría (y al revés). */
@@ -324,6 +374,15 @@ export class DialogoTransaccionComponent {
   private mostrarError(error: unknown): void {
     const problema = leerProblemaApi(error);
     if (problema?.status === 401) {
+      return;
+    }
+    if (problema?.codigo === CODIGOS_API.BENEFICIARIO_YA_EXISTE) {
+      const { beneficiario } = this.formulario.controls;
+      beneficiario.setErrors({
+        ...beneficiario.errors,
+        [CLAVE_ERROR_SERVIDOR]: MENSAJE_BENEFICIARIO_DUPLICADO,
+      });
+      beneficiario.markAsTouched();
       return;
     }
     if (problema?.codigo === CODIGOS_API.REGLA_NEGOCIO_VIOLADA) {

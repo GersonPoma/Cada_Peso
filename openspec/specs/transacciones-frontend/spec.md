@@ -56,7 +56,9 @@ todos. Cada filtro SHALL enviarse con su nombre de la API: `cuentaId`, `categori
 ### Requirement: Columnas de la tabla
 Cada fila SHALL mostrar fecha, nombre de la cuenta, beneficiario, categoría, memo, el monto en
 `Salida` si es negativo o en `Entrada` si es positivo (en la moneda del presupuesto), el estado y
-un indicador `Sin aprobar`. La categoría SHALL ser su nombre, `Dividida` con las partes si tiene
+un indicador `Sin aprobar`. El beneficiario SHALL ser el nombre actual del beneficiario vinculado
+(`beneficiarioId`) o, si no hay vínculo o no se encuentra, el texto `beneficiario` de la
+transacción. La categoría SHALL ser su nombre, `Dividida` con las partes si tiene
 subtransacciones, o vacía si no tiene. El estado SHALL verse con ícono y texto accesible
 (`No conciliada`, `Conciliada`, `Reconciliada` con candado). Las filas sin aprobar SHALL
 destacarse, y las patas de transferencia SHALL mostrar la insignia `Transferencia`. En pantallas
@@ -72,15 +74,23 @@ estrechas cada fila SHALL apilarse.
 - **CUANDO** se muestra la tabla
 - **ENTONCES** su categoría dice `Dividida` y nombra `Comida` y `Ropa`
 
+#### Scenario: Beneficiario vinculado renombrado
+- **DADO** una transacción con texto `Netflix` vinculada a un beneficiario ahora llamado
+  `Netflix Premium`
+- **CUANDO** se muestra la tabla
+- **ENTONCES** la columna `Beneficiario` muestra `Netflix Premium`
+
 ### Requirement: Acciones según el estado de cada transacción
 El menú de cada fila SHALL ofrecer `Editar`, `Duplicar`, `Mover a otra cuenta`, `Aprobar` (solo
 si no está aprobada), `Marcar conciliada` o `Marcar no conciliada`, y `Borrar`, con estas
 excepciones, y cada acción deshabilitada SHALL mostrar su motivo:
 - Una transacción `RECONCILIADA` SHALL tener deshabilitados `Editar`, `Mover a otra cuenta`,
   `Borrar` y el cambio de estado, con el motivo `Está reconciliada`.
-- Una pata de transferencia SHALL permitir solo `Aprobar` y el cambio de estado; `Editar`,
-  `Duplicar`, `Mover a otra cuenta` y `Borrar` SHALL estar deshabilitados con el motivo
-  `Es parte de una transferencia`.
+- Una pata de transferencia SHALL ofrecer `Editar transferencia`, `Borrar transferencia`,
+  `Aprobar` (solo si no está aprobada) y el cambio de estado, en lugar de `Editar` y `Borrar`;
+  `Duplicar` y `Mover a otra cuenta` SHALL estar deshabilitados con el motivo
+  `Es parte de una transferencia`. Las reglas de `Editar transferencia` y `Borrar
+  transferencia` son las de la capacidad `transferencias-frontend`.
 - Una transacción de una cuenta cerrada SHALL NOT ofrecer `Editar`.
 
 #### Scenario: Reconciliada
@@ -90,19 +100,22 @@ excepciones, y cada acción deshabilitada SHALL mostrar su motivo:
   deshabilitados con `Está reconciliada`
 
 #### Scenario: Pata de transferencia
-- **DADO** una transacción con `transaccionParId`
+- **DADO** una transacción con `transaccionParId`, no reconciliada y de una cuenta abierta
 - **CUANDO** la persona abre su menú
-- **ENTONCES** `Aprobar` y `Marcar conciliada` están habilitados
-- **Y** `Editar`, `Duplicar`, `Mover a otra cuenta` y `Borrar` están deshabilitados con
+- **ENTONCES** `Editar transferencia`, `Borrar transferencia`, `Aprobar` y `Marcar conciliada`
+  están habilitados
+- **Y** `Duplicar` y `Mover a otra cuenta` están deshabilitados con
   `Es parte de una transferencia`
+- **Y** no aparecen `Editar` ni `Borrar`
 
 ### Requirement: Crear y editar una transacción
 `Agregar transacción` SHALL abrir un diálogo con:
 - La cuenta, agrupada en `En el presupuesto` y `Seguimiento`, sin las cerradas.
 - La fecha, hoy en hora local por defecto.
-- El beneficiario (máximo 100 caracteres, con contador).
-- La categoría, agrupada por grupo; las ocultas solo si ya estaban elegidas, más `Sin
-  categoría`.
+- El beneficiario, con autocompletado por prefijo y texto libre (máximo 100 caracteres, con
+  contador), según la capacidad `beneficiarios-frontend`.
+- La categoría, agrupada por grupo; las ocultas solo si ya estaban elegidas o las sugirió el
+  beneficiario, más `Sin categoría`.
 - El tipo `Salida` o `Entrada`.
 - El monto en positivo con la calculadora.
 - El memo (máximo 500, con contador).
@@ -113,7 +126,7 @@ y beneficiario y memo recortados. `Editar` SHALL abrir el mismo diálogo con los
 transacción, la cuenta visible pero no editable y sin `Aprobada`, y SHALL enviar `PUT` sin la
 cuenta. Cuenta, fecha y monto SHALL ser obligatorios y el monto mayor que 0; el botón SHALL estar
 deshabilitado mientras el formulario sea inválido o se esté enviando. Al guardar, SHALL cerrarse
-y SHALL volver a pedirse la página actual y los saldos.
+y SHALL volver a pedirse la página actual, los saldos y la lista de beneficiarios.
 
 #### Scenario: Crear una salida
 - **DADO** hoy el 6 de octubre de 2026 y el diálogo de crear
@@ -130,6 +143,11 @@ y SHALL volver a pedirse la página actual y los saldos.
 - **CUANDO** la persona la edita
 - **ENTONCES** el diálogo muestra `Entrada`, `100` y la cuenta `Banco` sin poder cambiarla
 - **Y** al guardar se envía `PUT .../transacciones/{id}` sin `cuentaId`
+
+#### Scenario: Beneficiario escrito a mano
+- **DADO** el diálogo de crear
+- **CUANDO** la persona escribe `  Panadería Sol ` sin elegir sugerencia y guarda
+- **ENTONCES** se envía `beneficiario: 'Panadería Sol'`
 
 ### Requirement: Dividir una transacción
 El diálogo SHALL ofrecer el interruptor `Dividir`, que reemplaza la categoría por una lista de 2 a

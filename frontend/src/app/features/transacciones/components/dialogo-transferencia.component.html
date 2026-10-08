@@ -1,0 +1,130 @@
+<h2 mat-dialog-title>{{ esCrear ? 'Nueva transferencia' : 'Editar transferencia' }}</h2>
+<form [formGroup]="formulario" (ngSubmit)="enviar()" novalidate>
+  <mat-dialog-content class="contenido">
+    @if (cargando()) {
+      <div class="centrado">
+        <mat-progress-spinner mode="indeterminate" diameter="40" aria-label="Cargando" />
+      </div>
+    }
+    <div class="cuentas" [class.oculto]="cargando()">
+      <mat-form-field appearance="outline">
+        <mat-label>Cuenta origen</mat-label>
+        <mat-select formControlName="cuentaOrigenId" [required]="true">
+          @for (grupo of opcionesOrigen(); track grupo.etiqueta) {
+            <mat-optgroup [label]="grupo.etiqueta">
+              @for (cuenta of grupo.cuentas; track cuenta.id) {
+                <mat-option [value]="cuenta.id">{{ cuenta.nombre }}</mat-option>
+              }
+            </mat-optgroup>
+          }
+        </mat-select>
+        @if (mensaje('cuentaOrigenId'); as texto) {
+          <mat-error>{{ texto }}</mat-error>
+        }
+      </mat-form-field>
+
+      @if (esCrear) {
+        <button
+          mat-icon-button
+          type="button"
+          class="invertir"
+          aria-label="Invertir"
+          matTooltip="Invertir origen y destino"
+          (click)="invertir()"
+        >
+          <mat-icon>swap_vert</mat-icon>
+        </button>
+      }
+
+      <mat-form-field appearance="outline">
+        <mat-label>Cuenta destino</mat-label>
+        <mat-select formControlName="cuentaDestinoId" [required]="true">
+          @for (grupo of opcionesDestino(); track grupo.etiqueta) {
+            <mat-optgroup [label]="grupo.etiqueta">
+              @for (cuenta of grupo.cuentas; track cuenta.id) {
+                <mat-option [value]="cuenta.id">{{ cuenta.nombre }}</mat-option>
+              }
+            </mat-optgroup>
+          }
+        </mat-select>
+        @if (mensaje('cuentaDestinoId'); as texto) {
+          <mat-error>{{ texto }}</mat-error>
+        }
+      </mat-form-field>
+    </div>
+
+    <div class="fila-doble" [class.oculto]="cargando()">
+      <mat-form-field appearance="outline">
+        <mat-label>Fecha</mat-label>
+        <input matInput [matDatepicker]="selectorFecha" formControlName="fecha" required />
+        <mat-datepicker-toggle matSuffix [for]="selectorFecha" />
+        <mat-datepicker #selectorFecha />
+        @if (mensaje('fecha'); as texto) {
+          <mat-error>{{ texto }}</mat-error>
+        }
+      </mat-form-field>
+
+      <app-campo-monto
+        [control]="formulario.controls.monto"
+        etiqueta="Monto"
+        [requerido]="true"
+        [mensajes]="mensajesMonto"
+      />
+    </div>
+
+    @switch (regla()) {
+      @case ('oculta-presupuesto') {
+        <p class="texto-regla">{{ textos['oculta-presupuesto'] }}</p>
+      }
+      @case ('oculta-seguimiento') {
+        <p class="texto-regla">{{ textos['oculta-seguimiento'] }}</p>
+      }
+    }
+    @if (muestraCategoria()) {
+      <mat-form-field appearance="outline">
+        <mat-label>Categoría</mat-label>
+        <mat-select formControlName="categoriaId" [required]="regla() === 'obligatoria'">
+          @if (regla() === 'opcional') {
+            <mat-option [value]="null">Sin categoría</mat-option>
+          }
+          @for (grupo of grupos(); track grupo.id) {
+            <mat-optgroup [label]="grupo.nombre">
+              @for (categoria of grupo.categorias; track categoria.id) {
+                <mat-option [value]="categoria.id">{{ categoria.nombre }}</mat-option>
+              }
+            </mat-optgroup>
+          }
+        </mat-select>
+        <mat-hint class="ayuda-categoria">{{ textos[regla()] }}</mat-hint>
+        @if (mensaje('categoriaId'); as texto) {
+          <mat-error>{{ texto }}</mat-error>
+        }
+      </mat-form-field>
+    }
+
+    <mat-form-field appearance="outline" [class.oculto]="cargando()">
+      <mat-label>Memo</mat-label>
+      <textarea matInput rows="2" formControlName="memo"></textarea>
+      <mat-hint align="end">{{ largoMemo() }}/{{ maximoMemo }}</mat-hint>
+      @if (mensaje('memo'); as texto) {
+        <mat-error>{{ texto }}</mat-error>
+      }
+    </mat-form-field>
+
+    @if (errorGeneral(); as texto) {
+      <p class="error-general" role="alert">{{ texto }}</p>
+    }
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" [mat-dialog-close]="undefined" [disabled]="enviando()">
+      Cancelar
+    </button>
+    <button
+      mat-flat-button
+      type="submit"
+      [disabled]="formulario.invalid || enviando() || cargando()"
+    >
+      {{ esCrear ? 'Crear' : 'Guardar' }}
+    </button>
+  </mat-dialog-actions>
+</form>

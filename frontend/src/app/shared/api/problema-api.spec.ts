@@ -51,6 +51,7 @@ describe('leerProblemaApi', () => {
 
   it('expone los códigos usados y el mensaje genérico', () => {
     expect(CODIGOS_API.EMAIL_YA_REGISTRADO).toBe('EMAIL_YA_REGISTRADO');
+    expect(CODIGOS_API.BENEFICIARIO_YA_EXISTE).toBe('BENEFICIARIO_YA_EXISTE');
     expect(MENSAJE_ERROR_GENERICO).toBe('No pudimos completar la operación. Inténtalo de nuevo.');
   });
 });

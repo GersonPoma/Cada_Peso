@@ -1,0 +1,69 @@
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.encabezado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.titulo {
+  margin: 0;
+  font: var(--mat-sys-headline-medium);
+}
+
+.buscador {
+  width: 100%;
+  max-width: 400px;
+}
+
+.tabla {
+  width: 100%;
+}
+
+.acciones {
+  width: 56px;
+  text-align: end;
+}
+
+.oculto {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.centrado {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 48px 16px;
+  text-align: center;
+}
+
+.vacio,
+.sin-coincidencias {
+  margin: 0;
+  font: var(--mat-sys-title-medium);
+}
+
+.sin-coincidencias {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.error {
+  margin: 0;
+  color: var(--mat-sys-error);
+  font: var(--mat-sys-body-large);
+}

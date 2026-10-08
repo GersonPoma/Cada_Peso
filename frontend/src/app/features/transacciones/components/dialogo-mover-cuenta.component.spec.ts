@@ -26,11 +26,13 @@ const TRANSACCION: TransaccionResponse = {
   monto: -1000,
   categoriaId: null,
   beneficiario: null,
+  beneficiarioId: null,
   memo: null,
   estado: 'NO_CONCILIADA',
   aprobada: true,
   subtransacciones: [],
   transaccionParId: null,
+  programadaId: null,
   fechaCreacion: '',
   fechaActualizacion: '',
 };

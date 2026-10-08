@@ -12,6 +12,16 @@ export interface DatosDialogoTransaccion {
 /** Cómo terminó el diálogo de transacción. */
 export type ResultadoDialogoTransaccion = { tipo: 'guardada' } | { tipo: 'recargar' };
 
+/** Datos del diálogo de transferencia: crear (sin `transaccionId`) o editar por una pata. */
+export interface DatosDialogoTransferencia {
+  /** Id de cualquiera de las dos patas al editar; `null` al crear. */
+  transaccionId: number | null;
+  /** Cuenta origen preseleccionada al crear. */
+  cuentaOrigenId: number | null;
+  cuentas: CuentaResumen[];
+  grupos: GrupoCategoriasResumen[];
+}
+
 /** Datos del diálogo de mover a otra cuenta. */
 export interface DatosDialogoMoverCuenta {
   transaccion: TransaccionResponse;

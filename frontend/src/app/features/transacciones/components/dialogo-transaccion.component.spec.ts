@@ -4,6 +4,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { MatAutocompleteHarness } from '@angular/material/autocomplete/testing';
 import { MatButtonHarness } from '@angular/material/button/testing';
 import { MatButtonToggleHarness } from '@angular/material/button-toggle/testing';
 import { MATERIAL_ANIMATIONS } from '@angular/material/core';
@@ -14,6 +15,7 @@ import { MatSelectHarness } from '@angular/material/select/testing';
 import { MatSlideToggleHarness } from '@angular/material/slide-toggle/testing';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { provideRouter } from '@angular/router';
+import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { proveerMaterial } from '../../../core/material/proveer-material';
 import { PresupuestoActivoService } from '../../../core/presupuesto-activo/presupuesto-activo.service';
@@ -21,11 +23,15 @@ import {
   DatosDialogoTransaccion,
   ResultadoDialogoTransaccion,
 } from '../models/datos-dialogos-transacciones.model';
+import { BeneficiarioSugerido } from '../models/beneficiario-sugerido.model';
 import { TransaccionResponse } from '../models/transaccion-response.model';
+import { BeneficiarioLecturaService } from '../services/beneficiario-lectura.service';
 import {
   DialogoTransaccionComponent,
+  MENSAJE_BENEFICIARIO_DUPLICADO,
   MENSAJE_REFERENCIA_INEXISTENTE,
   MENSAJE_REGLA_TRANSACCION,
+  PISTA_CATEGORIA_SUGERIDA,
 } from './dialogo-transaccion.component';
 
 const URL = '/api/v1/presupuestos/3/transacciones';
@@ -48,6 +54,12 @@ const GRUPOS = [
   },
 ];
 
+const SUGERENCIAS: BeneficiarioSugerido[] = [
+  { id: 4, nombre: 'Netflix', categoriaPredeterminadaId: 7 },
+  { id: 5, nombre: 'Nube', categoriaPredeterminadaId: 10 },
+  { id: 6, nombre: 'Nada', categoriaPredeterminadaId: 99 },
+];
+
 function transaccion(cambios: Partial<TransaccionResponse> = {}): TransaccionResponse {
   return {
     id: 40,
@@ -56,11 +68,13 @@ function transaccion(cambios: Partial<TransaccionResponse> = {}): TransaccionRes
     monto: 100000,
     categoriaId: null,
     beneficiario: 'Empresa',
+    beneficiarioId: null,
     memo: 'Sueldo',
     estado: 'NO_CONCILIADA',
     aprobada: true,
     subtransacciones: [],
     transaccionParId: null,
+    programadaId: null,
     fechaCreacion: '',
     fechaActualizacion: '',
     ...cambios,
@@ -76,6 +90,7 @@ describe('DialogoTransaccionComponent', () => {
   let backend: HttpTestingController;
   let abrirAviso: ReturnType<typeof vi.spyOn>;
   let resultado: ResultadoDialogoTransaccion | undefined | 'abierto';
+  let buscar: ReturnType<typeof vi.fn>;
 
   async function estable(): Promise<void> {
     fixture.detectChanges();
@@ -108,6 +123,23 @@ describe('DialogoTransaccionComponent', () => {
     await entrada.blur();
     await estable();
   }
+  /** Escribe en el beneficiario, espera las sugerencias y elige la que se llama `nombre`. */
+  async function elegirBeneficiario(nombre: string): Promise<void> {
+    const campoBeneficiario = await cargador.getHarness(MatAutocompleteHarness);
+    await campoBeneficiario.clear();
+    await campoBeneficiario.enterText(nombre.slice(0, 2));
+    // Adelanta el reloj falso para que venza la espera de las sugerencias.
+    vi.advanceTimersByTime(300);
+    await new Promise((listo) => setTimeout(listo, 300));
+    await estable();
+    // El panel se muestra un tick después de que llegan las opciones.
+    await new Promise((listo) => setTimeout(listo, 50));
+    await estable();
+    // El texto de la opción incluye la categoría predeterminada debajo del nombre.
+    await campoBeneficiario.selectOption({ text: new RegExp(`^${nombre}`) });
+    await estable();
+  }
+  const pistaSugerida = () => textoDialogo().includes(PISTA_CATEGORIA_SUGERIDA);
   const boton = (t: string) => cargador.getHarness(MatButtonHarness.with({ text: t }));
   const textoDialogo = () =>
     (document.querySelector('mat-dialog-container')?.textContent ?? '').replace(/[  ]/g, ' ');
@@ -116,8 +148,10 @@ describe('DialogoTransaccionComponent', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(2026, 9, 6, 22));
     vi.stubGlobal('navigator', { language: 'es-BO', userAgent: '' });
+    buscar = vi.fn(() => of(SUGERENCIAS));
     TestBed.configureTestingModule({
       providers: [
+        { provide: BeneficiarioLecturaService, useValue: { buscar } },
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
@@ -297,6 +331,40 @@ describe('DialogoTransaccionComponent', () => {
       expect(resultado).toBe('abierto');
     });
 
+    it('ante 409 BENEFICIARIO_YA_EXISTE repite la misma petición una vez', async () => {
+      await (await selector('Cuenta')).clickOptions({ text: 'Banco' });
+      await (await texto('Beneficiario')).setValue('Netflix');
+      await monto('Monto', '5');
+      await (await boton('Crear')).click();
+      const primera = backend.expectOne(URL);
+      primera.flush({ codigo: 'BENEFICIARIO_YA_EXISTE' }, { status: 409, statusText: 'Conflict' });
+      const segunda = backend.expectOne(URL);
+      expect(segunda.request.body).toEqual(primera.request.body);
+      segunda.flush(transaccion());
+      await estable();
+
+      expect(resultado).toEqual({ tipo: 'guardada' });
+    });
+
+    it('si el reintento también da 409, avisa en el campo sin un tercer intento', async () => {
+      await (await selector('Cuenta')).clickOptions({ text: 'Banco' });
+      await (await texto('Beneficiario')).setValue('Netflix');
+      await monto('Monto', '5');
+      await (await boton('Crear')).click();
+      for (let i = 0; i < 2; i++) {
+        backend
+          .expectOne(URL)
+          .flush({ codigo: 'BENEFICIARIO_YA_EXISTE' }, { status: 409, statusText: 'Conflict' });
+      }
+      await estable();
+
+      backend.expectNone(URL);
+      expect(await (await campo('Beneficiario')).getTextErrors()).toEqual([
+        MENSAJE_BENEFICIARIO_DUPLICADO,
+      ]);
+      expect(resultado).toBe('abierto');
+    });
+
     it('404 avisa y cierra pidiendo recargar las listas', async () => {
       await (await selector('Cuenta')).clickOptions({ text: 'Banco' });
       await monto('Monto', '5');
@@ -310,6 +378,74 @@ describe('DialogoTransaccionComponent', () => {
         duration: 6000,
       });
       expect(resultado).toEqual({ tipo: 'recargar' });
+    });
+  });
+
+  describe('categoría recordada', () => {
+    it('al crear rellena la categoría del beneficiario y la pista se va al cambiarla', async () => {
+      await abrir();
+      await elegirBeneficiario('Netflix');
+
+      expect(buscar).toHaveBeenCalledWith(3, 'Ne');
+      expect(await (await selector('Categoría')).getValueText()).toBe('Comida');
+      expect(pistaSugerida()).toBe(true);
+
+      await (await selector('Categoría')).clickOptions({ text: 'Ropa' });
+      await estable();
+      expect(pistaSugerida()).toBe(false);
+    });
+
+    it('rellena con una categoría oculta, que aparece en el select', async () => {
+      await abrir();
+      await elegirBeneficiario('Nube');
+
+      expect(await (await selector('Categoría')).getValueText()).toBe('Escondida');
+      expect(pistaSugerida()).toBe(true);
+    });
+
+    it('no cambia la categoría que la persona ya eligió', async () => {
+      await abrir();
+      await (await selector('Categoría')).clickOptions({ text: 'Ropa' });
+      await elegirBeneficiario('Netflix');
+
+      expect(await (await selector('Categoría')).getValueText()).toBe('Ropa');
+      expect(pistaSugerida()).toBe(false);
+    });
+
+    it('no rellena si la categoría se tocó y se dejó vacía', async () => {
+      await abrir();
+      await (await selector('Categoría')).clickOptions({ text: 'Ropa' });
+      await (await selector('Categoría')).clickOptions({ text: 'Sin categoría' });
+      await elegirBeneficiario('Netflix');
+
+      expect(await (await selector('Categoría')).getValueText()).toBe('');
+    });
+
+    it('en modo Dividir no toca ninguna parte', async () => {
+      await abrir();
+      await (await cargador.getHarness(MatSlideToggleHarness)).check();
+      await estable();
+      await elegirBeneficiario('Netflix');
+
+      expect(await (await selector('Categoría 1')).getValueText()).toBe('');
+      expect(await (await selector('Categoría 2')).getValueText()).toBe('');
+      expect(pistaSugerida()).toBe(false);
+    });
+
+    it('al editar no rellena', async () => {
+      await abrir(transaccion());
+      await elegirBeneficiario('Netflix');
+
+      expect(await (await selector('Categoría')).getValueText()).toBe('');
+      expect(pistaSugerida()).toBe(false);
+    });
+
+    it('no rellena si la categoría ya no existe', async () => {
+      await abrir();
+      await elegirBeneficiario('Nada');
+
+      expect(await (await selector('Categoría')).getValueText()).toBe('');
+      expect(pistaSugerida()).toBe(false);
     });
   });
 

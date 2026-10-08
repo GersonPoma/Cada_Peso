@@ -1,0 +1,41 @@
+<h2 mat-dialog-title>{{ esCrear ? 'Nuevo beneficiario' : 'Editar beneficiario' }}</h2>
+<form [formGroup]="formulario" (ngSubmit)="enviar()" novalidate>
+  <mat-dialog-content class="contenido">
+    <mat-form-field appearance="outline">
+      <mat-label>Nombre</mat-label>
+      <input matInput type="text" autocomplete="off" formControlName="nombre" required />
+      @if (renombrando()) {
+        <mat-hint class="pista-renombrar">{{ pistaRenombrar }}</mat-hint>
+      }
+      <mat-hint align="end">{{ largoNombre() }}/{{ maximoNombre }}</mat-hint>
+      @if (mensajeNombre(); as texto) {
+        <mat-error>{{ texto }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Categoría predeterminada</mat-label>
+      <mat-select formControlName="categoriaId">
+        <mat-option [value]="null">Ninguna</mat-option>
+        @for (grupo of grupos; track grupo.id) {
+          <mat-optgroup [label]="grupo.nombre">
+            @for (categoria of grupo.categorias; track categoria.id) {
+              <mat-option [value]="categoria.id">{{ categoria.nombre }}</mat-option>
+            }
+          </mat-optgroup>
+        }
+      </mat-select>
+      @if (mensajeCategoria(); as texto) {
+        <mat-error>{{ texto }}</mat-error>
+      }
+    </mat-form-field>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" [mat-dialog-close]="undefined" [disabled]="enviando()">
+      Cancelar
+    </button>
+    <button mat-flat-button type="submit" [disabled]="formulario.invalid || enviando()">
+      {{ esCrear ? 'Crear' : 'Guardar' }}
+    </button>
+  </mat-dialog-actions>
+</form>
