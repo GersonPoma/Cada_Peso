@@ -19,9 +19,12 @@ export class ConciliacionService {
     fecha: string,
   ): Observable<EstadoConciliacionResponse> {
     const params = new HttpParams().set('saldoExtracto', saldoExtracto).set('fecha', fecha);
-    return this.http.get<EstadoConciliacionResponse>(`${this.url(presupuestoId, cuentaId)}/estado`, {
-      params,
-    });
+    return this.http.get<EstadoConciliacionResponse>(
+      `${this.url(presupuestoId, cuentaId)}/estado`,
+      {
+        params,
+      },
+    );
   }
 
   /** Cierra la conciliación (crea el ajuste si se pide y reconcilia hasta la fecha). */

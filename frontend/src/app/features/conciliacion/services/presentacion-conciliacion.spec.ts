@@ -56,11 +56,7 @@ describe('textoDiferencia', () => {
 describe('noConciliadasHasta', () => {
   it('cuenta las de fecha anterior o igual al corte, no las posteriores', () => {
     const resultado = noConciliadasHasta(
-      estado([
-        pendiente(3, '2026-10-02'),
-        pendiente(2, '2026-09-30'),
-        pendiente(1, '2026-09-12'),
-      ]),
+      estado([pendiente(3, '2026-10-02'), pendiente(2, '2026-09-30'), pendiente(1, '2026-09-12')]),
     );
 
     expect(resultado).toEqual({ cantidad: 2, minimo: false });

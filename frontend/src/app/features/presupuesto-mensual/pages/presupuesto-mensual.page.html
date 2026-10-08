@@ -4,18 +4,40 @@
       <app-barra-mes [mes]="mes()" (cambiar)="irAMes($event)" />
     }
     @if (estado() === 'listo' && moneda(); as moneda) {
-      <app-resumen-listo-para-asignar
-        [listoParaAsignar]="datos()?.listoParaAsignar ?? 0"
-        [moneda]="moneda"
-      />
+      <div class="resumen">
+        <app-resumen-listo-para-asignar
+          [listoParaAsignar]="datos()?.listoParaAsignar ?? 0"
+          [moneda]="moneda"
+        />
+        @if ((metas()?.totalFaltante ?? 0) > 0) {
+          <p class="falta-metas">
+            Falta para tus metas: {{ metas()?.totalFaltante ?? 0 | monto: moneda }}
+          </p>
+        }
+      </div>
     }
   </header>
 
   <div class="herramientas">
+    <button
+      mat-stroked-button
+      type="button"
+      [disabled]="estado() !== 'listo' || !datos()"
+      (click)="autoAsignar()"
+    >
+      Auto-asignar
+    </button>
     <mat-slide-toggle [checked]="incluirOcultas()" (change)="cambiarOcultas($event.checked)">
       Mostrar ocultas
     </mat-slide-toggle>
   </div>
+
+  @if (estado() === 'listo' && errorMetas()) {
+    <div class="aviso-metas" role="alert">
+      <span>No pudimos cargar las metas</span>
+      <button mat-button type="button" (click)="recargar()">Reintentar</button>
+    </div>
+  }
 
   @switch (estado()) {
     @case ('cargando') {
@@ -51,9 +73,15 @@
               [moneda]="moneda"
               [guardando]="guardando()"
               [errores]="errores()"
+              [metas]="metasPorCategoria()"
+              [metasEnCurso]="metasEnCurso()"
+              [mesPasado]="mesPasado()"
               (asignar)="asignar($event)"
               (moverDinero)="moverDinero($event)"
               (cubrirSobregasto)="cubrirSobregasto($event)"
+              (editarMeta)="editarMeta($event)"
+              (posponerMeta)="posponerMeta($event)"
+              (reanudarMeta)="reanudarMeta($event)"
             />
           }
           <div class="fila total">

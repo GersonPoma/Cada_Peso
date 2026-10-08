@@ -46,7 +46,12 @@ describe('ConciliacionService', () => {
 
   it('crear hace POST con el cuerpo tal cual', () => {
     let creada: unknown;
-    const cuerpo = { saldoExtracto: 150000, fecha: '2026-09-30', crearAjuste: true, categoriaId: 7 };
+    const cuerpo = {
+      saldoExtracto: 150000,
+      fecha: '2026-09-30',
+      crearAjuste: true,
+      categoriaId: 7,
+    };
     servicio.crear(3, 5, cuerpo).subscribe((r) => (creada = r));
     const peticion = backend.expectOne(URL);
 

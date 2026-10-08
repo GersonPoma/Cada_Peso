@@ -1,0 +1,192 @@
+<main class="pagina">
+  <header class="encabezado">
+    <a mat-button class="volver" [routerLink]="['/presupuestos', presupuestoId(), 'cuentas']">
+      <mat-icon>arrow_back</mat-icon>
+      Cuentas
+    </a>
+    <h1 class="titulo">
+      Conciliar
+      @if (cuenta(); as cuenta) {
+        <span class="nombre-cuenta">{{ cuenta.nombre }}</span>
+      }
+    </h1>
+    @if (cuenta(); as cuenta) {
+      <p class="tipo-cuenta">
+        {{ etiquetas[cuenta.tipo] }}{{ cuenta.enPresupuesto ? '' : ' · Seguimiento' }}
+      </p>
+    }
+  </header>
+
+  @switch (estado()) {
+    @case ('cargando') {
+      <div class="centrado">
+        <mat-progress-spinner mode="indeterminate" diameter="48" aria-label="Cargando" />
+      </div>
+    }
+    @case ('error') {
+      <div class="centrado">
+        <p class="error" role="alert">No pudimos cargar la cuenta.</p>
+        <button mat-stroked-button type="button" (click)="recargar()">Reintentar</button>
+      </div>
+    }
+    @case ('listo') {
+      <div class="contenido">
+        @if (cuenta()?.cerrada) {
+          <p class="aviso-cerrada" role="status">
+            La cuenta está cerrada; reábrela en Cuentas para conciliarla
+          </p>
+        } @else {
+          <section class="asistente" aria-labelledby="titulo-asistente">
+            <h2 id="titulo-asistente" class="titulo-seccion">Comparar con el extracto</h2>
+            <p class="explicacion">
+              Solo se reconcilian las transacciones Conciliada con fecha hasta la del extracto.
+            </p>
+
+            <form [formGroup]="formulario" novalidate>
+              <div class="campos">
+                <app-campo-monto
+                  [control]="formulario.controls.saldoExtracto"
+                  etiqueta="Saldo del extracto"
+                  [requerido]="true"
+                />
+                <mat-form-field appearance="outline">
+                  <mat-label>Fecha del extracto</mat-label>
+                  <input
+                    matInput
+                    [matDatepicker]="selectorFecha"
+                    formControlName="fecha"
+                    required
+                  />
+                  <mat-datepicker-toggle matSuffix [for]="selectorFecha" />
+                  <mat-datepicker #selectorFecha />
+                  @if (mensaje('fecha'); as texto) {
+                    <mat-error>{{ texto }}</mat-error>
+                  }
+                </mat-form-field>
+              </div>
+
+              <div class="estado" aria-live="polite">
+                @switch (vista()) {
+                  @case ('cargando') {
+                    <div class="calculando">
+                      <mat-progress-spinner
+                        mode="indeterminate"
+                        diameter="24"
+                        aria-label="Calculando la diferencia"
+                      />
+                      <span>Calculando la diferencia…</span>
+                    </div>
+                  }
+                  @case ('error') {
+                    <p class="error">No pudimos calcular la diferencia</p>
+                    <button mat-stroked-button type="button" (click)="reintentarEstado()">
+                      Reintentar
+                    </button>
+                  }
+                  @case ('listo') {
+                    @if (estadoVigente(); as e) {
+                      <p class="conciliado-al-corte">
+                        Saldo conciliado al {{ e.fecha | fecha }}:
+                        <strong>{{ e.saldoConciliadoAlCorte | monto: moneda() }}</strong>
+                      </p>
+                      @if (diferencia(); as d) {
+                        <p class="diferencia" [class]="d.tono">{{ d.texto }}</p>
+                      }
+                      @if (pendientes(); as p) {
+                        @if (p.cantidad > 0) {
+                          <p class="pendientes">
+                            Hay {{ p.minimo ? 'al menos ' : '' }}{{ p.cantidad }}
+                            {{
+                              p.cantidad === 1
+                                ? 'transacción no conciliada'
+                                : 'transacciones no conciliadas'
+                            }}
+                            hasta esa fecha que no se reconciliarán.
+                            <a
+                              class="revisar"
+                              [routerLink]="['/presupuestos', presupuestoId(), 'transacciones']"
+                              [queryParams]="filtroPendientes(e)"
+                              >Revisar en Transacciones</a
+                            >
+                          </p>
+                        }
+                      }
+                      @if (e.diferencia !== 0) {
+                        <mat-checkbox formControlName="crearAjuste" class="crear-ajuste">
+                          Crear transacción de ajuste por
+                          {{ e.diferencia | monto: moneda() }}
+                          ({{ e.diferencia > 0 ? 'entrada' : 'salida' }})
+                        </mat-checkbox>
+                      }
+                    }
+                  }
+                }
+              </div>
+
+              @if (muestraCategoria()) {
+                <mat-form-field appearance="outline" class="categoria">
+                  <mat-label>Categoría del ajuste</mat-label>
+                  <mat-select formControlName="categoriaId" [required]="regla() === 'obligatoria'">
+                    @if (regla() === 'opcional') {
+                      <mat-option [value]="null">Sin categoría</mat-option>
+                    }
+                    @for (grupo of opcionesCategoria(); track grupo.id) {
+                      <mat-optgroup [label]="grupo.nombre">
+                        @for (categoria of grupo.categorias; track categoria.id) {
+                          <mat-option [value]="categoria.id">{{ categoria.nombre }}</mat-option>
+                        }
+                      </mat-optgroup>
+                    }
+                  </mat-select>
+                  <mat-hint class="ayuda-categoria">{{ textosRegla[regla()] }}</mat-hint>
+                  @if (mensaje('categoriaId'); as texto) {
+                    <mat-error>{{ texto }}</mat-error>
+                  }
+                </mat-form-field>
+              }
+
+              @if (faltaAjuste()) {
+                <p class="falta-ajuste">{{ mensajeSinAjuste }}</p>
+              }
+              @if (errorGeneral(); as texto) {
+                <p class="error-general" role="alert">{{ texto }}</p>
+              }
+
+              <div class="acciones">
+                <button
+                  mat-flat-button
+                  type="button"
+                  class="reconciliar"
+                  (click)="reconciliar()"
+                  [disabled]="!puedeReconciliar() || enviando()"
+                >
+                  Reconciliar
+                </button>
+              </div>
+            </form>
+
+            <div class="resultado" aria-live="polite">
+              @if (conciliacionCreada(); as c) {
+                <p class="reconciliadas">
+                  Se reconciliaron {{ c.cantidadReconciliadas }}
+                  {{ c.cantidadReconciliadas === 1 ? 'transacción' : 'transacciones' }}
+                </p>
+                @if (c.ajuste !== 0) {
+                  <p class="ajuste-creado">Se creó un ajuste de {{ c.ajuste | monto: moneda() }}</p>
+                }
+              }
+            </div>
+          </section>
+        }
+
+        <app-historial-conciliaciones
+          class="historial"
+          [conciliaciones]="historial()"
+          [estado]="estadoHistorial()"
+          [moneda]="moneda()"
+          (reintentar)="recargarHistorial()"
+        />
+      </div>
+    }
+  }
+</main>

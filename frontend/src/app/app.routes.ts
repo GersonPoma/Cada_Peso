@@ -58,6 +58,12 @@ export const routes: Routes = [
         data: seccion('Cuentas', 'account_balance'),
       },
       {
+        // Sin `seccion`: se llega desde Cuentas y Transacciones, no desde el menú lateral.
+        path: 'cuentas/:cuentaId/conciliacion',
+        loadComponent: () =>
+          import('./features/conciliacion/pages/conciliacion.page').then((m) => m.ConciliacionPage),
+      },
+      {
         path: 'transacciones',
         loadComponent: () =>
           import('./features/transacciones/pages/transacciones.page').then(

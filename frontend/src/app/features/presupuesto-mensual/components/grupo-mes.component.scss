@@ -39,6 +39,13 @@
   min-width: 0;
 }
 
+.nombre-y-meta {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .nombre-categoria {
   overflow: hidden;
   font: var(--mat-sys-body-large);

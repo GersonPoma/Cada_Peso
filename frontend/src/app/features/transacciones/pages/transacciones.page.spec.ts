@@ -430,6 +430,41 @@ describe('TransaccionesPage', () => {
     });
   });
 
+  describe('conciliar', () => {
+    const enlaceConciliar = () =>
+      elemento().querySelector('a.conciliar') as HTMLAnchorElement | null;
+
+    it('con el filtro de una cuenta abierta enlaza a su conciliación', async () => {
+      await entrar('?cuentaId=5');
+
+      expect(normalizar(enlaceConciliar()?.textContent)).toContain('Conciliar');
+      expect(enlaceConciliar()?.getAttribute('href')).toBe(
+        '/presupuestos/3/cuentas/5/conciliacion',
+      );
+    });
+
+    it('sin filtro de cuenta no aparece', async () => {
+      await entrar();
+
+      expect(enlaceConciliar()).toBeNull();
+    });
+
+    it('con el filtro de una cuenta cerrada no aparece', async () => {
+      await harness.navigateByUrl('/presupuestos/3/transacciones?cuentaId=9');
+      responderBeneficiarios();
+      backend
+        .expectOne((p) => p.url === `${BASE}/cuentas`)
+        .flush([
+          { id: 5, nombre: 'Banco', enPresupuesto: true, cerrada: false },
+          { id: 9, nombre: 'Vieja', enPresupuesto: true, cerrada: true },
+        ]);
+      backend.expectOne((p) => p.url === `${BASE}/categorias`).flush([]);
+      await responder();
+
+      expect(enlaceConciliar()).toBeNull();
+    });
+  });
+
   describe('transferencias', () => {
     const pata = transaccion(2, { transaccionParId: 3 });
 

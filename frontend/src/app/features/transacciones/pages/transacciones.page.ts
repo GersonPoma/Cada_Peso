@@ -15,7 +15,7 @@ import { MatIcon } from '@angular/material/icon';
 import { MatPaginator, PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { EMPTY, Observable, catchError, filter, forkJoin, map, switchMap, tap } from 'rxjs';
 import { PresupuestoActivoService } from '../../../core/presupuesto-activo/presupuesto-activo.service';
 import {
@@ -96,6 +96,7 @@ const NOMBRE_OPERACION: Readonly<Record<OperacionLote, string>> = {
     MatPaginator,
     MatProgressSpinner,
     MontoPipe,
+    RouterLink,
     BarraLoteComponent,
     FiltrosTransaccionesComponent,
     TablaTransaccionesComponent,
@@ -120,7 +121,7 @@ export class TransaccionesPage {
   protected readonly filtros = toSignal(this.ruta.queryParamMap.pipe(map(leerFiltros)), {
     initialValue: leerFiltros(this.ruta.snapshot.queryParamMap),
   });
-  private readonly presupuestoId = computed(() => this.presupuestoActivo.presupuesto()?.id);
+  protected readonly presupuestoId = computed(() => this.presupuestoActivo.presupuesto()?.id);
   protected readonly moneda = computed(() => this.presupuestoActivo.presupuesto()?.moneda ?? null);
   protected readonly tamanos = TAMANOS_PAGINA;
 
@@ -177,6 +178,12 @@ export class TransaccionesPage {
       }),
       { saldo: 0, conciliado: 0 },
     );
+  });
+  /** Id de la cuenta filtrada si está abierta (se puede conciliar), o `null`. */
+  protected readonly cuentaConciliable = computed(() => {
+    const cuentaId = this.filtros().cuentaId;
+    const cuenta = this.cuentas().find((c) => c.id === cuentaId);
+    return cuenta && !cuenta.cerrada ? cuenta.id : null;
   });
   protected readonly cuentaFiltrada = computed(() => {
     const cuentaId = this.filtros().cuentaId;

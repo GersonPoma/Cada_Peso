@@ -21,7 +21,13 @@ describe('presentacionMeta', () => {
   it('FINANCIADA: Financiada, tono ok y barra llena', () => {
     expect(
       presentacionMeta(meta({ estado: 'FINANCIADA', asignado: 100000, faltante: 0 }), false),
-    ).toEqual({ texto: 'Financiada', monto: null, icono: 'check_circle', tono: 'ok', progreso: 100 });
+    ).toEqual({
+      texto: 'Financiada',
+      monto: null,
+      icono: 'check_circle',
+      tono: 'ok',
+      progreso: 100,
+    });
   });
 
   it('FALTA en el mes actual: Falta con el faltante y la barra proporcional', () => {
@@ -49,7 +55,10 @@ describe('presentacionMeta', () => {
 
   it('POSPUESTA: necesidad 0, barra llena y tono neutro', () => {
     expect(
-      presentacionMeta(meta({ estado: 'POSPUESTA', necesidad: 0, asignado: 0, faltante: 0 }), false),
+      presentacionMeta(
+        meta({ estado: 'POSPUESTA', necesidad: 0, asignado: 0, faltante: 0 }),
+        false,
+      ),
     ).toEqual({
       texto: 'Pospuesta este mes',
       monto: null,

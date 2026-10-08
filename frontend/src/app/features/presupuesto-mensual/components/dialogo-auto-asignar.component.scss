@@ -1,0 +1,93 @@
+.contenido {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+}
+
+.alcance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 16px;
+}
+
+.categorias {
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 8px;
+}
+
+.pago-tarjeta {
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-small);
+}
+
+.ayuda,
+.sin-cambios {
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-medium);
+}
+
+.previa {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--mat-sys-surface-container);
+}
+
+.cambios {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cambio {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding: 4px 0;
+  font: var(--mat-sys-body-medium);
+}
+
+.montos {
+  white-space: nowrap;
+}
+
+.listo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  font: var(--mat-sys-body-medium);
+
+  div {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 4px 12px;
+  }
+
+  dd {
+    margin: 0;
+    white-space: nowrap;
+  }
+}
+
+.negativo {
+  color: var(--mat-sys-error);
+}
+
+.texto-negativo {
+  font: var(--mat-sys-label-small);
+}
+
+.aviso-error {
+  margin: 0;
+  color: var(--mat-sys-error);
+  font: var(--mat-sys-body-medium);
+}
