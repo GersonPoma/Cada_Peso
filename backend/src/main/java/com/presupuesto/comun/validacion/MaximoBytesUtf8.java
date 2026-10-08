@@ -14,7 +14,12 @@ import java.lang.annotation.Target;
  */
 @Documented
 @Constraint(validatedBy = MaximoBytesUtf8Validator.class)
-@Target({ElementType.FIELD, ElementType.PARAMETER, ElementType.RECORD_COMPONENT})
+@Target({
+    ElementType.FIELD,
+    ElementType.PARAMETER,
+    ElementType.RECORD_COMPONENT,
+    ElementType.ANNOTATION_TYPE
+})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface MaximoBytesUtf8 {
 

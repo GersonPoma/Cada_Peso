@@ -1,7 +1,7 @@
 package com.presupuesto.auth.dto.request;
 
-import com.presupuesto.comun.validacion.MaximoBytesUtf8;
 import com.presupuesto.comun.validacion.MonedaValida;
+import com.presupuesto.usuario.validacion.ContrasenaValida;
 import com.presupuesto.usuario.validacion.MayorDeEdad;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -16,7 +16,7 @@ import java.time.LocalDate;
  */
 public record RegistroRequest(
         @NotBlank @Email @Size(max = 254) String email,
-        @NotBlank @Size(min = 8, max = 72) @MaximoBytesUtf8(72) String contrasena,
+        @ContrasenaValida String contrasena,
         @NotBlank @Size(min = 2, max = 100) String nombre,
         @NotBlank @Size(min = 2, max = 100) String apellido,
         @NotNull @MayorDeEdad LocalDate fechaNacimiento,

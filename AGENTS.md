@@ -162,6 +162,7 @@ com/presupuesto/
 └── usuario/
     ├── controller/
     ├── dto/
+    │   ├── request/
     │   └── response/
     ├── entity/
     ├── repository/
@@ -169,8 +170,8 @@ com/presupuesto/
     └── validacion/
 ```
 
-`auth` no tiene `entity` ni `repository` porque trabaja con las entidades de `usuario`, y
-`usuario` no tiene `dto/request` porque todavía no recibe datos propios. `presupuesto` puede
+`auth` no tiene `entity` ni `repository` porque trabaja con las entidades de `usuario`.
+`presupuesto` puede
 depender de `usuario` y de `comun`, y `auth` de `presupuesto` (crea el presupuesto inicial al
 registrarse); `cuenta` y `categoria` pueden depender de `presupuesto` y de `comun`;
 `beneficiario` puede depender de `presupuesto`, `categoria` y `comun`; `transaccion` puede
@@ -661,6 +662,36 @@ asignado del presupuesto mensual, que se edita en el lugar, usa `leerMonto()` di
   `Filter` también como filtro de servlet, fuera de la cadena de seguridad.
 - Los controllers obtienen el usuario autenticado con
   `@AuthenticationPrincipal UsuarioAutenticado usuario`, nunca leyendo el token a mano.
+
+## Perfil de usuario
+
+`usuario` (`/api/v1/usuarios/yo`) deja a la persona autenticada gestionar su propia cuenta. El
+id sale siempre del token (`@AuthenticationPrincipal`), nunca de la URL ni del cuerpo.
+
+- `PUT /api/v1/usuarios/yo`: cambia solo el nombre (`ActualizarNombreRequest`, recortado, 2 a 100
+  caracteres como en el registro) y responde 200 con `UsuarioActualResponse`. Otros campos del
+  cuerpo se ignoran.
+- `POST /api/v1/usuarios/yo/contrasena` (`CambiarContrasenaRequest`: `contrasenaActual`,
+  `contrasenaNueva`): responde 204 sin cuerpo y guarda el hash con el mismo `PasswordEncoder` del
+  registro.
+- **Orden de errores**: 400 (faltan datos o la nueva incumple `@ContrasenaValida`; el nombre
+  también) → 401 `NO_AUTENTICADO` (token sin persona) → 422 `REGLA_NEGOCIO_VIOLADA` con el mensaje
+  fijo "La contraseña actual es incorrecta" (actual incorrecta o de más de 72 bytes UTF-8) → 422
+  "La contraseña nueva debe ser distinta de la actual" (comparación exacta con `equals`, solo
+  después de verificar la actual). La actual incorrecta **no** es 401 porque el interceptor del
+  frontend cierra la sesión ante cualquier 401.
+- **Contraseña, una sola regla**: `@ContrasenaValida` (`usuario/validacion`) agrupa `@NotBlank`,
+  `@Size(min = 8, max = 72)` y `@MaximoBytesUtf8(72)`, sin recortar. La usan `RegistroRequest` y
+  `CambiarContrasenaRequest`; no se vuelve a escribir esa combinación.
+- **Nada sensible en errores ni en logs**: las respuestas de error no reflejan contraseñas ni el
+  nombre recibido, y `CambiarContrasenaRequest.toString()` oculta ambas contraseñas (los records
+  imprimen todos sus campos; `LoginRequest` y `RegistroRequest` aún lo hacen, y nadie los
+  registra).
+- **El token anterior sigue válido** hasta expirar (24 h): el JWT es stateless, el cambio no lo
+  invalida ni emite uno nuevo.
+- **Riesgo conocido: no hay límite de intentos**. Ni el login ni este endpoint limitan los
+  intentos fallidos; solo frenan BCrypt y la vida del token. Si se agrega, debe ser un único
+  mecanismo para ambos.
 
 ## Recursos de negocio cuelgan de un presupuesto
 
