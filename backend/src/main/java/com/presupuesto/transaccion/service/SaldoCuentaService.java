@@ -6,6 +6,7 @@ import com.presupuesto.presupuesto.service.PresupuestoService;
 import com.presupuesto.transaccion.dto.response.SaldoCuentaResponse;
 import com.presupuesto.transaccion.repository.TransaccionRepository;
 import com.presupuesto.transaccion.repository.TransaccionRepository.SumaPorCuenta;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -18,6 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class SaldoCuentaService {
+
+    /** Fecha tope para el saldo conciliado total. */
+    public static final LocalDate SIN_LIMITE = LocalDate.of(9999, 12, 31);
 
     private final TransaccionRepository transaccionRepository;
     private final CuentaRepository cuentaRepository;
@@ -33,6 +37,17 @@ public class SaldoCuentaService {
                 .stream()
                 .map(cuenta -> saldoDe(cuenta, sumas.get(cuenta.getId())))
                 .toList();
+    }
+
+    /**
+     * Saldo conciliado de la cuenta a una fecha: saldo inicial más las {@code CONCILIADA} y
+     * {@code RECONCILIADA} con fecha menor o igual a {@code hasta}. Mismo criterio que
+     * {@link #listar}.
+     */
+    @Transactional(readOnly = true)
+    public long saldoConciliadoAl(Cuenta cuenta, LocalDate hasta) {
+        return cuenta.getSaldoInicial()
+                + transaccionRepository.sumaConciliadaDeCuenta(cuenta.getId(), hasta);
     }
 
     private static SaldoCuentaResponse saldoDe(Cuenta cuenta, SumaPorCuenta suma) {

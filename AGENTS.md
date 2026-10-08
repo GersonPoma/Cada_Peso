@@ -96,6 +96,14 @@ com/presupuesto/
 │   ├── entity/
 │   ├── repository/
 │   └── service/
+├── conciliacion/
+│   ├── controller/
+│   ├── dto/
+│   │   ├── request/
+│   │   └── response/
+│   ├── entity/
+│   ├── repository/
+│   └── service/
 ├── cuenta/
 │   ├── controller/
 │   ├── dto/
@@ -163,7 +171,9 @@ depender de `presupuesto`, `cuenta`, `categoria`, `transaccion` y `comun`; nunca
 `AsignacionService.fijarAsignados`); `presupuesto`, `categoria` y `asignacion` nunca importan
 `meta`. `transaccionprogramada` puede depender de `presupuesto`, `cuenta`, `categoria`,
 `transaccion` y `comun`; ninguna otra feature la importa (`transaccion` guarda el id de la
-plantilla en un `Long`, sin relación JPA).
+plantilla en un `Long`, sin relación JPA). `conciliacion` puede depender de `presupuesto`,
+`cuenta`, `transaccion` y `comun`; ninguna otra feature la importa (guarda el id del ajuste en un
+`Long`, sin relación JPA).
 
 **Comunicación entre features: eventos.** Cuando una feature debe avisar a otra sin importarla
 (la dependencia iría al revés), publica un evento de Spring y la otra lo escucha. Hoy
@@ -219,7 +229,7 @@ procesador de anotaciones del `pom.xml`.
   `src/main` ni en `src/test`) importa `com.presupuesto.<feature>`. Si una clase de `comun/`
   necesita datos de una feature, los recibe como parámetros simples (ej.
   `JwtService.emitir(Long id, Rol rol)`, no la entidad `Usuario`). Se comprueba desde
-  `backend/src` con `grep -rnE "import com\.presupuesto\.(usuario|auth|presupuesto|cuenta|categoria|transaccion|transaccionprogramada|asignacion|beneficiario|meta)" <dir>` para
+  `backend/src` con `grep -rnE "import com\.presupuesto\.(usuario|auth|presupuesto|cuenta|categoria|transaccion|transaccionprogramada|asignacion|beneficiario|meta|conciliacion)" <dir>` para
   `<dir>` = `main/java/com/presupuesto/comun` y `test/java/com/presupuesto/comun` (ampliando la
   alternancia con cada feature nueva); debe devolver cero líneas.
 

@@ -22,6 +22,7 @@ import com.presupuesto.transaccion.entity.Transaccion;
 import com.presupuesto.transaccion.repository.TransaccionRepository;
 import com.presupuesto.transaccion.repository.TransaccionSpecifications;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -118,6 +119,52 @@ public class TransaccionService {
                 .build();
         transaccion.reemplazarSubtransacciones(division.partes());
         return transaccionRepository.saveAndFlush(transaccion);
+    }
+
+    /** Beneficiario de los ajustes de conciliación. */
+    public static final String BENEFICIARIO_AJUSTE = "Ajuste de conciliación";
+
+    /**
+     * Crea el ajuste de una conciliación: transacción de la cuenta por {@code monto}, con la
+     * categoría indicada (o ninguna), estado {@code CONCILIADA} y aprobada. No valida el usuario
+     * ni si la cuenta está cerrada: quien llama ya lo hizo. El beneficiario se crea si no
+     * existe, sin recordar categoría.
+     */
+    @Transactional
+    public Transaccion crearAjuste(
+            Presupuesto presupuesto, Cuenta cuenta, LocalDate fecha, long monto, Long categoriaId) {
+        Categoria categoria =
+                referencias.categoriaParaRegistrar(categoriaId, presupuesto.getId());
+        Beneficiario beneficiario =
+                beneficiarioService.obtenerOCrear(presupuesto, BENEFICIARIO_AJUSTE);
+        return transaccionRepository.saveAndFlush(Transaccion.builder()
+                .cuenta(cuenta)
+                .fecha(fecha)
+                .monto(monto)
+                .categoria(categoria)
+                .beneficiario(beneficiario.getNombre())
+                .beneficiarioVinculado(beneficiario)
+                .estado(EstadoTransaccion.CONCILIADA)
+                .aprobada(true)
+                .build());
+    }
+
+    /** Pasa a {@code RECONCILIADA} las {@code CONCILIADA} de la cuenta hasta la fecha. */
+    @Transactional
+    public int reconciliarHasta(Long cuentaId, LocalDate hasta) {
+        return transaccionRepository.reconciliarConciliadasHasta(
+                cuentaId, hasta, Instant.now(clock));
+    }
+
+    /** Las {@code NO_CONCILIADA} de la cuenta, de la más reciente a la más antigua. */
+    @Transactional(readOnly = true)
+    public List<Transaccion> listarNoConciliadas(Long cuentaId, int limite) {
+        return transaccionRepository.noConciliadasDeCuenta(cuentaId, PageRequest.of(0, limite));
+    }
+
+    @Transactional(readOnly = true)
+    public long contarNoConciliadas(Long cuentaId) {
+        return transaccionRepository.contarNoConciliadasDeCuenta(cuentaId);
     }
 
     /** {@code page} desde 0; {@code size} entre 1 y 100; cualquier otro valor es un 400. */
