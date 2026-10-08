@@ -116,6 +116,9 @@
 				<artifactId>maven-surefire-plugin</artifactId>
 				<configuration>
 					<argLine>-Duser.timezone=UTC</argLine>
+					<systemPropertyVariables>
+						<programadas.generacion.habilitada>false</programadas.generacion.habilitada>
+					</systemPropertyVariables>
 				</configuration>
 			</plugin>
 			<plugin>

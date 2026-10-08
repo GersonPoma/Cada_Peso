@@ -131,6 +131,14 @@ com/presupuesto/
 │   ├── repository/
 │   ├── service/
 │   └── validacion/
+├── transaccionprogramada/
+│   ├── controller/
+│   ├── dto/
+│   │   ├── request/
+│   │   └── response/
+│   ├── entity/
+│   ├── repository/
+│   └── service/
 └── usuario/
     ├── controller/
     ├── dto/
@@ -153,7 +161,9 @@ depender de `presupuesto`, `cuenta`, `categoria`, `transaccion` y `comun`; nunca
 `beneficiario` no importa `transaccion` ni `asignacion`). `meta` puede depender de `presupuesto`,
 `categoria`, `asignacion` y `comun` (lee el cálculo del mes y fija asignados por lote con
 `AsignacionService.fijarAsignados`); `presupuesto`, `categoria` y `asignacion` nunca importan
-`meta`.
+`meta`. `transaccionprogramada` puede depender de `presupuesto`, `cuenta`, `categoria`,
+`transaccion` y `comun`; ninguna otra feature la importa (`transaccion` guarda el id de la
+plantilla en un `Long`, sin relación JPA).
 
 **Comunicación entre features: eventos.** Cuando una feature debe avisar a otra sin importarla
 (la dependencia iría al revés), publica un evento de Spring y la otra lo escucha. Hoy
@@ -209,7 +219,7 @@ procesador de anotaciones del `pom.xml`.
   `src/main` ni en `src/test`) importa `com.presupuesto.<feature>`. Si una clase de `comun/`
   necesita datos de una feature, los recibe como parámetros simples (ej.
   `JwtService.emitir(Long id, Rol rol)`, no la entidad `Usuario`). Se comprueba desde
-  `backend/src` con `grep -rnE "import com\.presupuesto\.(usuario|auth|presupuesto|cuenta|categoria|transaccion|asignacion|beneficiario|meta)" <dir>` para
+  `backend/src` con `grep -rnE "import com\.presupuesto\.(usuario|auth|presupuesto|cuenta|categoria|transaccion|transaccionprogramada|asignacion|beneficiario|meta)" <dir>` para
   `<dir>` = `main/java/com/presupuesto/comun` y `test/java/com/presupuesto/comun` (ampliando la
   alternancia con cada feature nueva); debe devolver cero líneas.
 
@@ -275,6 +285,37 @@ misma fecha, el mismo valor absoluto y el mismo memo. Cada fila apunta a la otra
 - `asignacion` no cuenta como ingreso la entrada de una transferencia cuya pata par está en una
   cuenta del presupuesto (`ActividadMensualRepository.ingresosSinCategoria`); la que viene de
   una cuenta externa sin categoría sí es ingreso.
+
+## Transacciones programadas
+
+Una transacción programada (`transaccionprogramada`, bajo
+`/api/v1/presupuestos/{presupuestoId}/transacciones-programadas`) es una **plantilla** que genera
+transacciones reales en cada ocurrencia. Solo transacciones normales: las transferencias
+programadas, las frecuencias personalizadas y las subtransacciones quedan fuera de alcance.
+
+- **Frecuencias**: `DIARIA`, `SEMANAL`, `CADA_2_SEMANAS`, `MENSUAL`, `CADA_3_MESES`, `ANUAL`. Las
+  fechas se calculan siempre desde `fechaInicio` (`CalendarioProgramado`, funciones puras), nunca
+  sumando un periodo a la fecha anterior, y se ajustan al último día del mes (31-ene → 28/29-feb →
+  31-mar).
+- **Generación** (`GeneradorProgramadas.generarVencidas`): por cada plantilla activa con
+  `proximaFecha <= hoy` crea una transacción por ocurrencia (fecha original, máximo 366 por
+  plantilla y ejecución), `NO_CONCILIADA` y `aprobada=false`, llamando a
+  `TransaccionService.crearProgramada` (mismas reglas que una manual). Una transacción de base de
+  datos por plantilla, con su fila bloqueada; si falla, se revierte esa plantilla, queda el motivo
+  en `ultimoError` (guardado en una transacción aparte) y se sigue con las demás. La restricción
+  única `(programada_id, fecha_ocurrencia)` en `transacciones` impide duplicados.
+- **Cuándo corre**: al arrancar (`GeneracionAlArrancar`), una vez al día (`GeneracionDiaria`,
+  propiedad `programadas.generacion.cron`, por defecto `0 0 3 * * *` en UTC) y con
+  `POST .../generar`, que solo procesa el presupuesto de la URL. La propiedad
+  `programadas.generacion.habilitada=false` quita los dos primeros; Surefire la deja en `false`
+  para que los tests no toquen datos de otros presupuestos.
+- **Pausa**: reanudar no genera las ocurrencias del periodo pausado (la `proximaFecha` salta a la
+  primera igual o posterior a hoy, y la de hoy la crea la siguiente ejecución del generador).
+  Crear una plantilla con inicio pasado tampoco genera nada dentro del `POST`.
+- **Edición**: `PUT` ignora `cuentaId` y `fechaInicio`; para cambiarlas se crea otra plantilla.
+- **Borrado**: no hay clave foránea entre `transacciones.programada_id` y la plantilla; el único
+  camino de borrado es `TransaccionProgramadaService.borrar`, que antes deja en `null` el vínculo
+  de las ya generadas.
 
 ## Paginación
 

@@ -16,6 +16,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,7 +37,10 @@ import org.hibernate.annotations.BatchSize;
 @Entity
 @Table(
         name = "transacciones",
-        indexes = @Index(name = "ix_transacciones_cuenta_fecha", columnList = "cuenta_id, fecha"))
+        indexes = @Index(name = "ix_transacciones_cuenta_fecha", columnList = "cuenta_id, fecha"),
+        uniqueConstraints = @UniqueConstraint(
+                name = "uq_transacciones_programada_ocurrencia",
+                columnNames = {"programada_id", "fecha_ocurrencia"}))
 @Getter
 @Setter
 @SuperBuilder
@@ -106,6 +110,23 @@ public class Transaccion extends EntidadBase {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "transaccion_par_id")
     private Transaccion transaccionPar;
+
+    /**
+     * Id de la transacción programada que la generó, o {@code null}. Sin relación JPA ni clave
+     * foránea para no depender de la feature {@code transaccionprogramada}; al borrar la
+     * plantilla se pone en {@code null} a mano. Sin setter: se fija al construirla.
+     */
+    @Setter(AccessLevel.NONE)
+    @Column(name = "programada_id")
+    private Long programadaId;
+
+    /**
+     * Fecha de la ocurrencia de la plantilla que la generó; junto con {@link #programadaId} es
+     * única. Sin setter: se fija al construirla.
+     */
+    @Setter(AccessLevel.NONE)
+    @Column(name = "fecha_ocurrencia")
+    private LocalDate fechaOcurrencia;
 
     /** Sin setter: solo cambia con {@link #reemplazarSubtransacciones(List)}. */
     @Setter(AccessLevel.NONE)

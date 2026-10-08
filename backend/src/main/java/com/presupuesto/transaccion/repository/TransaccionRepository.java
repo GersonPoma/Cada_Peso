@@ -1,11 +1,13 @@
 package com.presupuesto.transaccion.repository;
 
 import com.presupuesto.transaccion.entity.Transaccion;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -13,6 +15,17 @@ public interface TransaccionRepository
         extends JpaRepository<Transaccion, Long>, JpaSpecificationExecutor<Transaccion> {
 
     Optional<Transaccion> findByIdAndCuentaPresupuestoId(Long id, Long presupuestoId);
+
+    boolean existsByProgramadaIdAndFechaOcurrencia(Long programadaId, LocalDate fechaOcurrencia);
+
+    /** Deja las transacciones generadas por una plantilla sin vínculo (al borrarla). */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update Transaccion t
+            set t.programadaId = null, t.fechaOcurrencia = null
+            where t.programadaId = :programadaId
+            """)
+    int desvincularProgramada(@Param("programadaId") Long programadaId);
 
     List<Transaccion> findByIdInAndCuentaPresupuestoId(
             Collection<Long> ids, Long presupuestoId);

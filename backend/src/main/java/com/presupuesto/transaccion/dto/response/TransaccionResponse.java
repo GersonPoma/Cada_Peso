@@ -19,6 +19,7 @@ public record TransaccionResponse(
         boolean aprobada,
         List<SubTransaccionResponse> subtransacciones,
         Long transaccionParId,
+        Long programadaId,
         Instant fechaCreacion,
         Instant fechaActualizacion) {
 
@@ -42,6 +43,7 @@ public record TransaccionResponse(
                 transaccion.getTransaccionPar() == null
                         ? null
                         : transaccion.getTransaccionPar().getId(),
+                transaccion.getProgramadaId(),
                 transaccion.getFechaCreacion(),
                 transaccion.getFechaActualizacion());
     }

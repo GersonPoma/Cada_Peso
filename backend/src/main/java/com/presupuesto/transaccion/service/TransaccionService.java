@@ -63,6 +63,42 @@ public class TransaccionService {
     public TransaccionResponse crear(
             Long presupuestoId, Long usuarioId, CrearTransaccionRequest request) {
         Presupuesto presupuesto = presupuestoService.obtenerDelUsuario(presupuestoId, usuarioId);
+        return TransaccionResponse.desde(
+                guardar(presupuestoId, presupuesto, request, null, null));
+    }
+
+    /**
+     * Crea la transacción de una ocurrencia de una transacción programada. No valida el usuario:
+     * quien llama ya resolvió el presupuesto. Pasa por las mismas reglas que {@link #crear}; la
+     * fecha de ocurrencia y el id de la plantilla quedan guardados (y son únicos juntos).
+     */
+    @Transactional
+    public Transaccion crearProgramada(
+            Presupuesto presupuesto,
+            CrearTransaccionRequest request,
+            Long programadaId,
+            LocalDate fechaOcurrencia) {
+        return guardar(
+                presupuesto.getId(), presupuesto, request, programadaId, fechaOcurrencia);
+    }
+
+    /** Cuenta abierta y categoría que no sea de pago de tarjeta (422); sin categoría, la omite. */
+    public void exigirRegistrable(Cuenta cuenta, Categoria categoria) {
+        referencias.exigirAbierta(cuenta);
+        referencias.exigirNoEsDePago(categoria);
+    }
+
+    /** 422 si la categoría es de pago de tarjeta; sin categoría ({@code null}) la omite. */
+    public void exigirCategoriaRegistrable(Categoria categoria) {
+        referencias.exigirNoEsDePago(categoria);
+    }
+
+    private Transaccion guardar(
+            Long presupuestoId,
+            Presupuesto presupuesto,
+            CrearTransaccionRequest request,
+            Long programadaId,
+            LocalDate fechaOcurrencia) {
         Cuenta cuenta = referencias.cuenta(request.cuentaId(), presupuestoId);
         TransaccionReferencias.Division division = referencias.dividir(
                 presupuestoId, request.categoriaId(), request.monto(), request.subtransacciones());
@@ -77,9 +113,11 @@ public class TransaccionService {
                 .beneficiarioVinculado(beneficiario)
                 .memo(request.memo())
                 .aprobada(request.aprobada())
+                .programadaId(programadaId)
+                .fechaOcurrencia(fechaOcurrencia)
                 .build();
         transaccion.reemplazarSubtransacciones(division.partes());
-        return TransaccionResponse.desde(transaccionRepository.saveAndFlush(transaccion));
+        return transaccionRepository.saveAndFlush(transaccion);
     }
 
     /** {@code page} desde 0; {@code size} entre 1 y 100; cualquier otro valor es un 400. */

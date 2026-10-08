@@ -71,10 +71,15 @@ class TransaccionReferencias {
      */
     Categoria categoriaParaRegistrar(Long categoriaId, Long presupuestoId) {
         Categoria categoria = categoria(categoriaId, presupuestoId);
+        exigirNoEsDePago(categoria);
+        return categoria;
+    }
+
+    /** 422 si la categoría es de pago de tarjeta; {@code null} se acepta. */
+    void exigirNoEsDePago(Categoria categoria) {
         if (categoria != null && categoria.esPagoTarjeta()) {
             throw new ReglaNegocioException(MENSAJE_CATEGORIA_DE_PAGO);
         }
-        return categoria;
     }
 
     /** Las patas de una transferencia solo se cambian por {@code /transferencias}. */
