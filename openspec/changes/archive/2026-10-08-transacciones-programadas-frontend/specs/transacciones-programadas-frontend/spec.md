@@ -170,7 +170,8 @@ La pantalla SHALL tener el botón `Generar ahora`, que llama a
 `POST .../transacciones-programadas/generar`, queda deshabilitado mientras espera, anuncia el
 resultado y recarga la lista: `Se generaron {n} transacciones` (`Se generó 1 transacción`), o
 `No había ocurrencias pendientes` con `0`; si `plantillasConError` es mayor que 0, agrega
-`{m} programadas no se pudieron generar` (`1 programada no se pudo generar`). Un error SHALL mostrar el aviso genérico.
+`{m} programadas no se pudieron generar` (`1 programada no se pudo generar`). Un error
+SHALL mostrar el aviso genérico.
 
 #### Scenario: Con ocurrencias
 - **CUANDO** la API responde `generadas 2` y `plantillasConError 0`
