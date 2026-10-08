@@ -136,6 +136,12 @@ com/presupuesto/
 │   ├── evento/
 │   ├── repository/
 │   └── service/
+├── reporte/
+│   ├── controller/
+│   ├── dto/
+│   │   └── response/
+│   ├── repository/
+│   └── service/
 ├── transaccion/
 │   ├── controller/
 │   ├── dto/
@@ -182,7 +188,10 @@ plantilla en un `Long`, sin relación JPA). `conciliacion` puede depender de `pr
 `Long`, sin relación JPA). `importacion` puede depender de `presupuesto`, `cuenta`, `transaccion` y
 `comun` (no de `beneficiario` ni `categoria`: la normalización del beneficiario y la creación por
 lote viven en `transaccion`); ninguna otra feature la importa. No tiene `entity` ni `repository`:
-no hay tablas propias.
+no hay tablas propias. `reporte` puede depender de `presupuesto`, `cuenta`, `categoria`,
+`transaccion`, `asignacion`, `meta` y `comun` (solo lee: ver "Reportes"); ninguna otra feature la
+importa.
+Solo tiene `repository` para sus consultas de lectura sobre `Transaccion`: no hay tablas propias.
 
 **Comunicación entre features: eventos.** Cuando una feature debe avisar a otra sin importarla
 (la dependencia iría al revés), publica un evento de Spring y la otra lo escucha. Hoy
@@ -238,7 +247,7 @@ procesador de anotaciones del `pom.xml`.
   `src/main` ni en `src/test`) importa `com.presupuesto.<feature>`. Si una clase de `comun/`
   necesita datos de una feature, los recibe como parámetros simples (ej.
   `JwtService.emitir(Long id, Rol rol)`, no la entidad `Usuario`). Se comprueba desde
-  `backend/src` con `grep -rnE "import com\.presupuesto\.(usuario|auth|presupuesto|cuenta|categoria|transaccion|transaccionprogramada|asignacion|beneficiario|meta|conciliacion|importacion)" <dir>` para
+  `backend/src` con `grep -rnE "import com\.presupuesto\.(usuario|auth|presupuesto|cuenta|categoria|transaccion|transaccionprogramada|asignacion|beneficiario|meta|conciliacion|importacion|reporte)" <dir>` para
   `<dir>` = `main/java/com/presupuesto/comun` y `test/java/com/presupuesto/comun` (ampliando la
   alternancia con cada feature nueva); debe devolver cero líneas.
 
@@ -378,6 +387,104 @@ que el techo multipart, que lo corta Tomcat antes del controller.
   transacción) para que dos importaciones simultáneas del mismo archivo no dupliquen; la segunda
   espera y ve las filas de la primera. Un `POST /transacciones` manual no toma ese bloqueo. La
   carrera real no tiene test automático.
+
+## Reportes
+
+`reporte` (`/api/v1/presupuestos/{presupuestoId}/reportes/...`) agrega por rango de meses lo que
+ya existe, solo con `GET`: sin tablas nuevas, sin escribir nada. **No reimplementa reglas**: lee
+las mismas consultas de actividad que el presupuesto mensual (`ActividadMensualRepository`).
+
+- **Orden de errores**: presupuesto 404, cuenta 404 (solo la evolución de saldo), parámetros 400.
+  Por eso el controller recibe `desde` y `hasta` como `String` (nunca `YearMonth`, `LocalDate` ni
+  `@Valid`: Spring respondería 400 antes que el 404) y los valida el service con `RangoMeses`.
+- **Rango**: `desde` y `hasta` son `yyyy-MM` (año 2000-2100), ambos inclusivos. Mes mal
+  formado, `desde > hasta`, parámetro obligatorio ausente o más meses que
+  `reportes.max-meses` (60 por defecto) responden 400 `DATOS_INVALIDOS`. Cada mes del rango
+  aparece en la respuesta, también sin datos (ceros).
+- **Costo constante**: un número fijo de consultas por reporte, sin consulta por mes, por
+  categoría ni por cuenta (el detalle por reporte está en el `design.md` del change).
+- **Montos** `long` en milésimas con signo; los meses viajan como `yyyy-MM`; los porcentajes, en
+  centésimas de punto porcentual (`1234` = 12,34 %), al entero más cercano con el medio
+  alejándose de cero (`Porcentaje`), sin coma flotante.
+- **Categorías de pago de tarjeta**: no admiten transacciones (422, spec `transacciones`), así
+  que nunca tienen gasto propio y no aparecen en los reportes de gasto: no hay doble conteo con
+  el gasto que ya está en la categoría real.
+
+Qué cuenta como gasto, ingreso y patrimonio (todo en milésimas):
+
+| Caso | Gasto | Ingreso | Patrimonio |
+|---|---|---|---|
+| Gasto con categoría en cuenta del presupuesto | `-monto` en su categoría | - | baja el saldo |
+| Gasto con tarjeta (con categoría) | `-monto` en **su** categoría, no en "Pago: Visa" | - | más deuda en la tarjeta |
+| Pago de tarjeta / transferencia entre cuentas del presupuesto | no cuenta | no cuenta | neutro |
+| Transferencia del presupuesto a una cuenta fuera | `-monto` en su categoría | - | pasa de una cuenta a otra |
+| Entrada sin categoría desde una cuenta fuera, o en una cuenta que no es tarjeta | - | sí | sube el saldo |
+| Transacción dividida | cada parte en su categoría | - | el total baja el saldo |
+| Gasto (o parte de división) sin categoría | cubo "Sin categoría" | - | baja el saldo |
+| Entrada sin categoría en una tarjeta | no cuenta | no cuenta | sube el saldo |
+| Reembolso con categoría | resta del gasto de su categoría (puede quedar negativa) | - | sube el saldo |
+| Cuenta cerrada del presupuesto | cuenta | cuenta | cuenta |
+| Cuenta fuera del presupuesto | no cuenta | no cuenta | **sí** cuenta |
+| Saldo inicial | - | no es ingreso de ningún mes | parte del saldo desde el primer mes |
+
+Reportes de gasto (`GastoReporteService`):
+
+- `GET .../reportes/gasto-por-categoria?desde&hasta`: `{desde, hasta, total, grupos:[{grupoId,
+  nombre, total, porcentaje, categorias:[{categoriaId, nombre, oculta, total, porcentaje}]}],
+  sinCategoria:{total, porcentaje}}`. Gasto neto por categoría en el orden del árbol; solo las
+  categorías con movimientos en el rango; "Sin categoría" siempre presente y aparte. Porcentajes
+  sobre el total general (0 si el total no es positivo; no suman 10000 exactos por el redondeo).
+- `GET .../reportes/ingresos-gastos?desde&hasta`: `{desde, hasta, ingresos, gastos, neto,
+  meses:[{mes, ingresos, gastos, neto}]}`. `gastos` es el del reporte anterior mes a mes.
+- Ejemplo de octubre (milésimas): sueldo `+500000`; supermercado `-80000` (Comida); retiro
+  `-5000`; compra dividida `-60000` (`-40000` Comida, `-20000` Hogar); transferencia a una cuenta
+  fuera `-100000` (Metas de ahorro); con la tarjeta `-30000` y reembolso `+10000` (Comida); pago de
+  la tarjeta `30000` (neutro); intereses `+2000` en la cuenta fuera (no cuentan). Resultado:
+  ingresos `500000`; Comida `140000` (`5283`), Metas de ahorro `100000` (`3774`), Hogar `20000`
+  (`755`), Sin categoría `5000` (`189`); gastos `265000`; neto `235000`.
+- Las consultas de "sin categoría" por mes (`sinCategoriaPorMes`,
+  `salidasDivididasSinCategoria`) viven junto a `ingresosSinCategoria` en
+  `ActividadMensualRepository`: si cambia la regla de ingreso hay que cambiar las dos, y un test
+  compara que sumen igual. Consultas: 7 el gasto por categoría y 5 ingresos contra gastos.
+
+Reportes de saldos (`PatrimonioReporteService`):
+
+- `GET .../reportes/patrimonio?desde&hasta`: `{desde, hasta, meses:[{mes, activos, pasivos,
+  patrimonio}]}` al cierre de cada mes, con **todas** las cuentas del presupuesto (dentro y fuera
+  de él, abiertas y cerradas). `activos` suma las cuentas corriente, de ahorro, de efectivo y de
+  inversión; `pasivos` es la suma de las tarjetas de crédito y los préstamos con el signo cambiado
+  (una tarjeta con saldo `-150000` es un pasivo de `150000`); `patrimonio = activos - pasivos` es
+  siempre la suma de todos los saldos. Ejemplo: Corriente `1200000`, Ahorro fuera `600000`, Visa
+  `-150000`, Préstamo `-2900000` dan activos `1800000`, pasivos `3050000`, patrimonio `-1250000`.
+- `GET .../reportes/cuentas/{cuentaId}/evolucion-saldo?desde&hasta`: `{cuentaId, nombre, tipo,
+  enPresupuesto, cerrada, saldoInicial, desde, hasta, meses:[{mes, entradas, salidas, saldo}]}`
+  para cualquier cuenta del presupuesto. Cuenta ajena o de otro presupuesto: 404.
+- **Saldo de apertura**: el saldo de un mes es `saldoInicial` más todos los movimientos hasta su
+  último día, también los anteriores a `desde`. Cuenta con `saldoInicial = 100000`, `+40000` y
+  `-10000` antes del rango y `+5000 -2000` en enero: enero cierra en `133000` (no `103000`) y
+  febrero, sin movimientos, repite `133000`. La cuenta no tiene fecha de apertura: antes de su
+  primera transacción aporta su `saldoInicial`.
+- Cuentan transacciones de todos los estados (como `saldo` del listado de saldos). Consultas: 3
+  cada uno.
+
+Reporte de metas (`MetasReporteService`):
+
+- `GET .../reportes/metas?desde&hasta`: `hasta` es opcional (sin él, el reporte trae solo el mes
+  de `desde`). `{desde, hasta, metas:[{categoriaId, nombre, oculta, tipo, monto, necesidad,
+  asignado, gastado, porcentaje, meses:[{mes, necesidad, asignado, gastado, disponible, faltante,
+  estado, porcentaje}]}]}` con todas las metas (también de categorías ocultas) en el orden del
+  árbol. `necesidad`, `faltante` y `estado` son los de `GET .../meses/{mes}/metas`: salen de
+  `CalculoMeta`; `asignado`, `disponible` y la actividad, de `MesPresupuestoService.calcularFilas`,
+  que aplica `CalculoMensual` mes a mes **en memoria** sobre una sola carga de datos y trae, para
+  cada mes, exactamente las filas de `MesPresupuestoService.calcular`.
+- `gastado` es el negativo de la actividad, y `0` en una categoría de pago de tarjeta (allí la
+  actividad es una reserva). `porcentaje` es `asignado / necesidad` en centésimas, sin tope y
+  `null` si la necesidad es `0` (meta pospuesta o ya cubierta); en los totales usa las sumas del
+  rango. Ejemplo: meta mensual de `100000` con `80000` asignados y `-60000` de actividad:
+  `necesidad 100000`, `gastado 60000`, `faltante 20000`, `FALTA`, `porcentaje 8000`.
+- La **meta vigente se aplica a todos los meses** del rango, también a los anteriores a su
+  creación: no hay historial de metas.
+- Consultas: 7 (10 si el presupuesto tiene alguna tarjeta). `reporte` depende de `meta` solo aquí.
 
 ## Paginación
 

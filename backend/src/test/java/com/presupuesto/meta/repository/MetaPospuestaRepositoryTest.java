@@ -10,11 +10,13 @@ import com.presupuesto.categoria.repository.GrupoCategoriaRepository;
 import com.presupuesto.meta.entity.Meta;
 import com.presupuesto.meta.entity.MetaPospuesta;
 import com.presupuesto.meta.entity.TipoMeta;
+import com.presupuesto.meta.repository.MetaPospuestaRepository.PospuestaEnMes;
 import com.presupuesto.presupuesto.entity.Presupuesto;
 import com.presupuesto.presupuesto.repository.PresupuestoRepository;
 import com.presupuesto.usuario.entity.Usuario;
 import com.presupuesto.usuario.repository.UsuarioRepository;
 import java.time.LocalDate;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -88,6 +90,41 @@ class MetaPospuestaRepositoryTest {
                 .containsExactly(deComida.getId());
         assertThat(repository.findMetaIdsPospuestas(viajes.getId(), OCTUBRE))
                 .containsExactly(deAvion.getId());
+    }
+
+    @Test
+    void lasPospuestasEnUnRangoTraenSoloLasDeEsePresupuestoDentroDelRango() {
+        LocalDate septiembre = LocalDate.of(2026, 9, 1);
+        LocalDate diciembre = LocalDate.of(2026, 12, 1);
+        repository.save(pospuesta(deComida, septiembre));
+        repository.save(pospuesta(deComida, OCTUBRE));
+        repository.save(pospuesta(deComida, NOVIEMBRE));
+        repository.save(pospuesta(deComida, diciembre));
+        repository.saveAndFlush(pospuesta(deAvion, OCTUBRE));
+
+        List<PospuestaEnMes> filas =
+                repository.findPospuestasEnRango(casa.getId(), OCTUBRE, NOVIEMBRE);
+
+        assertThat(filas).extracting(PospuestaEnMes::getMetaId)
+                .containsOnly(deComida.getId());
+        assertThat(filas).extracting(PospuestaEnMes::getMes)
+                .containsExactlyInAnyOrder(OCTUBRE, NOVIEMBRE);
+        assertThat(repository.findPospuestasEnRango(viajes.getId(), OCTUBRE, NOVIEMBRE))
+                .extracting(PospuestaEnMes::getMetaId).containsExactly(deAvion.getId());
+        assertThat(repository.findPospuestasEnRango(casa.getId(), diciembre.plusMonths(1),
+                diciembre.plusMonths(2))).isEmpty();
+    }
+
+    @Test
+    void elResultadoDeUnMesEnElRangoIgualaALasPospuestasDeEseMes() {
+        repository.save(pospuesta(deComida, OCTUBRE));
+        repository.saveAndFlush(pospuesta(deAvion, OCTUBRE));
+
+        List<Long> delRango = repository.findPospuestasEnRango(casa.getId(), OCTUBRE, OCTUBRE)
+                .stream().map(PospuestaEnMes::getMetaId).toList();
+
+        assertThat(delRango).containsExactlyElementsOf(
+                repository.findMetaIdsPospuestas(casa.getId(), OCTUBRE));
     }
 
     @Test

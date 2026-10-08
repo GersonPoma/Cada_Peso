@@ -3,6 +3,7 @@ package com.presupuesto.asignacion.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -18,6 +19,7 @@ import com.presupuesto.categoria.repository.CategoriaRepository.PagoDeTarjeta;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -173,6 +175,136 @@ class CalculadoraMesTest {
         ResultadoMes resultado = calculadora.calcular(PRESUPUESTO_ID, febrero);
 
         assertThat(resultado.fila(PAGO_VISA)).isEqualTo(new FilaMes(0L, 0L, 30_000L));
+    }
+
+    // ---------- calcularFilas: un rango con una sola carga de datos ----------
+
+    private void historialDeTresMeses() {
+        LocalDate marzo = LocalDate.of(2026, 3, 1);
+        when(asignacionRepository.asignadosHasta(PRESUPUESTO_ID, marzo)).thenReturn(List.of(
+                asignado(COMIDA, LocalDate.of(2026, 1, 1), 100_000L),
+                asignado(COMIDA, LocalDate.of(2026, 3, 1), 10_000L),
+                asignado(OCIO, LocalDate.of(2026, 2, 1), 5_000L)));
+        when(actividadRepository.actividadSimple(PRESUPUESTO_ID, LocalDate.of(2026, 3, 31)))
+                .thenReturn(List.of(
+                        actividad(COMIDA, 2026, 1, -20_000L),
+                        actividad(COMIDA, 2026, 2, -90_000L),
+                        actividad(OCIO, 2026, 3, -8_000L)));
+        when(actividadRepository.actividadDividida(PRESUPUESTO_ID, LocalDate.of(2026, 3, 31)))
+                .thenReturn(List.of(actividad(COMIDA, 2026, 2, -5_000L)));
+    }
+
+    @Test
+    void calcularFilasDeUnMesIgualaALasFilasDeCalcular() {
+        ResultadoMes mes = calculadora.calcular(PRESUPUESTO_ID, ENERO);
+
+        Map<YearMonth, Map<Long, FilaMes>> filas =
+                calculadora.calcularFilas(PRESUPUESTO_ID, ENERO, ENERO);
+
+        assertThat(filas).containsOnlyKeys(ENERO);
+        assertThat(filas.get(ENERO)).isEqualTo(mes.filas());
+    }
+
+    @Test
+    void calcularFilasDeVariosMesesIgualaALlamarACalcularMesAMes() {
+        historialDeTresMeses();
+        YearMonth febrero = YearMonth.of(2026, 2);
+        YearMonth marzo = YearMonth.of(2026, 3);
+        when(asignacionRepository.asignadosHasta(PRESUPUESTO_ID, LocalDate.of(2026, 2, 1)))
+                .thenReturn(List.of(
+                        asignado(COMIDA, LocalDate.of(2026, 1, 1), 100_000L),
+                        asignado(OCIO, LocalDate.of(2026, 2, 1), 5_000L)));
+        when(actividadRepository.actividadSimple(PRESUPUESTO_ID, LocalDate.of(2026, 2, 28)))
+                .thenReturn(List.of(
+                        actividad(COMIDA, 2026, 1, -20_000L),
+                        actividad(COMIDA, 2026, 2, -90_000L)));
+        when(actividadRepository.actividadDividida(PRESUPUESTO_ID, LocalDate.of(2026, 2, 28)))
+                .thenReturn(List.of(actividad(COMIDA, 2026, 2, -5_000L)));
+        when(actividadRepository.actividadSimple(PRESUPUESTO_ID, FIN_ENERO))
+                .thenReturn(List.of(actividad(COMIDA, 2026, 1, -20_000L)));
+        when(actividadRepository.actividadDividida(PRESUPUESTO_ID, FIN_ENERO))
+                .thenReturn(List.of());
+        when(asignacionRepository.asignadosHasta(PRESUPUESTO_ID, LocalDate.of(2026, 1, 1)))
+                .thenReturn(List.of(asignado(COMIDA, LocalDate.of(2026, 1, 1), 100_000L)));
+
+        Map<YearMonth, Map<Long, FilaMes>> filas =
+                calculadora.calcularFilas(PRESUPUESTO_ID, ENERO, marzo);
+
+        assertThat(filas.keySet()).containsExactly(ENERO, febrero, marzo);
+        for (YearMonth mes : filas.keySet()) {
+            assertThat(filas.get(mes)).as("filas de %s", mes)
+                    .isEqualTo(calculadora.calcular(PRESUPUESTO_ID, mes).filas());
+        }
+        // enero: 100000 - 20000; febrero: 80000 + 0 - 95000 (sobregasto); marzo: 0 + 10000
+        assertThat(filas.get(febrero).get(COMIDA)).isEqualTo(new FilaMes(0L, -95_000L, -15_000L));
+        assertThat(filas.get(marzo).get(COMIDA)).isEqualTo(new FilaMes(10_000L, 0L, 10_000L));
+    }
+
+    @Test
+    void calcularFilasUnRangoQueEmpiezaEnElMedioArrastraLoAnteriorADesde() {
+        historialDeTresMeses();
+
+        Map<YearMonth, Map<Long, FilaMes>> filas = calculadora.calcularFilas(
+                PRESUPUESTO_ID, YearMonth.of(2026, 3), YearMonth.of(2026, 3));
+
+        assertThat(filas.keySet()).containsExactly(YearMonth.of(2026, 3));
+        // el disponible negativo de febrero no se arrastra; marzo solo tiene su asignado
+        assertThat(filas.get(YearMonth.of(2026, 3)).get(COMIDA))
+                .isEqualTo(new FilaMes(10_000L, 0L, 10_000L));
+        assertThat(filas.get(YearMonth.of(2026, 3)).get(OCIO))
+                .isEqualTo(new FilaMes(0L, -8_000L, -3_000L));
+    }
+
+    @Test
+    void calcularFilasConMesesAnterioresAlPrimerDatoDevuelveFilasVaciasEnEsosMeses() {
+        Map<YearMonth, Map<Long, FilaMes>> filas = calculadora.calcularFilas(
+                PRESUPUESTO_ID, YearMonth.of(2025, 11), ENERO);
+
+        assertThat(filas.keySet()).containsExactly(
+                YearMonth.of(2025, 11), YearMonth.of(2025, 12), ENERO);
+        assertThat(filas.get(YearMonth.of(2025, 11))).isEmpty();
+        assertThat(filas.get(YearMonth.of(2025, 12))).isEmpty();
+        assertThat(filas.get(ENERO)).isEqualTo(calculadora.calcular(PRESUPUESTO_ID, ENERO).filas());
+    }
+
+    @Test
+    void calcularFilasHaceLasMismasConsultasConUnMesQueConDoce() {
+        historialDeTresMeses();
+
+        calculadora.calcularFilas(PRESUPUESTO_ID, YearMonth.of(2026, 3), YearMonth.of(2026, 3));
+        calculadora.calcularFilas(PRESUPUESTO_ID, YearMonth.of(2025, 4), YearMonth.of(2026, 3));
+
+        verify(asignacionRepository, times(2))
+                .asignadosHasta(PRESUPUESTO_ID, LocalDate.of(2026, 3, 1));
+        verify(actividadRepository, times(2))
+                .actividadSimple(PRESUPUESTO_ID, LocalDate.of(2026, 3, 31));
+        verify(actividadRepository, times(2))
+                .actividadDividida(PRESUPUESTO_ID, LocalDate.of(2026, 3, 31));
+        verify(categoriaRepository, times(2)).pagosDeTarjetas(PRESUPUESTO_ID);
+    }
+
+    @Test
+    void calcularFilasNoConsultaLosIngresos() {
+        historialDeTresMeses();
+
+        calculadora.calcularFilas(PRESUPUESTO_ID, YearMonth.of(2026, 1), YearMonth.of(2026, 3));
+
+        verify(actividadRepository, never()).ingresosSinCategoria(any(), any());
+        verify(actividadRepository, never()).saldosInicialesPositivos(any());
+    }
+
+    @Test
+    void calcularFilasIncluyeLaReservaDeLasCategoriasDePagoDeTarjeta() {
+        historialDeTresMeses();
+        hayTarjeta();
+        when(actividadRepository.gastosTarjeta(PRESUPUESTO_ID, LocalDate.of(2026, 3, 31)))
+                .thenReturn(List.of(sumaTarjeta(VISA, 2026, 2, -30_000L)));
+
+        Map<YearMonth, Map<Long, FilaMes>> filas = calculadora.calcularFilas(
+                PRESUPUESTO_ID, YearMonth.of(2026, 3), YearMonth.of(2026, 3));
+
+        assertThat(filas.get(YearMonth.of(2026, 3)).get(PAGO_VISA))
+                .isEqualTo(new FilaMes(0L, 0L, 30_000L));
     }
 
     private static PagoDeTarjeta pagoDeTarjeta(long cuentaId, long categoriaId) {

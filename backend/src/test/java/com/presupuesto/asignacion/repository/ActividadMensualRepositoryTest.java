@@ -3,7 +3,9 @@ package com.presupuesto.asignacion.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.presupuesto.asignacion.repository.ActividadMensualRepository.ActividadPorMes;
+import com.presupuesto.asignacion.repository.ActividadMensualRepository.SinCategoriaPorMes;
 import com.presupuesto.asignacion.repository.ActividadMensualRepository.SumaTarjetaPorMes;
+import com.presupuesto.asignacion.repository.ActividadMensualRepository.TotalPorMes;
 import com.presupuesto.categoria.entity.Categoria;
 import com.presupuesto.categoria.entity.GrupoCategoria;
 import com.presupuesto.categoria.repository.CategoriaRepository;
@@ -344,6 +346,175 @@ class ActividadMensualRepositoryTest {
         transferir(fuera, visa, 20_000L, null);
 
         assertThat(repository.ingresosSinCategoria(casa.getId(), FIN_ANIO)).isEqualTo(500_000L);
+    }
+
+    private static final LocalDate DESDE_TODO = LocalDate.of(2000, 1, 1);
+
+    @Test
+    void sinCategoriaPorMesSeparaIngresosYSalidasPorMesYSoloContabilizaSinCategoria() {
+        guardar(banco, "2026-01-05", 500_000L, null);
+        guardar(banco, "2026-01-06", -5_000L, null);
+        guardar(banco, "2026-01-07", -3_000L, comida);
+        guardar(banco, "2026-02-01", -2_000L, null);
+        guardar(cerrada, "2026-01-08", -1_000L, null);
+        guardar(fuera, "2026-01-09", -70_000L, null);
+
+        List<SinCategoriaPorMes> filas =
+                repository.sinCategoriaPorMes(casa.getId(), DESDE_TODO, FIN_ANIO);
+
+        assertThat(filas).hasSize(2);
+        assertThat(ingresos(filas, 2026, 1)).isEqualTo(500_000L);
+        assertThat(salidas(filas, 2026, 1)).isEqualTo(-6_000L);
+        assertThat(ingresos(filas, 2026, 2)).isZero();
+        assertThat(salidas(filas, 2026, 2)).isEqualTo(-2_000L);
+    }
+
+    @Test
+    void sinCategoriaPorMesExcluyeAmbasPatasDeUnaTransferenciaEntreCuentasDelPresupuesto() {
+        transferir(banco, cerrada, 30_000L, null);
+
+        assertThat(repository.sinCategoriaPorMes(casa.getId(), DESDE_TODO, FIN_ANIO)).isEmpty();
+    }
+
+    @Test
+    void sinCategoriaPorMesCuentaLaTransferenciaConUnaCuentaFueraDelPresupuesto() {
+        transferir(banco, fuera, 20_000L, null);
+        transferir(fuera, banco, 8_000L, null);
+
+        List<SinCategoriaPorMes> filas =
+                repository.sinCategoriaPorMes(casa.getId(), DESDE_TODO, FIN_ANIO);
+
+        assertThat(ingresos(filas, 2026, 1)).isEqualTo(8_000L);
+        assertThat(salidas(filas, 2026, 1)).isEqualTo(-20_000L);
+    }
+
+    @Test
+    void sinCategoriaPorMesEnUnaTarjetaLaSalidaCuentaYLaEntradaNo() {
+        Cuenta visa = tarjeta(casa, "Visa", true);
+        guardar(visa, "2026-01-05", -9_000L, null);
+        guardar(visa, "2026-01-06", 4_000L, null);
+
+        List<SinCategoriaPorMes> filas =
+                repository.sinCategoriaPorMes(casa.getId(), DESDE_TODO, FIN_ANIO);
+
+        assertThat(ingresos(filas, 2026, 1)).isZero();
+        assertThat(salidas(filas, 2026, 1)).isEqualTo(-9_000L);
+    }
+
+    @Test
+    void sinCategoriaPorMesIgnoraLasTransaccionesDivididasYRespetaLasCotas() {
+        Transaccion dividida = guardar(banco, "2026-01-10", -30_000L, null);
+        dividida.reemplazarSubtransacciones(List.of(
+                SubTransaccion.builder().monto(-10_000L).categoria(comida).build(),
+                SubTransaccion.builder().monto(-20_000L).build()));
+        transaccionRepository.flush();
+        guardar(banco, "2026-02-10", -4_000L, null);
+        guardar(banco, "2026-03-10", -5_000L, null);
+
+        List<SinCategoriaPorMes> filas = repository.sinCategoriaPorMes(
+                casa.getId(), LocalDate.of(2026, 2, 1), LocalDate.of(2026, 2, 28));
+
+        assertThat(filas).hasSize(1);
+        assertThat(salidas(filas, 2026, 2)).isEqualTo(-4_000L);
+    }
+
+    @Test
+    void sinCategoriaPorMesNoMezclaPresupuestos() {
+        guardar(cuentaViajes, "2026-01-05", -9_999L, null);
+        guardar(cuentaViajes, "2026-01-06", 8_888L, null);
+
+        assertThat(repository.sinCategoriaPorMes(casa.getId(), DESDE_TODO, FIN_ANIO)).isEmpty();
+    }
+
+    @Test
+    void salidasDivididasSinCategoriaSumaSoloLasPartesNegativasSinCategoria() {
+        Transaccion dividida = guardar(banco, "2026-01-10", -30_000L, null);
+        dividida.reemplazarSubtransacciones(List.of(
+                SubTransaccion.builder().monto(-10_000L).categoria(comida).build(),
+                SubTransaccion.builder().monto(-20_000L).build()));
+        Transaccion mixta = guardar(banco, "2026-02-10", -1_000L, null);
+        mixta.reemplazarSubtransacciones(List.of(
+                SubTransaccion.builder().monto(-6_000L).build(),
+                SubTransaccion.builder().monto(5_000L).build()));
+        Transaccion enFuera = guardar(fuera, "2026-01-10", -8_000L, null);
+        enFuera.reemplazarSubtransacciones(List.of(
+                SubTransaccion.builder().monto(-8_000L).build()));
+        Transaccion enCerrada = guardar(cerrada, "2026-01-11", -2_000L, null);
+        enCerrada.reemplazarSubtransacciones(List.of(
+                SubTransaccion.builder().monto(-2_000L).build()));
+        Transaccion enViajes = guardar(cuentaViajes, "2026-01-10", -7_000L, null);
+        enViajes.reemplazarSubtransacciones(List.of(
+                SubTransaccion.builder().monto(-7_000L).build()));
+        transaccionRepository.flush();
+
+        List<TotalPorMes> filas = repository.salidasDivididasSinCategoria(
+                casa.getId(), DESDE_TODO, FIN_ANIO);
+
+        assertThat(filas).hasSize(2);
+        assertThat(totalDelMes(filas, 2026, 1)).isEqualTo(-22_000L);
+        assertThat(totalDelMes(filas, 2026, 2)).isEqualTo(-6_000L);
+        assertThat(repository.salidasDivididasSinCategoria(
+                casa.getId(), LocalDate.of(2026, 2, 1), LocalDate.of(2026, 2, 28)))
+                .hasSize(1);
+    }
+
+    @Test
+    void laSumaDeIngresosPorMesHastaUnMesEsIngresosSinCategoria() {
+        Cuenta visa = tarjeta(casa, "Visa", true);
+        guardar(banco, "2026-01-05", 500_000L, null);
+        guardar(banco, "2026-02-05", 120_000L, null);
+        guardar(banco, "2026-03-05", 90_000L, null);
+        guardar(banco, "2026-01-06", -5_000L, null);
+        guardar(visa, "2026-01-07", 9_000L, null);
+        guardar(fuera, "2026-01-08", 33_000L, null);
+        guardar(cerrada, "2026-02-09", 15_000L, null);
+        guardar(banco, "2026-02-10", 4_000L, comida);
+        transferir(banco, cerrada, 30_000L, null);
+        transferir(fuera, banco, 20_000L, null);
+        transferir(banco, fuera, 6_000L, null);
+        transferir(fuera, visa, 12_000L, null);
+        Transaccion dividida = guardar(banco, "2026-02-11", 40_000L, null);
+        dividida.reemplazarSubtransacciones(List.of(
+                SubTransaccion.builder().monto(25_000L).categoria(comida).build(),
+                SubTransaccion.builder().monto(15_000L).build()));
+        transaccionRepository.flush();
+
+        List<SinCategoriaPorMes> filas =
+                repository.sinCategoriaPorMes(casa.getId(), DESDE_TODO, FIN_ANIO);
+
+        for (int mes = 1; mes <= 3; mes++) {
+            final int hastaMes = mes;
+            long acumulado = filas.stream()
+                    .filter(f -> f.getAnio() == 2026 && f.getMes() <= hastaMes)
+                    .mapToLong(SinCategoriaPorMes::getIngresos)
+                    .sum();
+            LocalDate finDeMes = LocalDate.of(2026, mes, 1).plusMonths(1).minusDays(1);
+
+            assertThat(acumulado)
+                    .as("ingresos acumulados hasta %s", finDeMes)
+                    .isEqualTo(repository.ingresosSinCategoria(casa.getId(), finDeMes));
+        }
+    }
+
+    private static long ingresos(List<SinCategoriaPorMes> filas, int anio, int mes) {
+        return filas.stream()
+                .filter(f -> f.getAnio() == anio && f.getMes() == mes)
+                .mapToLong(SinCategoriaPorMes::getIngresos)
+                .sum();
+    }
+
+    private static long salidas(List<SinCategoriaPorMes> filas, int anio, int mes) {
+        return filas.stream()
+                .filter(f -> f.getAnio() == anio && f.getMes() == mes)
+                .mapToLong(SinCategoriaPorMes::getSalidas)
+                .sum();
+    }
+
+    private static long totalDelMes(List<TotalPorMes> filas, int anio, int mes) {
+        return filas.stream()
+                .filter(f -> f.getAnio() == anio && f.getMes() == mes)
+                .mapToLong(TotalPorMes::getTotal)
+                .sum();
     }
 
     private Cuenta tarjeta(Presupuesto presupuesto, String nombre, boolean enPresupuesto) {

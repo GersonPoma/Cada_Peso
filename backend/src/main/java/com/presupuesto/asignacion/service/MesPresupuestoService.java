@@ -45,6 +45,18 @@ public class MesPresupuestoService {
         return calculadora.calcular(presupuestoId, mes);
     }
 
+    /**
+     * Las cifras de cada categoría con datos en cada mes de {@code desde} a {@code hasta}, con
+     * una sola carga de datos (sin consulta por mes); cada mes trae las mismas filas que
+     * {@link #calcular}. No valida la pertenencia: lo llama quien ya validó el presupuesto con
+     * {@code obtenerDelUsuario}.
+     */
+    @Transactional(readOnly = true)
+    public Map<YearMonth, Map<Long, FilaMes>> calcularFilas(
+            Long presupuestoId, YearMonth desde, YearMonth hasta) {
+        return calculadora.calcularFilas(presupuestoId, desde, hasta);
+    }
+
     /** El mes ya calculado, con grupos y categorías en su orden (con o sin las ocultas). */
     MesPresupuestoResponse construir(
             Long presupuestoId, YearMonth mes, boolean incluirOcultas) {

@@ -69,6 +69,58 @@ public interface ActividadMensualRepository extends Repository<Transaccion, Long
     long ingresosSinCategoria(
             @Param("presupuestoId") Long presupuestoId, @Param("hasta") LocalDate hasta);
 
+    /**
+     * Lo mismo que {@link #ingresosSinCategoria}, pero por mes calendario y con cota inferior, más
+     * las salidas: para cada mes, {@code ingresos} (entradas sin categoría de cuentas que no son
+     * tarjeta) y {@code salidas} (montos negativos sin categoría, el gasto "Sin categoría"). Las
+     * dos sumas comparten la cláusula de {@link #ingresosSinCategoria}: sin categoría, sin
+     * subtransacciones y fuera de una transferencia con par en el presupuesto (ambas patas).
+     * Mantener en sincronía con {@link #ingresosSinCategoria}; un test compara las dos.
+     */
+    @Query("""
+            select extract(year from t.fecha) as anio,
+                   extract(month from t.fecha) as mes,
+                   sum(case when t.monto > 0
+                             and t.cuenta.tipo <> com.presupuesto.cuenta.entity
+                                 .TipoCuenta.TARJETA_CREDITO
+                            then t.monto else 0L end) as ingresos,
+                   sum(case when t.monto < 0 then t.monto else 0L end) as salidas
+            from Transaccion t
+            where t.cuenta.presupuesto.id = :presupuestoId
+              and t.cuenta.enPresupuesto = true
+              and t.categoria is null
+              and not exists (select 1 from SubTransaccion s where s.transaccion = t)
+              and not exists (select 1 from Transaccion p
+                              where p = t.transaccionPar and p.cuenta.enPresupuesto = true)
+              and t.fecha between :desde and :hasta
+            group by extract(year from t.fecha), extract(month from t.fecha)
+            """)
+    List<SinCategoriaPorMes> sinCategoriaPorMes(
+            @Param("presupuestoId") Long presupuestoId,
+            @Param("desde") LocalDate desde,
+            @Param("hasta") LocalDate hasta);
+
+    /**
+     * Suma por mes de las partes de transacciones divididas sin categoría y con monto negativo
+     * (gasto "Sin categoría") de cuentas del presupuesto, por la fecha de su transacción.
+     */
+    @Query("""
+            select extract(year from t.fecha) as anio,
+                   extract(month from t.fecha) as mes,
+                   sum(s.monto) as total
+            from SubTransaccion s join s.transaccion t
+            where t.cuenta.presupuesto.id = :presupuestoId
+              and t.cuenta.enPresupuesto = true
+              and s.categoria is null
+              and s.monto < 0
+              and t.fecha between :desde and :hasta
+            group by extract(year from t.fecha), extract(month from t.fecha)
+            """)
+    List<TotalPorMes> salidasDivididasSinCategoria(
+            @Param("presupuestoId") Long presupuestoId,
+            @Param("desde") LocalDate desde,
+            @Param("hasta") LocalDate hasta);
+
     /** Saldos iniciales positivos de las cuentas del presupuesto que no son tarjeta de crédito. */
     @Query("""
             select coalesce(sum(c.saldoInicial), 0L)
@@ -140,6 +192,26 @@ public interface ActividadMensualRepository extends Repository<Transaccion, Long
             """)
     List<SumaTarjetaPorMes> pagosATarjeta(
             @Param("presupuestoId") Long presupuestoId, @Param("hasta") LocalDate hasta);
+
+    interface SinCategoriaPorMes {
+
+        Integer getAnio();
+
+        Integer getMes();
+
+        Long getIngresos();
+
+        Long getSalidas();
+    }
+
+    interface TotalPorMes {
+
+        Integer getAnio();
+
+        Integer getMes();
+
+        Long getTotal();
+    }
 
     interface SumaTarjetaPorMes {
 

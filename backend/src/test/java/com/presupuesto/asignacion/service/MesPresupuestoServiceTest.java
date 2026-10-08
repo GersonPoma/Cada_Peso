@@ -84,6 +84,22 @@ class MesPresupuestoServiceTest {
     }
 
     @Test
+    void calcularFilasDelegaEnLaCalculadoraSinValidarElPresupuesto() {
+        YearMonth febrero = YearMonth.of(2026, 2);
+        Map<YearMonth, Map<Long, FilaMes>> filas = Map.of(
+                ENERO, Map.of(10L, new FilaMes(1_000L, -300L, 700L)),
+                febrero, Map.of());
+        when(calculadora.calcularFilas(PRESUPUESTO_ID, ENERO, febrero)).thenReturn(filas);
+
+        Map<YearMonth, Map<Long, FilaMes>> resultado =
+                service.calcularFilas(PRESUPUESTO_ID, ENERO, febrero);
+
+        assertThat(resultado).isSameAs(filas);
+        verify(calculadora).calcularFilas(PRESUPUESTO_ID, ENERO, febrero);
+        verify(presupuestoService, never()).obtenerDelUsuario(any(), any());
+    }
+
+    @Test
     void armaLosGruposYCategoriasEnOrdenConSusCifrasYTotales() {
         MesPresupuestoResponse mes = service.obtener(PRESUPUESTO_ID, USUARIO_ID, "2026-01", false);
 

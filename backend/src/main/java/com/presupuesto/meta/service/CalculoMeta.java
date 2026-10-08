@@ -16,14 +16,15 @@ import java.time.YearMonth;
  * faltante = max(0, necesidad - asignado); pospuesta: necesidad = faltante = 0
  * </pre>
  */
-final class CalculoMeta {
+public final class CalculoMeta {
 
     /** Resultado del cálculo de una meta en un mes. */
-    record Resultado(long necesidad, long faltante, EstadoMeta estado) {}
+    public record Resultado(long necesidad, long faltante, EstadoMeta estado) {}
 
     private CalculoMeta() {}
 
-    static Resultado calcular(Meta meta, YearMonth mes, FilaMes fila, boolean pospuesta) {
+    public static Resultado calcular(
+            Meta meta, YearMonth mes, FilaMes fila, boolean pospuesta) {
         long necesidad = pospuesta ? 0L : necesidad(meta, mes, fila);
         long faltante = Math.max(0L, necesidad - fila.asignado());
         return new Resultado(necesidad, faltante, estado(fila, pospuesta, faltante));
