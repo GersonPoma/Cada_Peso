@@ -134,6 +134,73 @@ class CalculoMensualTest {
         assertThat(enero.listoParaAsignar()).isEqualTo(40_000L);
     }
 
+    private static final long PAGO_VISA = 100L;
+    private static final long VISA = 10L;
+
+    @Test
+    void conTarjetaElSobregastoSeTrataComoElNormalYLaReservaEsCompleta() {
+        Map<Long, Map<YearMonth, Long>> asignado = datos(COMIDA, ENERO, 30_000L);
+        Map<Long, Map<YearMonth, Long>> actividad = datos(COMIDA, ENERO, -40_000L);
+        agregarTarjeta(actividad, datos(VISA, ENERO, -40_000L));
+        long ingresos = 100_000L;
+
+        ResultadoMes enero = CalculoMensual.calcular(ENERO, asignado, actividad, ingresos);
+        ResultadoMes febrero = CalculoMensual.calcular(FEBRERO, asignado, actividad, ingresos);
+
+        assertThat(enero.fila(COMIDA).disponible()).isEqualTo(-10_000L);
+        assertThat(enero.fila(PAGO_VISA)).isEqualTo(new FilaMes(0L, 40_000L, 40_000L));
+        assertThat(enero.listoParaAsignar()).isEqualTo(70_000L);
+        assertThat(febrero.fila(COMIDA).disponible()).isEqualTo(0L);
+        assertThat(febrero.fila(PAGO_VISA).disponible()).isEqualTo(40_000L);
+        assertThat(febrero.listoParaAsignar()).isEqualTo(60_000L);
+        // invariante: efectivo (100000, el gasto fue con tarjeta) = listo + suma de disponibles
+        assertThat(invariante(enero)).isEqualTo(100_000L);
+        assertThat(invariante(febrero)).isEqualTo(100_000L);
+    }
+
+    @Test
+    void pagarLaTarjetaBajaLaReservaYElEfectivoPorIgual() {
+        Map<Long, Map<YearMonth, Long>> asignado = datos(COMIDA, ENERO, 30_000L);
+        Map<Long, Map<YearMonth, Long>> actividad = datos(COMIDA, ENERO, -40_000L);
+        Map<Long, Map<YearMonth, Long>> enLaTarjeta = datos(VISA, ENERO, -40_000L);
+        agregar(enLaTarjeta, VISA, FEBRERO, 40_000L);
+        agregarTarjeta(actividad, enLaTarjeta);
+
+        ResultadoMes febrero = CalculoMensual.calcular(FEBRERO, asignado, actividad, 100_000L);
+
+        assertThat(febrero.fila(PAGO_VISA)).isEqualTo(new FilaMes(0L, -40_000L, 0L));
+        assertThat(febrero.listoParaAsignar()).isEqualTo(60_000L);
+        // efectivo 100000 - 40000 pagados = 60000 = listo + suma de disponibles (0)
+        assertThat(invariante(febrero)).isEqualTo(60_000L);
+    }
+
+    @Test
+    void unReembolsoConTarjetaDevuelveLaReservaYElDisponibleNormal() {
+        Map<Long, Map<YearMonth, Long>> asignado = datos(COMIDA, ENERO, 50_000L);
+        Map<Long, Map<YearMonth, Long>> actividad = datos(COMIDA, ENERO, -40_000L + 5_000L);
+        agregarTarjeta(actividad, datos(VISA, ENERO, -40_000L + 5_000L));
+
+        ResultadoMes enero = CalculoMensual.calcular(ENERO, asignado, actividad, 100_000L);
+
+        assertThat(enero.fila(COMIDA).disponible()).isEqualTo(15_000L);
+        assertThat(enero.fila(PAGO_VISA).disponible()).isEqualTo(35_000L);
+        assertThat(invariante(enero)).isEqualTo(100_000L);
+    }
+
+    private static void agregarTarjeta(
+            Map<Long, Map<YearMonth, Long>> actividad, Map<Long, Map<YearMonth, Long>> sumas) {
+        CalculoPagoTarjeta.actividadPorCategoria(sumas, Map.of(VISA, PAGO_VISA))
+                .forEach((categoria, porMes) -> porMes.forEach(
+                        (mes, valor) -> actividad.computeIfAbsent(categoria, c -> new HashMap<>())
+                                .merge(mes, valor, Long::sum)));
+    }
+
+    /** listoParaAsignar + suma de los disponibles: debe ser el efectivo fuera de tarjetas. */
+    private static long invariante(ResultadoMes resultado) {
+        return resultado.listoParaAsignar()
+                + resultado.filas().values().stream().mapToLong(FilaMes::disponible).sum();
+    }
+
     private static Map<Long, Map<YearMonth, Long>> datos(
             long categoria, YearMonth mes, long valor) {
         Map<Long, Map<YearMonth, Long>> mapa = new HashMap<>();

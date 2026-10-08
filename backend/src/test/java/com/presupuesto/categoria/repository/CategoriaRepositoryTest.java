@@ -5,6 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.presupuesto.categoria.entity.Categoria;
 import com.presupuesto.categoria.entity.GrupoCategoria;
+import com.presupuesto.categoria.repository.CategoriaRepository.PagoDeTarjeta;
+import com.presupuesto.cuenta.entity.Cuenta;
+import com.presupuesto.cuenta.entity.TipoCuenta;
+import com.presupuesto.cuenta.repository.CuentaRepository;
 import com.presupuesto.presupuesto.entity.Presupuesto;
 import com.presupuesto.presupuesto.repository.PresupuestoRepository;
 import com.presupuesto.usuario.entity.Usuario;
@@ -26,6 +30,9 @@ class CategoriaRepositoryTest {
 
     @Autowired
     private GrupoCategoriaRepository grupoRepository;
+
+    @Autowired
+    private CuentaRepository cuentaRepository;
 
     @Autowired
     private PresupuestoRepository presupuestoRepository;
@@ -130,6 +137,90 @@ class CategoriaRepositoryTest {
         Categoria enComida = categoriaRepository.saveAndFlush(nueva(comida, "Otros", 0));
 
         assertThat(enComida.getId()).isNotNull();
+    }
+
+    @Test
+    void laRestriccionUnicaImpideDosCategoriasDePagoParaLaMismaTarjeta() {
+        Cuenta visa = tarjeta(casa, "Visa", true);
+        categoriaRepository.saveAndFlush(pago(vivienda, "Pago: Visa", 0, visa));
+
+        assertThrows(DataIntegrityViolationException.class,
+                () -> categoriaRepository.saveAndFlush(pago(comida, "Pago: Visa", 0, visa)));
+    }
+
+    @Test
+    void laCategoriaDePagoSeEncuentraPorSuTarjeta() {
+        Cuenta visa = tarjeta(casa, "Visa", true);
+        Categoria pago = categoriaRepository.saveAndFlush(pago(vivienda, "Pago: Visa", 0, visa));
+
+        assertThat(categoriaRepository.findByCuentaTarjetaId(visa.getId()))
+                .get().extracting(Categoria::getId).isEqualTo(pago.getId());
+        assertThat(categoriaRepository.findByCuentaTarjetaId(Long.MAX_VALUE)).isEmpty();
+    }
+
+    @Test
+    void pagosDeTarjetasDevuelveSoloLasDelPresupuesto() {
+        Cuenta visa = tarjeta(casa, "Visa", true);
+        Cuenta master = tarjeta(viajes, "Master", true);
+        Categoria pagoVisa =
+                categoriaRepository.save(pago(vivienda, "Pago: Visa", 0, visa));
+        categoriaRepository.save(pago(ajeno, "Pago: Master", 0, master));
+        categoriaRepository.saveAndFlush(nueva(vivienda, "Alquiler", 1));
+
+        List<PagoDeTarjeta> pagos = categoriaRepository.pagosDeTarjetas(casa.getId());
+
+        assertThat(pagos).hasSize(1);
+        assertThat(pagos.get(0).getCuentaId()).isEqualTo(visa.getId());
+        assertThat(pagos.get(0).getCategoriaId()).isEqualTo(pagoVisa.getId());
+        assertThat(categoriaRepository.pagosDeTarjetas(Long.MAX_VALUE)).isEmpty();
+    }
+
+    @Test
+    void lasTarjetasSinCategoriaSonSoloLasDelPresupuestoQueNoLaTienen() {
+        Cuenta conCategoria = tarjeta(casa, "Visa", true);
+        Cuenta sinCategoria = tarjeta(casa, "Master", true);
+        tarjeta(casa, "Seguimiento", false);
+        cuentaRepository.saveAndFlush(Cuenta.builder().presupuesto(casa).nombre("Banco")
+                .nombreNormalizado("banco").tipo(TipoCuenta.CORRIENTE).build());
+        Cuenta deViajes = tarjeta(viajes, "Visa", true);
+        categoriaRepository.saveAndFlush(pago(vivienda, "Pago: Visa", 0, conCategoria));
+
+        assertThat(categoriaRepository.tarjetasSinCategoria(casa.getId()))
+                .extracting(Cuenta::getId).containsExactly(sinCategoria.getId());
+        assertThat(categoriaRepository.tarjetasSinCategoria(viajes.getId()))
+                .extracting(Cuenta::getId).containsExactly(deViajes.getId());
+        assertThat(categoriaRepository.presupuestosConTarjetasSinCategoria())
+                .contains(casa.getId(), viajes.getId());
+    }
+
+    @Test
+    void sinTarjetasPendientesElPresupuestoNoApareceEnLaMigracion() {
+        Cuenta visa = tarjeta(casa, "Visa", true);
+        categoriaRepository.saveAndFlush(pago(vivienda, "Pago: Visa", 0, visa));
+
+        assertThat(categoriaRepository.presupuestosConTarjetasSinCategoria())
+                .doesNotContain(casa.getId());
+        assertThat(categoriaRepository.tarjetasSinCategoria(casa.getId())).isEmpty();
+    }
+
+    private Cuenta tarjeta(Presupuesto presupuesto, String nombre, boolean enPresupuesto) {
+        return cuentaRepository.saveAndFlush(Cuenta.builder()
+                .presupuesto(presupuesto)
+                .nombre(nombre)
+                .nombreNormalizado(Cuenta.normalizar(nombre))
+                .tipo(TipoCuenta.TARJETA_CREDITO)
+                .enPresupuesto(enPresupuesto)
+                .build());
+    }
+
+    private static Categoria pago(GrupoCategoria grupo, String nombre, int orden, Cuenta tarjeta) {
+        return Categoria.builder()
+                .grupo(grupo)
+                .nombre(nombre)
+                .nombreNormalizado(Categoria.normalizar(nombre))
+                .orden(orden)
+                .cuentaTarjeta(tarjeta)
+                .build();
     }
 
     private static Presupuesto nuevoPresupuesto(Usuario usuario, String nombre) {

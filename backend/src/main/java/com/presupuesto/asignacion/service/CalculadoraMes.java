@@ -2,9 +2,12 @@ package com.presupuesto.asignacion.service;
 
 import com.presupuesto.asignacion.repository.ActividadMensualRepository;
 import com.presupuesto.asignacion.repository.ActividadMensualRepository.ActividadPorMes;
+import com.presupuesto.asignacion.repository.ActividadMensualRepository.SumaTarjetaPorMes;
 import com.presupuesto.asignacion.repository.AsignacionMensualRepository;
 import com.presupuesto.asignacion.repository.AsignacionMensualRepository.AsignadoPorMes;
 import com.presupuesto.asignacion.service.CalculoMensual.ResultadoMes;
+import com.presupuesto.categoria.repository.CategoriaRepository;
+import com.presupuesto.categoria.repository.CategoriaRepository.PagoDeTarjeta;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.HashMap;
@@ -15,7 +18,9 @@ import org.springframework.stereotype.Component;
 
 /**
  * Arma las entradas del cálculo con consultas agregadas (asignaciones, actividad e ingresos del
- * presupuesto hasta el mes pedido) y delega las reglas en {@link CalculoMensual}.
+ * presupuesto hasta el mes pedido) y delega las reglas en {@link CalculoMensual}. La actividad de
+ * la categoría de pago de cada tarjeta sale de {@link CalculoPagoTarjeta} y se suma a la de las
+ * demás categorías, que no cambia.
  */
 @Component
 @RequiredArgsConstructor
@@ -23,6 +28,7 @@ class CalculadoraMes {
 
     private final AsignacionMensualRepository asignacionRepository;
     private final ActividadMensualRepository actividadRepository;
+    private final CategoriaRepository categoriaRepository;
 
     ResultadoMes calcular(Long presupuestoId, YearMonth mes) {
         LocalDate finDeMes = mes.atEndOfMonth();
@@ -35,9 +41,40 @@ class CalculadoraMes {
         Map<Long, Map<YearMonth, Long>> actividad = new HashMap<>();
         agregar(actividad, actividadRepository.actividadSimple(presupuestoId, finDeMes));
         agregar(actividad, actividadRepository.actividadDividida(presupuestoId, finDeMes));
+        agregarPagosDeTarjetas(actividad, presupuestoId, finDeMes);
         long ingresos = actividadRepository.ingresosSinCategoria(presupuestoId, finDeMes)
                 + actividadRepository.saldosInicialesPositivos(presupuestoId);
         return CalculoMensual.calcular(mes, asignado, actividad, ingresos);
+    }
+
+    /**
+     * Suma a la actividad la reserva de las categorías de pago: gastos con categoría de cada
+     * tarjeta y pagos recibidos. Sin tarjetas con categoría de pago no hace ninguna consulta.
+     */
+    private void agregarPagosDeTarjetas(
+            Map<Long, Map<YearMonth, Long>> actividad, Long presupuestoId, LocalDate finDeMes) {
+        Map<Long, Long> categoriaDePago = new HashMap<>();
+        for (PagoDeTarjeta pago : categoriaRepository.pagosDeTarjetas(presupuestoId)) {
+            categoriaDePago.put(pago.getCuentaId(), pago.getCategoriaId());
+        }
+        if (categoriaDePago.isEmpty()) {
+            return;
+        }
+        Map<Long, Map<YearMonth, Long>> sumas = new HashMap<>();
+        agregarTarjeta(sumas, actividadRepository.gastosTarjeta(presupuestoId, finDeMes));
+        agregarTarjeta(sumas, actividadRepository.gastosTarjetaDivididos(presupuestoId, finDeMes));
+        agregarTarjeta(sumas, actividadRepository.pagosATarjeta(presupuestoId, finDeMes));
+        CalculoPagoTarjeta.actividadPorCategoria(sumas, categoriaDePago)
+                .forEach((categoriaId, porMes) -> porMes.forEach(
+                        (mes, valor) -> acumular(actividad, categoriaId, mes, valor)));
+    }
+
+    private static void agregarTarjeta(
+            Map<Long, Map<YearMonth, Long>> destino, List<SumaTarjetaPorMes> filas) {
+        for (SumaTarjetaPorMes fila : filas) {
+            acumular(destino, fila.getCuentaId(), YearMonth.of(fila.getAnio(), fila.getMes()),
+                    fila.getTotal());
+        }
     }
 
     private static void agregar(

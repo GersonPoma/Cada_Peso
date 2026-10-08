@@ -2,6 +2,7 @@ package com.presupuesto.categoria.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.presupuesto.cuenta.entity.Cuenta;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Locale;
@@ -74,5 +75,17 @@ class CategoriaTest {
         assertThat(Arrays.stream(Categoria.class.getMethods()).map(Method::getName))
                 .doesNotContain("setNombre", "setNombreNormalizado", "setOrden", "setOculta",
                         "setNota", "setGrupo");
+    }
+
+    @Test
+    void esPagoTarjetaSoloSiApuntaAUnaCuentaYNoTieneSetter() {
+        Categoria normal = Categoria.builder().build();
+        Categoria pago = Categoria.builder().cuentaTarjeta(Cuenta.builder().build()).build();
+
+        assertThat(normal.esPagoTarjeta()).isFalse();
+        assertThat(normal.getCuentaTarjeta()).isNull();
+        assertThat(pago.esPagoTarjeta()).isTrue();
+        assertThat(Arrays.stream(Categoria.class.getMethods()).map(Method::getName))
+                .doesNotContain("setCuentaTarjeta");
     }
 }

@@ -45,6 +45,15 @@ class PresupuestoRepositoryTest {
     }
 
     @Test
+    void findByIdParaActualizarDevuelveElPresupuestoPorIdYNadaSiNoExiste() {
+        Presupuesto deAna = presupuestoRepository.saveAndFlush(nuevo(ana, "Casa"));
+
+        assertThat(presupuestoRepository.findByIdParaActualizar(deAna.getId()))
+                .get().extracting(Presupuesto::getNombre).isEqualTo("Casa");
+        assertThat(presupuestoRepository.findByIdParaActualizar(Long.MAX_VALUE)).isEmpty();
+    }
+
+    @Test
     void laListaEsDelUsuarioYEstaOrdenadaPorNombreSinDistinguirMayusculas() {
         presupuestoRepository.save(nuevo(ana, "Viajes"));
         presupuestoRepository.save(nuevo(ana, "casa"));

@@ -4,6 +4,8 @@ import com.presupuesto.comun.EntidadBase;
 import com.presupuesto.presupuesto.entity.Presupuesto;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -60,6 +62,17 @@ public class GrupoCategoria extends EntidadBase {
     @Builder.Default
     private boolean oculto = false;
 
+    /**
+     * Sin setter: se fija al crear. El {@code default} de la columna permite que
+     * {@code ddl-auto=update} la agregue a una tabla con filas existentes.
+     */
+    @Setter(AccessLevel.NONE)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20,
+            columnDefinition = "varchar(20) not null default 'NORMAL'")
+    @Builder.Default
+    private TipoGrupoCategoria tipo = TipoGrupoCategoria.NORMAL;
+
     /** Forma comparable de un nombre ya recortado ({@code Locale.ROOT}, sin depender de la JVM). */
     public static String normalizar(String nombre) {
         return nombre.toLowerCase(Locale.ROOT);
@@ -73,6 +86,10 @@ public class GrupoCategoria extends EntidadBase {
 
     public void asignarOrden(int nuevoOrden) {
         this.orden = nuevoOrden;
+    }
+
+    public boolean esPagosTarjeta() {
+        return tipo == TipoGrupoCategoria.PAGOS_TARJETA;
     }
 
     public void ocultar() {

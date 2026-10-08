@@ -163,7 +163,9 @@ validaciones que al crear, y SHALL responder `200`. `enPresupuesto` y `saldoInic
 ignorarse si llegan en la petición. Un nombre ya usado por otra cuenta del presupuesto SHALL
 responder `409` con `CUENTA_YA_EXISTE`; conservar el propio nombre, aunque cambie su
 capitalización, SHALL ser válido. Con `saldoInicial` negativo, un tipo que no lo admite SHALL
-responder `422` con `REGLA_NEGOCIO_VIOLADA`.
+responder `422` con `REGLA_NEGOCIO_VIOLADA`. Cambiar el tipo desde `TARJETA_CREDITO` hacia otro,
+o desde otro hacia `TARJETA_CREDITO`, SHALL responder `422` con `REGLA_NEGOCIO_VIOLADA` y no
+cambiar nada; conservar el tipo `TARJETA_CREDITO` al renombrar SHALL ser válido.
 
 #### Scenario: Cambiar nombre y tipo
 - **DADO** una cuenta `Banco` tipo `CORRIENTE`
@@ -193,7 +195,19 @@ responder `422` con `REGLA_NEGOCIO_VIOLADA`.
 #### Scenario: Cambio a un tipo que sí admite saldo negativo
 - **DADO** una cuenta `TARJETA_CREDITO` con `saldoInicial` negativo
 - **CUANDO** se edita cambiando el tipo a `PRESTAMO`
-- **ENTONCES** el sistema responde `200`
+- **ENTONCES** el sistema responde `422` con código `REGLA_NEGOCIO_VIOLADA` y la cuenta conserva
+  el tipo `TARJETA_CREDITO`
+
+#### Scenario: Cambiar una cuenta a tarjeta de crédito
+- **DADO** una cuenta `CORRIENTE`
+- **CUANDO** se edita cambiando el tipo a `TARJETA_CREDITO`
+- **ENTONCES** el sistema responde `422` con código `REGLA_NEGOCIO_VIOLADA` y la cuenta conserva
+  su tipo
+
+#### Scenario: Renombrar una tarjeta conservando el tipo
+- **DADO** una cuenta `Visa` tipo `TARJETA_CREDITO`
+- **CUANDO** se edita con nombre `Visa Oro` y tipo `TARJETA_CREDITO`
+- **ENTONCES** el sistema responde `200` con el nuevo nombre
 
 #### Scenario: Datos inválidos al editar
 - **DADO** una cuenta del presupuesto

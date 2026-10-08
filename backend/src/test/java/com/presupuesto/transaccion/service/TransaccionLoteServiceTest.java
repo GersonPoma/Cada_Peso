@@ -281,4 +281,19 @@ class TransaccionLoteServiceTest {
         assertThat(respuesta.afectadas()).isEqualTo(1);
         assertThat(pata.isAprobada()).isTrue();
     }
+
+    @Test
+    void categorizarConUnaCategoriaDePagoDa422YNoCambiaNingunaTransaccion() {
+        Categoria pago = Categoria.builder().id(60L)
+                .cuentaTarjeta(Cuenta.builder().id(44L).build()).build();
+        when(categoriaRepository.findByIdAndGrupoPresupuestoId(60L, PRESUPUESTO_ID))
+                .thenReturn(Optional.of(pago));
+
+        assertThrows(ReglaNegocioException.class,
+                () -> ejecutar(OperacionLote.CATEGORIZAR, 60L, 1L, 2L));
+
+        assertThat(a.getCategoria()).isNull();
+        assertThat(b.getCategoria()).isNull();
+        verify(transaccionRepository, never()).saveAllAndFlush(any());
+    }
 }

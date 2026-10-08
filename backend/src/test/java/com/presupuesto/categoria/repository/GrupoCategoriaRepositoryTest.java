@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.presupuesto.categoria.entity.GrupoCategoria;
+import com.presupuesto.categoria.entity.TipoGrupoCategoria;
 import com.presupuesto.presupuesto.entity.Presupuesto;
 import com.presupuesto.presupuesto.repository.PresupuestoRepository;
 import com.presupuesto.usuario.entity.Usuario;
@@ -117,6 +118,33 @@ class GrupoCategoriaRepositoryTest {
         GrupoCategoria enViajes = grupoRepository.saveAndFlush(nuevo(viajes, "Vivienda", 0));
 
         assertThat(enViajes.getId()).isNotNull();
+    }
+
+    @Test
+    void elGrupoDePagosSeLocalizaPorTipoYNoPorNombre() {
+        grupoRepository.saveAndFlush(nuevo(casa, "Pagos de tarjetas de crédito", 0));
+        GrupoCategoria pagos = grupoRepository.saveAndFlush(GrupoCategoria.builder()
+                .presupuesto(casa)
+                .nombre("Pagos de tarjetas de crédito (2)")
+                .nombreNormalizado(GrupoCategoria.normalizar("Pagos de tarjetas de crédito (2)"))
+                .orden(1)
+                .tipo(TipoGrupoCategoria.PAGOS_TARJETA)
+                .build());
+
+        assertThat(grupoRepository.findFirstByPresupuestoIdAndTipo(
+                casa.getId(), TipoGrupoCategoria.PAGOS_TARJETA))
+                .get().extracting(GrupoCategoria::getId).isEqualTo(pagos.getId());
+        assertThat(grupoRepository.findFirstByPresupuestoIdAndTipo(
+                viajes.getId(), TipoGrupoCategoria.PAGOS_TARJETA)).isEmpty();
+    }
+
+    @Test
+    void unGrupoNuevoEsNormalPorDefecto() {
+        GrupoCategoria grupo = grupoRepository.saveAndFlush(nuevo(casa, "Vivienda", 0));
+
+        assertThat(grupo.getTipo()).isEqualTo(TipoGrupoCategoria.NORMAL);
+        assertThat(grupoRepository.findFirstByPresupuestoIdAndTipo(
+                casa.getId(), TipoGrupoCategoria.NORMAL)).isPresent();
     }
 
     private static Presupuesto nuevoPresupuesto(Usuario usuario, String nombre) {

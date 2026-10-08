@@ -54,7 +54,7 @@ public class TransaccionLoteService {
             if (request.categoriaId() == null) {
                 throw new DatosInvalidosException(MENSAJE_CATEGORIA_OBLIGATORIA);
             }
-            categoria = referencias.categoria(request.categoriaId(), presupuestoId);
+            categoria = referencias.categoriaParaRegistrar(request.categoriaId(), presupuestoId);
         }
         validar(operacion, transacciones);
         switch (operacion) {

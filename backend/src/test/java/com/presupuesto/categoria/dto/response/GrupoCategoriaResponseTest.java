@@ -3,6 +3,7 @@ package com.presupuesto.categoria.dto.response;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.presupuesto.categoria.entity.GrupoCategoria;
+import com.presupuesto.categoria.entity.TipoGrupoCategoria;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 
@@ -29,5 +30,17 @@ class GrupoCategoriaResponseTest {
         assertThat(response.oculto()).isTrue();
         assertThat(response.fechaCreacion()).isEqualTo(creada);
         assertThat(response.fechaActualizacion()).isEqualTo(actualizada);
+    }
+
+    @Test
+    void desdeIncluyeElTipoDelGrupo() {
+        GrupoCategoria normal = GrupoCategoria.builder().id(1L).nombre("Vivienda").build();
+        GrupoCategoria pagos = GrupoCategoria.builder()
+                .id(2L).nombre("Pagos").tipo(TipoGrupoCategoria.PAGOS_TARJETA).build();
+
+        assertThat(GrupoCategoriaResponse.desde(normal).tipo())
+                .isEqualTo(TipoGrupoCategoria.NORMAL);
+        assertThat(GrupoCategoriaResponse.desde(pagos).tipo())
+                .isEqualTo(TipoGrupoCategoria.PAGOS_TARJETA);
     }
 }

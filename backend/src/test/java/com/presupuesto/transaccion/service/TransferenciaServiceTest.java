@@ -394,4 +394,39 @@ class TransferenciaServiceTest {
         assertThat(patas[0].getTransaccionPar()).isSameAs(patas[1]);
         verify(transaccionRepository, never()).deleteAll(any());
     }
+
+    // ---------- categoría de pago de tarjeta ----------
+
+    private static final long PAGO_ID = 60L;
+
+    private void hayCategoriaDePago() {
+        Categoria pago = Categoria.builder().id(PAGO_ID)
+                .cuentaTarjeta(Cuenta.builder().id(44L).build()).build();
+        when(categoriaRepository.findByIdAndGrupoPresupuestoId(PAGO_ID, PRESUPUESTO_ID))
+                .thenReturn(Optional.of(pago));
+    }
+
+    @Test
+    void crearConUnaCategoriaDePagoDa422YNoGuardaNada() {
+        hayCategoriaDePago();
+
+        NegocioException error = assertThrows(ReglaNegocioException.class,
+                () -> crear(BANCO_ID, EXTERNA_ID, PAGO_ID));
+
+        assertThat(error.getCodigo()).isEqualTo(CodigoError.REGLA_NEGOCIO_VIOLADA);
+        verify(transaccionRepository, never()).saveAllAndFlush(any());
+    }
+
+    @Test
+    void actualizarConUnaCategoriaDePagoDa422YNoCambiaLasPatas() {
+        hayCategoriaDePago();
+        Transaccion[] patas = existente(banco, externa);
+
+        assertThrows(ReglaNegocioException.class,
+                () -> service.actualizar(PRESUPUESTO_ID, USUARIO_ID, 1L, edicion(PAGO_ID)));
+
+        assertThat(patas[0].getMonto()).isEqualTo(-30000L);
+        assertThat(patas[0].getCategoria()).isNull();
+        verify(transaccionRepository, never()).saveAllAndFlush(any());
+    }
 }

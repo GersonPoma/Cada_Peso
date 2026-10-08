@@ -12,11 +12,13 @@ import com.presupuesto.categoria.dto.request.CrearGrupoCategoriaRequest;
 import com.presupuesto.categoria.dto.request.MoverGrupoCategoriaRequest;
 import com.presupuesto.categoria.dto.response.GrupoCategoriaResponse;
 import com.presupuesto.categoria.entity.GrupoCategoria;
+import com.presupuesto.categoria.entity.TipoGrupoCategoria;
 import com.presupuesto.categoria.repository.GrupoCategoriaRepository;
 import com.presupuesto.comun.excepcion.CodigoError;
 import com.presupuesto.comun.excepcion.ConflictoException;
 import com.presupuesto.comun.excepcion.DatosInvalidosException;
 import com.presupuesto.comun.excepcion.RecursoNoEncontradoException;
+import com.presupuesto.comun.excepcion.ReglaNegocioException;
 import com.presupuesto.presupuesto.entity.Presupuesto;
 import com.presupuesto.presupuesto.service.PresupuestoService;
 import java.util.List;
@@ -261,5 +263,45 @@ class GrupoCategoriaServiceTest {
                 () -> service.mostrar(PRESUPUESTO_ID, USUARIO_ID, 77L));
         assertThrows(RecursoNoEncontradoException.class, () -> service.mover(
                 PRESUPUESTO_ID, USUARIO_ID, 77L, new MoverGrupoCategoriaRequest(0)));
+    }
+
+    // ---------- grupo de pagos de tarjetas ----------
+
+    @Test
+    void elGrupoDePagosNoSeRenombraOcultaMuestraNiMueveYNoSeGuardaNada() {
+        GrupoCategoria pagos = GrupoCategoria.builder()
+                .id(9L).presupuesto(presupuesto).nombre("Pagos").nombreNormalizado("pagos")
+                .orden(0).tipo(TipoGrupoCategoria.PAGOS_TARJETA).build();
+        when(grupoRepository.findByIdAndPresupuestoId(9L, PRESUPUESTO_ID))
+                .thenReturn(Optional.of(pagos));
+
+        assertThrows(ReglaNegocioException.class, () -> service.renombrar(
+                PRESUPUESTO_ID, USUARIO_ID, 9L, new ActualizarGrupoCategoriaRequest("Otro")));
+        assertThrows(ReglaNegocioException.class,
+                () -> service.ocultar(PRESUPUESTO_ID, USUARIO_ID, 9L));
+        assertThrows(ReglaNegocioException.class,
+                () -> service.mostrar(PRESUPUESTO_ID, USUARIO_ID, 9L));
+        assertThrows(ReglaNegocioException.class, () -> service.mover(
+                PRESUPUESTO_ID, USUARIO_ID, 9L, new MoverGrupoCategoriaRequest(0)));
+
+        assertThat(pagos.getNombre()).isEqualTo("Pagos");
+        assertThat(pagos.isOculto()).isFalse();
+        verify(grupoRepository, never()).saveAndFlush(any());
+        verify(grupoRepository, never()).saveAllAndFlush(any());
+    }
+
+    @Test
+    void moverUnGrupoNormalSigueFuncionandoConElGrupoDePagosEnLaLista() {
+        GrupoCategoria a = grupo(1L, "A", 0);
+        GrupoCategoria pagos = GrupoCategoria.builder()
+                .id(9L).presupuesto(presupuesto).nombre("Pagos").nombreNormalizado("pagos")
+                .orden(1).tipo(TipoGrupoCategoria.PAGOS_TARJETA).build();
+        when(grupoRepository.findByPresupuestoIdOrderByOrden(PRESUPUESTO_ID))
+                .thenReturn(List.of(a, pagos));
+
+        service.mover(PRESUPUESTO_ID, USUARIO_ID, 1L, new MoverGrupoCategoriaRequest(1));
+
+        assertThat(a.getOrden()).isEqualTo(1);
+        assertThat(pagos.getOrden()).isZero();
     }
 }

@@ -47,7 +47,8 @@ public class TransferenciaService {
         }
         Cuenta origen = referencias.cuenta(request.cuentaOrigenId(), presupuestoId);
         Cuenta destino = referencias.cuenta(request.cuentaDestinoId(), presupuestoId);
-        Categoria categoria = referencias.categoria(request.categoriaId(), presupuestoId);
+        Categoria categoria =
+                referencias.categoriaParaRegistrar(request.categoriaId(), presupuestoId);
         referencias.exigirAbierta(origen);
         referencias.exigirAbierta(destino);
         exigirReglaDeCategoria(origen, destino, categoria);
@@ -74,7 +75,8 @@ public class TransferenciaService {
         Transaccion[] patas = buscar(presupuestoId, usuarioId, id);
         Transaccion salida = patas[0];
         Transaccion entrada = patas[1];
-        Categoria categoria = referencias.categoria(request.categoriaId(), presupuestoId);
+        Categoria categoria =
+                referencias.categoriaParaRegistrar(request.categoriaId(), presupuestoId);
         exigirNoReconciliadas(salida, entrada);
         referencias.exigirAbierta(salida.getCuenta());
         referencias.exigirAbierta(entrada.getCuenta());

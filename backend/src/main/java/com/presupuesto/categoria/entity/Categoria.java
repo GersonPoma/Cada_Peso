@@ -1,11 +1,13 @@
 package com.presupuesto.categoria.entity;
 
 import com.presupuesto.comun.EntidadBase;
+import com.presupuesto.cuenta.entity.Cuenta;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.util.Locale;
@@ -66,6 +68,15 @@ public class Categoria extends EntidadBase {
     @Column(length = 500)
     private String nota;
 
+    /**
+     * Tarjeta de crédito cuya reserva de pago es esta categoría, o {@code null} en las demás. Sin
+     * setter: se fija al crear y es única (una tarjeta, una categoría de pago).
+     */
+    @Setter(AccessLevel.NONE)
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cuenta_tarjeta_id", unique = true)
+    private Cuenta cuentaTarjeta;
+
     /** Forma comparable de un nombre ya recortado ({@code Locale.ROOT}, sin depender de la JVM). */
     public static String normalizar(String nombre) {
         return nombre.toLowerCase(Locale.ROOT);
@@ -88,6 +99,10 @@ public class Categoria extends EntidadBase {
 
     public void moverAGrupo(GrupoCategoria nuevoGrupo) {
         this.grupo = nuevoGrupo;
+    }
+
+    public boolean esPagoTarjeta() {
+        return cuentaTarjeta != null;
     }
 
     public void ocultar() {

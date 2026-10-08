@@ -12,6 +12,7 @@ import static com.presupuesto.meta.controller.ApoyoHttpMeta.saldoObjetivo;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -444,5 +445,83 @@ class MetaIntegracionTest {
         http.consultar(ana, rutaMetas(ana.presupuestoId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    // ---------- categoría de pago de tarjeta ----------
+
+    @Test
+    void laCategoriaDePagoDeUnaTarjetaAdmiteMetaYLaMideConLoAsignadoDelMes() throws Exception {
+        Sesion ana = http.registrar("ana-meta-tarjeta@ejemplo.com");
+        long p = ana.presupuestoId();
+        long banco = http.crearCuenta(ana, p, 200_000L);
+        long comida = http.crearCategoria(ana, p, "Comida");
+        Map<String, Object> tarjeta = new LinkedHashMap<>();
+        tarjeta.put("nombre", "Visa");
+        tarjeta.put("tipo", "TARJETA_CREDITO");
+        long visa = http.idDe(http.enviar(post(ApoyoHttpMeta.RUTA_PRESUPUESTOS + "/" + p
+                + "/cuentas"), ana, tarjeta));
+        long pago = categoriaDePago(ana, p, "Pago: Visa");
+        http.asignar(ana, p, "2026-10", comida, 40_000L);
+        http.crearTransaccion(ana, p, visa, "2026-10-10", -40_000L, comida);
+
+        // Guardar y consultar la meta de la categoría de pago.
+        guardar(ana, p, pago, metaMensual(50_000L)).andExpect(status().isOk());
+        http.consultar(ana, rutaMeta(p, pago))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tipo").value("MONTO_MENSUAL"))
+                .andExpect(jsonPath("$.monto").value(50_000));
+
+        // La meta mide lo asignado en el mes (0): la reserva automática no cuenta, igual que la
+        // actividad del mes no entra en el inicial de las categorías normales.
+        JsonNode estado = elementoDeMetas(ana, "2026-10", pago);
+        assertThat(estado.get("asignado").asLong()).isEqualTo(0);
+        assertThat(estado.get("disponible").asLong()).isEqualTo(40_000);
+        assertThat(estado.get("necesidad").asLong()).isEqualTo(50_000);
+        assertThat(estado.get("faltante").asLong()).isEqualTo(50_000);
+        assertThat(estado.get("estado").asString()).isEqualTo("FALTA");
+        assertThat(banco).isNotEqualTo(visa);
+
+        // Posponer y reanudar solo afectan a ese mes.
+        http.accion(ana, rutaMes(p, "2026-10") + "/metas/" + pago + "/posponer")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("POSPUESTA"));
+        assertThat(elementoDeMetas(ana, "2026-11", pago).get("estado").asString())
+                .isEqualTo("FALTA");
+        http.accion(ana, rutaMes(p, "2026-10") + "/metas/" + pago + "/reanudar")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("FALTA"));
+
+        // Borrar la meta.
+        http.borrar(ana, rutaMeta(p, pago)).andExpect(status().is2xxSuccessful());
+        esperarNoEncontrado(http.consultar(ana, rutaMeta(p, pago)));
+    }
+
+    private JsonNode elementoDeMetas(Sesion sesion, String mes, long categoriaId)
+            throws Exception {
+        JsonNode cuerpo = http.cuerpo(http.consultar(sesion,
+                rutaMes(sesion.presupuestoId(), mes) + "/metas", "incluirOcultas", "true")
+                .andExpect(status().isOk()));
+        for (JsonNode meta : cuerpo.get("metas")) {
+            if (meta.get("categoriaId").asLong() == categoriaId) {
+                return meta;
+            }
+        }
+        throw new AssertionError("La categoría " + categoriaId + " no tiene meta en " + mes);
+    }
+
+    private long categoriaDePago(Sesion sesion, long presupuestoId, String nombre)
+            throws Exception {
+        JsonNode arbol = http.cuerpo(http.consultar(sesion,
+                ApoyoHttpMeta.RUTA_PRESUPUESTOS + "/" + presupuestoId + "/categorias",
+                "incluirOcultas", "true").andExpect(status().isOk()));
+        for (JsonNode grupo : arbol) {
+            for (JsonNode categoria : grupo.get("categorias")) {
+                if (categoria.get("esPagoTarjeta").asBoolean()
+                        && categoria.get("nombre").asString().equals(nombre)) {
+                    return categoria.get("id").asLong();
+                }
+            }
+        }
+        throw new AssertionError("No hay categoría de pago " + nombre);
     }
 }

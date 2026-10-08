@@ -197,4 +197,44 @@ class TransaccionReferenciasTest {
         referencias.exigirNoEsTransferencia(
                 com.presupuesto.transaccion.entity.Transaccion.builder().build());
     }
+
+    // ---------- categoría de pago de tarjeta ----------
+
+    private Categoria pagoDeTarjeta() {
+        Categoria pago = Categoria.builder().id(3L)
+                .cuentaTarjeta(Cuenta.builder().id(44L).build()).build();
+        when(categoriaRepository.findByIdAndGrupoPresupuestoId(3L, PRESUPUESTO_ID))
+                .thenReturn(Optional.of(pago));
+        return pago;
+    }
+
+    @Test
+    void categoriaParaRegistrarAceptaNulaNormalYOcultaYRechazaLaDePagoCon422() {
+        Categoria pago = pagoDeTarjeta();
+
+        assertThat(referencias.categoriaParaRegistrar(null, PRESUPUESTO_ID)).isNull();
+        assertThat(referencias.categoriaParaRegistrar(1L, PRESUPUESTO_ID)).isSameAs(comida);
+        assertThat(referencias.categoriaParaRegistrar(2L, PRESUPUESTO_ID)).isSameAs(oculta);
+        ReglaNegocioException error = assertThrows(ReglaNegocioException.class,
+                () -> referencias.categoriaParaRegistrar(3L, PRESUPUESTO_ID));
+        assertThat(error.getCodigo()).isEqualTo(CodigoError.REGLA_NEGOCIO_VIOLADA);
+        assertThat(error.getMessage()).isEqualTo(TransaccionReferencias.MENSAJE_CATEGORIA_DE_PAGO);
+        assertThat(referencias.categoria(3L, PRESUPUESTO_ID)).isSameAs(pago);
+    }
+
+    @Test
+    void categoriaParaRegistrarSigueDando404ParaUnaAjena() {
+        assertThrows(RecursoNoEncontradoException.class,
+                () -> referencias.categoriaParaRegistrar(99L, PRESUPUESTO_ID));
+    }
+
+    @Test
+    void dividirRechazaLaCategoriaDePagoEnLaTransaccionYEnCualquierParte() {
+        pagoDeTarjeta();
+
+        assertThrows(ReglaNegocioException.class,
+                () -> referencias.dividir(PRESUPUESTO_ID, 3L, -1000L, List.of()));
+        assertThrows(ReglaNegocioException.class, () -> referencias.dividir(
+                PRESUPUESTO_ID, null, -2500L, List.of(parte(1L, -1000L), parte(3L, -1500L))));
+    }
 }

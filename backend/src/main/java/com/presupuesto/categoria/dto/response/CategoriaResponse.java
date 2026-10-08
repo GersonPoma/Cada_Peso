@@ -10,6 +10,8 @@ public record CategoriaResponse(
         int orden,
         boolean oculta,
         String nota,
+        boolean esPagoTarjeta,
+        Long cuentaId,
         Instant fechaCreacion,
         Instant fechaActualizacion) {
 
@@ -21,6 +23,8 @@ public record CategoriaResponse(
                 categoria.getOrden(),
                 categoria.isOculta(),
                 categoria.getNota(),
+                categoria.esPagoTarjeta(),
+                categoria.esPagoTarjeta() ? categoria.getCuentaTarjeta().getId() : null,
                 categoria.getFechaCreacion(),
                 categoria.getFechaActualizacion());
     }

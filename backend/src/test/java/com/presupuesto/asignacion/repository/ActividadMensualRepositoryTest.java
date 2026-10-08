@@ -3,6 +3,7 @@ package com.presupuesto.asignacion.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.presupuesto.asignacion.repository.ActividadMensualRepository.ActividadPorMes;
+import com.presupuesto.asignacion.repository.ActividadMensualRepository.SumaTarjetaPorMes;
 import com.presupuesto.categoria.entity.Categoria;
 import com.presupuesto.categoria.entity.GrupoCategoria;
 import com.presupuesto.categoria.repository.CategoriaRepository;
@@ -223,6 +224,139 @@ class ActividadMensualRepositoryTest {
         assertThat(repository.saldosInicialesPositivos(casa.getId())).isZero();
         assertThat(repository.actividadSimple(casa.getId(), FIN_ANIO)).isEmpty();
         assertThat(repository.actividadDividida(casa.getId(), FIN_ANIO)).isEmpty();
+    }
+
+    @Test
+    void gastosTarjetaSumaPorTarjetaYMesSoloLosQueTienenCategoria() {
+        Cuenta visa = tarjeta(casa, "Visa", true);
+        Cuenta master = tarjeta(casa, "Master", true);
+        guardar(visa, "2026-01-05", -30_000L, comida);
+        guardar(visa, "2026-01-20", -5_000L, ocio);
+        guardar(visa, "2026-02-01", -7_000L, comida);
+        guardar(visa, "2026-01-06", -9_000L, null);
+        guardar(master, "2026-01-07", -2_000L, comida);
+        guardar(banco, "2026-01-08", -50_000L, comida);
+
+        List<SumaTarjetaPorMes> filas = repository.gastosTarjeta(casa.getId(), FIN_ANIO);
+
+        assertThat(suma(filas, visa, 2026, 1)).isEqualTo(-35_000L);
+        assertThat(suma(filas, visa, 2026, 2)).isEqualTo(-7_000L);
+        assertThat(suma(filas, master, 2026, 1)).isEqualTo(-2_000L);
+        assertThat(filas).hasSize(3);
+    }
+
+    @Test
+    void gastosTarjetaIncluyeLaTarjetaCerradaPeroNoLaDeSeguimientoNiOtroPresupuesto() {
+        Cuenta cerradaTarjeta = tarjeta(casa, "Vieja", true);
+        cerradaTarjeta.cerrar();
+        Cuenta seguimiento = tarjeta(casa, "Externa", false);
+        Cuenta deViajes = tarjeta(viajes, "Visa", true);
+        Categoria hotel = categoria(viajes, "Hotel");
+        guardar(cerradaTarjeta, "2026-01-05", -4_000L, comida);
+        guardar(seguimiento, "2026-01-05", -6_000L, comida);
+        guardar(deViajes, "2026-01-05", -8_000L, hotel);
+
+        List<SumaTarjetaPorMes> casaFilas = repository.gastosTarjeta(casa.getId(), FIN_ANIO);
+        List<SumaTarjetaPorMes> viajesFilas = repository.gastosTarjeta(viajes.getId(), FIN_ANIO);
+
+        assertThat(casaFilas).hasSize(1);
+        assertThat(suma(casaFilas, cerradaTarjeta, 2026, 1)).isEqualTo(-4_000L);
+        assertThat(viajesFilas).hasSize(1);
+        assertThat(suma(viajesFilas, deViajes, 2026, 1)).isEqualTo(-8_000L);
+    }
+
+    @Test
+    void gastosTarjetaRespetaElTopeDeFecha() {
+        Cuenta visa = tarjeta(casa, "Visa", true);
+        guardar(visa, "2026-01-05", -1_000L, comida);
+        guardar(visa, "2026-03-05", -2_000L, comida);
+
+        List<SumaTarjetaPorMes> filas =
+                repository.gastosTarjeta(casa.getId(), LocalDate.of(2026, 2, 28));
+
+        assertThat(filas).hasSize(1);
+        assertThat(suma(filas, visa, 2026, 1)).isEqualTo(-1_000L);
+    }
+
+    @Test
+    void gastosTarjetaDivididosSumaLasPartesConCategoria() {
+        Cuenta visa = tarjeta(casa, "Visa", true);
+        Transaccion dividida = guardar(visa, "2026-01-10", -30_000L, null);
+        dividida.reemplazarSubtransacciones(List.of(
+                SubTransaccion.builder().monto(-10_000L).categoria(comida).build(),
+                SubTransaccion.builder().monto(-15_000L).categoria(ocio).build(),
+                SubTransaccion.builder().monto(-5_000L).build()));
+        Transaccion enBanco = guardar(banco, "2026-01-10", -3_000L, null);
+        enBanco.reemplazarSubtransacciones(List.of(
+                SubTransaccion.builder().monto(-1_000L).categoria(comida).build(),
+                SubTransaccion.builder().monto(-2_000L).categoria(ocio).build()));
+        transaccionRepository.flush();
+
+        List<SumaTarjetaPorMes> filas =
+                repository.gastosTarjetaDivididos(casa.getId(), FIN_ANIO);
+
+        assertThat(filas).hasSize(1);
+        assertThat(suma(filas, visa, 2026, 1)).isEqualTo(-25_000L);
+        assertThat(repository.gastosTarjetaDivididos(viajes.getId(), FIN_ANIO)).isEmpty();
+    }
+
+    @Test
+    void pagosATarjetaSoloContabilizaPatasConParEnElPresupuesto() {
+        Cuenta visa = tarjeta(casa, "Visa", true);
+        transferir(banco, visa, 30_000L, null);
+        transferir(fuera, visa, 20_000L, null);
+        guardar(visa, "2026-01-12", -9_000L, comida);
+
+        List<SumaTarjetaPorMes> filas = repository.pagosATarjeta(casa.getId(), FIN_ANIO);
+
+        assertThat(filas).hasSize(1);
+        assertThat(suma(filas, visa, 2026, 1)).isEqualTo(30_000L);
+        assertThat(repository.pagosATarjeta(viajes.getId(), FIN_ANIO)).isEmpty();
+    }
+
+    @Test
+    void pagosATarjetaIncluyeLaTarjetaCerradaYElAvanceDeEfectivoVieneNegativo() {
+        Cuenta visa = tarjeta(casa, "Visa", true);
+        visa.cerrar();
+        transferir(banco, visa, 10_000L, null);
+        transferir(visa, banco, 4_000L, null);
+
+        List<SumaTarjetaPorMes> filas = repository.pagosATarjeta(casa.getId(), FIN_ANIO);
+
+        assertThat(filas).hasSize(1);
+        assertThat(suma(filas, visa, 2026, 1)).isEqualTo(6_000L);
+    }
+
+    @Test
+    void laEntradaSinCategoriaEnUnaTarjetaNoEsIngreso() {
+        Cuenta visa = tarjeta(casa, "Visa", true);
+        guardar(banco, "2026-01-05", 500_000L, null);
+        guardar(visa, "2026-01-06", 9_000L, null);
+
+        assertThat(repository.ingresosSinCategoria(casa.getId(), FIN_ANIO)).isEqualTo(500_000L);
+    }
+
+    @Test
+    void laTransferenciaDesdeUnaCuentaExternaHaciaUnaTarjetaNoEsIngreso() {
+        Cuenta visa = tarjeta(casa, "Visa", true);
+        guardar(banco, "2026-01-05", 500_000L, null);
+
+        transferir(fuera, visa, 20_000L, null);
+
+        assertThat(repository.ingresosSinCategoria(casa.getId(), FIN_ANIO)).isEqualTo(500_000L);
+    }
+
+    private Cuenta tarjeta(Presupuesto presupuesto, String nombre, boolean enPresupuesto) {
+        return cuentaRepository.saveAndFlush(
+                cuenta(presupuesto, nombre, TipoCuenta.TARJETA_CREDITO, enPresupuesto, 0L));
+    }
+
+    private static long suma(List<SumaTarjetaPorMes> filas, Cuenta cuenta, int anio, int mes) {
+        return filas.stream()
+                .filter(f -> f.getCuentaId().equals(cuenta.getId())
+                        && f.getAnio() == anio && f.getMes() == mes)
+                .mapToLong(SumaTarjetaPorMes::getTotal)
+                .sum();
     }
 
     private static long total(

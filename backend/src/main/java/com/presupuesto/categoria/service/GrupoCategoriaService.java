@@ -10,6 +10,7 @@ import com.presupuesto.comun.excepcion.CodigoError;
 import com.presupuesto.comun.excepcion.ConflictoException;
 import com.presupuesto.comun.excepcion.DatosInvalidosException;
 import com.presupuesto.comun.excepcion.RecursoNoEncontradoException;
+import com.presupuesto.comun.excepcion.ReglaNegocioException;
 import com.presupuesto.presupuesto.entity.Presupuesto;
 import com.presupuesto.presupuesto.service.PresupuestoService;
 import java.util.ArrayList;
@@ -27,6 +28,8 @@ public class GrupoCategoriaService {
     static final String MENSAJE_NO_ENCONTRADO = "Grupo de categorías no encontrado";
     static final String MENSAJE_YA_EXISTE = "Ya existe un grupo de categorías con ese nombre";
     static final String MENSAJE_POSICION_INVALIDA = "La posición está fuera de rango";
+    static final String MENSAJE_GRUPO_DE_PAGOS =
+            "El grupo de pagos de tarjetas lo gestiona el sistema";
 
     private final GrupoCategoriaRepository grupoRepository;
     private final PresupuestoService presupuestoService;
@@ -53,6 +56,7 @@ public class GrupoCategoriaService {
     public GrupoCategoriaResponse renombrar(
             Long presupuestoId, Long usuarioId, Long id, ActualizarGrupoCategoriaRequest request) {
         GrupoCategoria grupo = buscar(presupuestoId, usuarioId, id);
+        exigirNoEsDePagos(grupo);
         String normalizado = GrupoCategoria.normalizar(request.nombre());
         if (grupoRepository.existsByPresupuestoIdAndNombreNormalizadoAndIdNot(
                 presupuestoId, normalizado, id)) {
@@ -65,6 +69,7 @@ public class GrupoCategoriaService {
     @Transactional
     public GrupoCategoriaResponse ocultar(Long presupuestoId, Long usuarioId, Long id) {
         GrupoCategoria grupo = buscar(presupuestoId, usuarioId, id);
+        exigirNoEsDePagos(grupo);
         grupo.ocultar();
         return GrupoCategoriaResponse.desde(grupoRepository.saveAndFlush(grupo));
     }
@@ -72,6 +77,7 @@ public class GrupoCategoriaService {
     @Transactional
     public GrupoCategoriaResponse mostrar(Long presupuestoId, Long usuarioId, Long id) {
         GrupoCategoria grupo = buscar(presupuestoId, usuarioId, id);
+        exigirNoEsDePagos(grupo);
         grupo.mostrar();
         return GrupoCategoriaResponse.desde(grupoRepository.saveAndFlush(grupo));
     }
@@ -81,6 +87,7 @@ public class GrupoCategoriaService {
     public GrupoCategoriaResponse mover(
             Long presupuestoId, Long usuarioId, Long id, MoverGrupoCategoriaRequest request) {
         GrupoCategoria grupo = buscar(presupuestoId, usuarioId, id);
+        exigirNoEsDePagos(grupo);
         List<GrupoCategoria> grupos =
                 new ArrayList<>(grupoRepository.findByPresupuestoIdOrderByOrden(presupuestoId));
         int posicion = request.posicion();
@@ -98,6 +105,13 @@ public class GrupoCategoriaService {
         }
         grupoRepository.saveAllAndFlush(cambiados);
         return GrupoCategoriaResponse.desde(grupo);
+    }
+
+    /** El grupo de pagos de tarjetas no se renombra, oculta, muestra ni mueve a mano. */
+    private static void exigirNoEsDePagos(GrupoCategoria grupo) {
+        if (grupo.esPagosTarjeta()) {
+            throw new ReglaNegocioException(MENSAJE_GRUPO_DE_PAGOS);
+        }
     }
 
     private GrupoCategoria buscar(Long presupuestoId, Long usuarioId, Long id) {

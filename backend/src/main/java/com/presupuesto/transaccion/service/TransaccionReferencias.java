@@ -31,6 +31,8 @@ class TransaccionReferencias {
     static final String MENSAJE_CUENTA_NO_ENCONTRADA = "Cuenta no encontrada";
     static final String MENSAJE_CATEGORIA_NO_ENCONTRADA = "Categoría no encontrada";
     static final String MENSAJE_CUENTA_CERRADA = "La cuenta está cerrada";
+    static final String MENSAJE_CATEGORIA_DE_PAGO =
+            "Una categoría de pago de tarjeta no admite transacciones";
     static final String MENSAJE_ES_TRANSFERENCIA =
             "Es parte de una transferencia; usa /transferencias";
     static final String MENSAJE_CANTIDAD_SUBTRANSACCIONES =
@@ -61,6 +63,20 @@ class TransaccionReferencias {
                         () -> new RecursoNoEncontradoException(MENSAJE_CATEGORIA_NO_ENCONTRADA));
     }
 
+    /**
+     * La categoría que una transacción, una parte, una transferencia o un lote va a guardar: igual
+     * que {@link #categoria(Long, Long)}, pero una categoría de pago de tarjeta responde 422.
+     * Todas las vías que asignan categoría pasan por aquí; el filtro del listado usa
+     * {@code categoria(...)}.
+     */
+    Categoria categoriaParaRegistrar(Long categoriaId, Long presupuestoId) {
+        Categoria categoria = categoria(categoriaId, presupuestoId);
+        if (categoria != null && categoria.esPagoTarjeta()) {
+            throw new ReglaNegocioException(MENSAJE_CATEGORIA_DE_PAGO);
+        }
+        return categoria;
+    }
+
     /** Las patas de una transferencia solo se cambian por {@code /transferencias}. */
     void exigirNoEsTransferencia(Transaccion transaccion) {
         if (transaccion.esTransferencia()) {
@@ -83,7 +99,7 @@ class TransaccionReferencias {
             Long categoriaId,
             long monto,
             List<SubTransaccionRequest> subtransacciones) {
-        Categoria categoria = categoria(categoriaId, presupuestoId);
+        Categoria categoria = categoriaParaRegistrar(categoriaId, presupuestoId);
         if (subtransacciones.isEmpty()) {
             return new Division(categoria, List.of());
         }
@@ -93,7 +109,8 @@ class TransaccionReferencias {
             Long idCategoria = parte.categoriaId();
             Categoria deLaParte = idCategoria == null
                     ? null
-                    : categorias.computeIfAbsent(idCategoria, id -> categoria(id, presupuestoId));
+                    : categorias.computeIfAbsent(
+                            idCategoria, id -> categoriaParaRegistrar(id, presupuestoId));
             partes.add(SubTransaccion.builder()
                     .categoria(deLaParte)
                     .monto(parte.monto())

@@ -1498,6 +1498,93 @@ class TransaccionIntegracionTest {
         org.junit.jupiter.api.Assertions.assertEquals(140001L, saldoBanco + saldoAhorros);
     }
 
+
+    // ---------- categoría de pago de tarjeta ----------
+
+    @Test
+    void crearConLaCategoriaDePagoDa422YNoGuardaNada() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long cuenta = crearCuenta(ana, ana.presupuestoId, "Banco", 0);
+        long pago = crearCategoriaDePago(ana, ana.presupuestoId, "Visa");
+        Map<String, Object> cuerpo = cuerpo(cuenta, -1000);
+        cuerpo.put("categoriaId", pago);
+
+        esperarReglaNegocio(crear(ana, ana.presupuestoId, cuerpo));
+
+        esperarTotal(ana, ana.presupuestoId, 0);
+    }
+
+    @Test
+    void editarConLaCategoriaDePagoDa422YNoCambiaLaTransaccion() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long cuenta = crearCuenta(ana, ana.presupuestoId, "Banco", 0);
+        long comida = crearCategoria(ana, ana.presupuestoId, "Comida");
+        long pago = crearCategoriaDePago(ana, ana.presupuestoId, "Visa");
+        Map<String, Object> original = cuerpo(cuenta, -1000);
+        original.put("categoriaId", comida);
+        long id = idDe(crear(ana, ana.presupuestoId, original));
+        Map<String, Object> cambio = edicion(-2000);
+        cambio.put("categoriaId", pago);
+
+        esperarReglaNegocio(editar(ana, ana.presupuestoId, id, cambio));
+
+        obtener(ana, ana.presupuestoId, id)
+                .andExpect(jsonPath("$.monto").value(-1000))
+                .andExpect(jsonPath("$.categoriaId").value(comida));
+    }
+
+    @Test
+    void dividirConUnaParteEnLaCategoriaDePagoDa422YNoGuardaNada() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long cuenta = crearCuenta(ana, ana.presupuestoId, "Banco", 0);
+        long comida = crearCategoria(ana, ana.presupuestoId, "Comida");
+        long pago = crearCategoriaDePago(ana, ana.presupuestoId, "Visa");
+        Map<String, Object> dividida = cuerpo(cuenta, -3000);
+        dividida.put("subtransacciones", List.of(sub(comida, -1000), sub(pago, -2000)));
+
+        esperarReglaNegocio(crear(ana, ana.presupuestoId, dividida));
+
+        esperarTotal(ana, ana.presupuestoId, 0);
+    }
+
+    @Test
+    void loteCategorizarConLaCategoriaDePagoDa422YNoCambiaNada() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long cuenta = crearCuenta(ana, ana.presupuestoId, "Banco", 0);
+        long a = crearTx(ana, ana.presupuestoId, cuenta, -1);
+        long b = crearTx(ana, ana.presupuestoId, cuenta, -2);
+        long pago = crearCategoriaDePago(ana, ana.presupuestoId, "Visa");
+
+        esperarReglaNegocio(lote(ana, ana.presupuestoId, List.of(a, b), "CATEGORIZAR", pago));
+
+        obtener(ana, ana.presupuestoId, a).andExpect(jsonPath("$.categoriaId").value(nullValue()));
+        obtener(ana, ana.presupuestoId, b).andExpect(jsonPath("$.categoriaId").value(nullValue()));
+    }
+
+    @Test
+    void filtrarPorLaCategoriaDePagoDa200ConLaListaVacia() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long cuenta = crearCuenta(ana, ana.presupuestoId, "Banco", 0);
+        crearTx(ana, ana.presupuestoId, cuenta, -1);
+        long pago = crearCategoriaDePago(ana, ana.presupuestoId, "Visa");
+
+        listar(ana, ana.presupuestoId, Map.of("categoriaId", String.valueOf(pago)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElementos").value(0));
+    }
+
+    @Test
+    void laCategoriaDePagoDeOtroPresupuestoDa404() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        Sesion beto = registrar("beto@ejemplo.com");
+        long cuenta = crearCuenta(ana, ana.presupuestoId, "Banco", 0);
+        long deBeto = crearCategoriaDePago(beto, beto.presupuestoId, "Visa");
+        Map<String, Object> cuerpo = cuerpo(cuenta, -1000);
+        cuerpo.put("categoriaId", deBeto);
+
+        esperarNoEncontrado(crear(ana, ana.presupuestoId, cuerpo));
+    }
+
     // ---------- ayudas ----------
 
     private record Sesion(String token, long presupuestoId) {
@@ -1526,6 +1613,29 @@ class TransaccionIntegracionTest {
                 .getContentAsString();
         // Toda persona recibe "Mi presupuesto" al registrarse: es el único de la lista.
         return new Sesion(token, objectMapper.readTree(presupuestos).get(0).get("id").asLong());
+    }
+
+    /** Crea una tarjeta de crédito y devuelve el id de su categoría de pago. */
+    private long crearCategoriaDePago(Sesion sesion, long presupuestoId, String tarjeta)
+            throws Exception {
+        Map<String, Object> cuenta = new LinkedHashMap<>();
+        cuenta.put("nombre", tarjeta);
+        cuenta.put("tipo", "TARJETA_CREDITO");
+        idDe(enviar(post(RUTA_PRESUPUESTOS + "/" + presupuestoId + "/cuentas"), sesion, cuenta));
+        String arbol = mockMvc.perform(get(RUTA_PRESUPUESTOS + "/" + presupuestoId + "/categorias")
+                        .param("incluirOcultas", "true")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(sesion.token)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        for (tools.jackson.databind.JsonNode grupo : objectMapper.readTree(arbol)) {
+            for (tools.jackson.databind.JsonNode categoria : grupo.get("categorias")) {
+                if (categoria.get("esPagoTarjeta").asBoolean()
+                        && categoria.get("nombre").asString().equals("Pago: " + tarjeta)) {
+                    return categoria.get("id").asLong();
+                }
+            }
+        }
+        throw new AssertionError("No hay categoría de pago de " + tarjeta);
     }
 
     private ResultActions crearPresupuesto(Sesion sesion, String nombre) throws Exception {

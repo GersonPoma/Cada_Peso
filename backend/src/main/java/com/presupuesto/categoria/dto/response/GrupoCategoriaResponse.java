@@ -1,6 +1,7 @@
 package com.presupuesto.categoria.dto.response;
 
 import com.presupuesto.categoria.entity.GrupoCategoria;
+import com.presupuesto.categoria.entity.TipoGrupoCategoria;
 import java.time.Instant;
 
 public record GrupoCategoriaResponse(
@@ -8,6 +9,7 @@ public record GrupoCategoriaResponse(
         String nombre,
         int orden,
         boolean oculto,
+        TipoGrupoCategoria tipo,
         Instant fechaCreacion,
         Instant fechaActualizacion) {
 
@@ -17,6 +19,7 @@ public record GrupoCategoriaResponse(
                 grupo.getNombre(),
                 grupo.getOrden(),
                 grupo.isOculto(),
+                grupo.getTipo(),
                 grupo.getFechaCreacion(),
                 grupo.getFechaActualizacion());
     }

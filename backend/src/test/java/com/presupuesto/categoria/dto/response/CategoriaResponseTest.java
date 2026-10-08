@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.presupuesto.categoria.entity.Categoria;
 import com.presupuesto.categoria.entity.GrupoCategoria;
+import com.presupuesto.cuenta.entity.Cuenta;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 
@@ -34,5 +35,31 @@ class CategoriaResponseTest {
         assertThat(response.nota()).isEqualTo("Mensual");
         assertThat(response.fechaCreacion()).isEqualTo(creada);
         assertThat(response.fechaActualizacion()).isEqualTo(actualizada);
+    }
+
+    @Test
+    void unaCategoriaNormalNoEsDePagoYNoTieneCuenta() {
+        Categoria categoria = Categoria.builder()
+                .id(8L).grupo(GrupoCategoria.builder().id(3L).build()).nombre("Alquiler").build();
+
+        CategoriaResponse response = CategoriaResponse.desde(categoria);
+
+        assertThat(response.esPagoTarjeta()).isFalse();
+        assertThat(response.cuentaId()).isNull();
+    }
+
+    @Test
+    void laCategoriaDePagoTraeLaMarcaYElIdDeLaCuenta() {
+        Categoria categoria = Categoria.builder()
+                .id(9L)
+                .grupo(GrupoCategoria.builder().id(3L).build())
+                .nombre("Pago: Visa")
+                .cuentaTarjeta(Cuenta.builder().id(44L).build())
+                .build();
+
+        CategoriaResponse response = CategoriaResponse.desde(categoria);
+
+        assertThat(response.esPagoTarjeta()).isTrue();
+        assertThat(response.cuentaId()).isEqualTo(44L);
     }
 }

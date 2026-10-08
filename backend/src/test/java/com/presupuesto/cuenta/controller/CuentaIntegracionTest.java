@@ -297,14 +297,41 @@ class CuentaIntegracionTest {
     }
 
     @Test
-    void cambiarAUnTipoQueSiAdmiteElSaldoNegativoDevuelve200() throws Exception {
+    void cambiarUnaTarjetaAUnTipoQueSiAdmiteElSaldoNegativoDevuelve422() throws Exception {
         Sesion ana = registrar("ana@ejemplo.com");
         long id = idDe(crear(
                 ana, ana.presupuestoId, "Tarjeta", "TARJETA_CREDITO", null, -500L));
 
         editar(ana, ana.presupuestoId, id, cuerpoEdicion("Tarjeta", "PRESTAMO"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.codigo").value("REGLA_NEGOCIO_VIOLADA"));
+
+        obtener(ana, ana.presupuestoId, id)
+                .andExpect(jsonPath("$.tipo").value("TARJETA_CREDITO"));
+    }
+
+    @Test
+    void cambiarUnaCuentaATarjetaDeCreditoDevuelve422YNoCambiaElTipo() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long id = idDe(crear(ana, ana.presupuestoId, "Banco", "CORRIENTE", null, 0L));
+
+        editar(ana, ana.presupuestoId, id, cuerpoEdicion("Banco", "TARJETA_CREDITO"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.codigo").value("REGLA_NEGOCIO_VIOLADA"));
+
+        obtener(ana, ana.presupuestoId, id)
+                .andExpect(jsonPath("$.tipo").value("CORRIENTE"));
+    }
+
+    @Test
+    void renombrarUnaTarjetaConservandoElTipoDevuelve200() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long id = idDe(crear(ana, ana.presupuestoId, "Visa", "TARJETA_CREDITO", null, 0L));
+
+        editar(ana, ana.presupuestoId, id, cuerpoEdicion("Visa Oro", "TARJETA_CREDITO"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.tipo").value("PRESTAMO"));
+                .andExpect(jsonPath("$.nombre").value("Visa Oro"))
+                .andExpect(jsonPath("$.tipo").value("TARJETA_CREDITO"));
     }
 
     // ---------- cerrar y reabrir ----------

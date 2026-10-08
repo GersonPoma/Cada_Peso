@@ -13,6 +13,7 @@ import com.presupuesto.comun.excepcion.CodigoError;
 import com.presupuesto.comun.excepcion.ConflictoException;
 import com.presupuesto.comun.excepcion.DatosInvalidosException;
 import com.presupuesto.comun.excepcion.RecursoNoEncontradoException;
+import com.presupuesto.comun.excepcion.ReglaNegocioException;
 import com.presupuesto.presupuesto.service.PresupuestoService;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -31,6 +32,10 @@ public class CategoriaService {
     static final String MENSAJE_NO_ENCONTRADA = "Categoría no encontrada";
     static final String MENSAJE_YA_EXISTE = "Ya existe una categoría con ese nombre en el grupo";
     static final String MENSAJE_POSICION_INVALIDA = "La posición está fuera de rango";
+    static final String MENSAJE_CATEGORIA_DE_PAGO =
+            "Las categorías de pago de tarjeta las gestiona el sistema";
+    static final String MENSAJE_GRUPO_DE_PAGOS =
+            "No se pueden agregar categorías al grupo de pagos de tarjetas";
 
     private final CategoriaRepository categoriaRepository;
     private final GrupoCategoriaRepository grupoRepository;
@@ -41,6 +46,7 @@ public class CategoriaService {
             Long presupuestoId, Long usuarioId, CrearCategoriaRequest request) {
         presupuestoService.obtenerDelUsuario(presupuestoId, usuarioId);
         GrupoCategoria grupo = buscarGrupo(presupuestoId, request.grupoId());
+        exigirGrupoNormal(grupo);
         String normalizado = Categoria.normalizar(request.nombre());
         if (categoriaRepository.existsByGrupoIdAndNombreNormalizado(grupo.getId(), normalizado)) {
             throw yaExiste();
@@ -66,6 +72,7 @@ public class CategoriaService {
     public CategoriaResponse actualizar(
             Long presupuestoId, Long usuarioId, Long id, ActualizarCategoriaRequest request) {
         Categoria categoria = buscar(presupuestoId, usuarioId, id);
+        exigirNoEsDePago(categoria);
         String normalizado = Categoria.normalizar(request.nombre());
         if (categoriaRepository.existsByGrupoIdAndNombreNormalizadoAndIdNot(
                 categoria.getGrupo().getId(), normalizado, id)) {
@@ -79,6 +86,7 @@ public class CategoriaService {
     @Transactional
     public CategoriaResponse ocultar(Long presupuestoId, Long usuarioId, Long id) {
         Categoria categoria = buscar(presupuestoId, usuarioId, id);
+        exigirNoEsDePago(categoria);
         categoria.ocultar();
         return CategoriaResponse.desde(categoriaRepository.saveAndFlush(categoria));
     }
@@ -86,6 +94,7 @@ public class CategoriaService {
     @Transactional
     public CategoriaResponse mostrar(Long presupuestoId, Long usuarioId, Long id) {
         Categoria categoria = buscar(presupuestoId, usuarioId, id);
+        exigirNoEsDePago(categoria);
         categoria.mostrar();
         return CategoriaResponse.desde(categoriaRepository.saveAndFlush(categoria));
     }
@@ -100,6 +109,8 @@ public class CategoriaService {
             Long presupuestoId, Long usuarioId, Long id, MoverCategoriaRequest request) {
         Categoria categoria = buscar(presupuestoId, usuarioId, id);
         GrupoCategoria destino = buscarGrupo(presupuestoId, request.grupoId());
+        exigirNoEsDePago(categoria);
+        exigirGrupoNormal(destino);
         Long origenId = categoria.getGrupo().getId();
         boolean mismoGrupo = destino.getId().equals(origenId);
         int posicion = request.posicion();
@@ -167,6 +178,20 @@ public class CategoriaService {
                 categoria.asignarOrden(i);
                 cambiadas.add(categoria);
             }
+        }
+    }
+
+    /** Las categorías de pago de tarjeta no se editan, ocultan, muestran ni mueven a mano. */
+    private static void exigirNoEsDePago(Categoria categoria) {
+        if (categoria.esPagoTarjeta()) {
+            throw new ReglaNegocioException(MENSAJE_CATEGORIA_DE_PAGO);
+        }
+    }
+
+    /** Al grupo de pagos de tarjetas no se crean ni se mueven categorías. */
+    private static void exigirGrupoNormal(GrupoCategoria grupo) {
+        if (grupo.esPagosTarjeta()) {
+            throw new ReglaNegocioException(MENSAJE_GRUPO_DE_PAGOS);
         }
     }
 

@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.presupuesto.categoria.entity.Categoria;
 import com.presupuesto.categoria.entity.GrupoCategoria;
+import com.presupuesto.categoria.entity.TipoGrupoCategoria;
+import com.presupuesto.cuenta.entity.Cuenta;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -33,5 +35,20 @@ class GrupoCategoriaConCategoriasResponseTest {
 
         assertThat(GrupoCategoriaConCategoriasResponse.desde(grupo, List.of()).categorias())
                 .isEmpty();
+    }
+
+    @Test
+    void incluyeElTipoDelGrupoYLaMarcaDePagoDeSusCategorias() {
+        GrupoCategoria pagos = GrupoCategoria.builder()
+                .id(7L).nombre("Pagos").tipo(TipoGrupoCategoria.PAGOS_TARJETA).build();
+        Categoria pagoVisa = Categoria.builder().id(1L).grupo(pagos).nombre("Pago: Visa")
+                .cuentaTarjeta(Cuenta.builder().id(12L).build()).build();
+
+        GrupoCategoriaConCategoriasResponse response =
+                GrupoCategoriaConCategoriasResponse.desde(pagos, List.of(pagoVisa));
+
+        assertThat(response.tipo()).isEqualTo(TipoGrupoCategoria.PAGOS_TARJETA);
+        assertThat(response.categorias().get(0).esPagoTarjeta()).isTrue();
+        assertThat(response.categorias().get(0).cuentaId()).isEqualTo(12L);
     }
 }

@@ -1,15 +1,20 @@
 package com.presupuesto.asignacion.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.presupuesto.asignacion.repository.ActividadMensualRepository;
 import com.presupuesto.asignacion.repository.ActividadMensualRepository.ActividadPorMes;
+import com.presupuesto.asignacion.repository.ActividadMensualRepository.SumaTarjetaPorMes;
 import com.presupuesto.asignacion.repository.AsignacionMensualRepository;
 import com.presupuesto.asignacion.repository.AsignacionMensualRepository.AsignadoPorMes;
 import com.presupuesto.asignacion.service.CalculoMensual.FilaMes;
 import com.presupuesto.asignacion.service.CalculoMensual.ResultadoMes;
+import com.presupuesto.categoria.repository.CategoriaRepository;
+import com.presupuesto.categoria.repository.CategoriaRepository.PagoDeTarjeta;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
@@ -37,11 +42,15 @@ class CalculadoraMesTest {
     @Mock
     private ActividadMensualRepository actividadRepository;
 
+    @Mock
+    private CategoriaRepository categoriaRepository;
+
     private CalculadoraMes calculadora;
 
     @BeforeEach
     void preparar() {
-        calculadora = new CalculadoraMes(asignacionRepository, actividadRepository);
+        calculadora = new CalculadoraMes(
+                asignacionRepository, actividadRepository, categoriaRepository);
         when(asignacionRepository.asignadosHasta(PRESUPUESTO_ID, LocalDate.of(2026, 1, 1)))
                 .thenReturn(List.of(asignado(COMIDA, LocalDate.of(2026, 1, 1), 100_000L)));
         when(actividadRepository.actividadSimple(PRESUPUESTO_ID, FIN_ENERO))
@@ -91,6 +100,117 @@ class CalculadoraMesTest {
         assertThat(resultado.listoParaAsignar()).isEqualTo(100_007L);
         verify(actividadRepository)
                 .actividadSimple(PRESUPUESTO_ID, LocalDate.of(2028, 2, 29));
+    }
+
+    private static final long PAGO_VISA = 700L;
+    private static final long VISA = 70L;
+
+    private void hayTarjeta() {
+        when(categoriaRepository.pagosDeTarjetas(PRESUPUESTO_ID))
+                .thenReturn(List.of(pagoDeTarjeta(VISA, PAGO_VISA)));
+    }
+
+    @Test
+    void sinTarjetasNoConsultaLaReservaNiCambiaLaActividad() {
+        ResultadoMes resultado = calculadora.calcular(PRESUPUESTO_ID, ENERO);
+
+        verify(categoriaRepository).pagosDeTarjetas(PRESUPUESTO_ID);
+        verify(actividadRepository, never()).gastosTarjeta(any(), any());
+        verify(actividadRepository, never()).gastosTarjetaDivididos(any(), any());
+        verify(actividadRepository, never()).pagosATarjeta(any(), any());
+        assertThat(resultado.fila(PAGO_VISA)).isEqualTo(FilaMes.CERO);
+    }
+
+    @Test
+    void elGastoConTarjetaSumaLaReservaALaCategoriaDePagoYNoCambiaLaNormal() {
+        hayTarjeta();
+        when(actividadRepository.gastosTarjeta(PRESUPUESTO_ID, FIN_ENERO))
+                .thenReturn(List.of(sumaTarjeta(VISA, 2026, 1, -30_000L)));
+
+        ResultadoMes resultado = calculadora.calcular(PRESUPUESTO_ID, ENERO);
+
+        assertThat(resultado.fila(PAGO_VISA)).isEqualTo(new FilaMes(0L, 30_000L, 30_000L));
+        assertThat(resultado.fila(COMIDA)).isEqualTo(new FilaMes(100_000L, -30_000L, 70_000L));
+    }
+
+    @Test
+    void sumaGastosSimplesDivididosYPagosDeLaMismaTarjeta() {
+        hayTarjeta();
+        when(actividadRepository.gastosTarjeta(PRESUPUESTO_ID, FIN_ENERO))
+                .thenReturn(List.of(sumaTarjeta(VISA, 2026, 1, -30_000L)));
+        when(actividadRepository.gastosTarjetaDivididos(PRESUPUESTO_ID, FIN_ENERO))
+                .thenReturn(List.of(sumaTarjeta(VISA, 2026, 1, -10_000L)));
+        when(actividadRepository.pagosATarjeta(PRESUPUESTO_ID, FIN_ENERO))
+                .thenReturn(List.of(sumaTarjeta(VISA, 2026, 1, 15_000L)));
+
+        ResultadoMes resultado = calculadora.calcular(PRESUPUESTO_ID, ENERO);
+
+        assertThat(resultado.fila(PAGO_VISA).actividad()).isEqualTo(25_000L);
+        assertThat(resultado.fila(PAGO_VISA).disponible()).isEqualTo(25_000L);
+    }
+
+    @Test
+    void laTarjetaSinCategoriaDePagoSeIgnora() {
+        hayTarjeta();
+        when(actividadRepository.gastosTarjeta(PRESUPUESTO_ID, FIN_ENERO))
+                .thenReturn(List.of(sumaTarjeta(999L, 2026, 1, -30_000L)));
+
+        ResultadoMes resultado = calculadora.calcular(PRESUPUESTO_ID, ENERO);
+
+        assertThat(resultado.fila(PAGO_VISA)).isEqualTo(FilaMes.CERO);
+    }
+
+    @Test
+    void laReservaPositivaPasaAlMesSiguiente() {
+        hayTarjeta();
+        YearMonth febrero = YearMonth.of(2026, 2);
+        LocalDate finFebrero = LocalDate.of(2026, 2, 28);
+        when(asignacionRepository.asignadosHasta(PRESUPUESTO_ID, LocalDate.of(2026, 2, 1)))
+                .thenReturn(List.of());
+        when(actividadRepository.gastosTarjeta(PRESUPUESTO_ID, finFebrero))
+                .thenReturn(List.of(sumaTarjeta(VISA, 2026, 1, -30_000L)));
+
+        ResultadoMes resultado = calculadora.calcular(PRESUPUESTO_ID, febrero);
+
+        assertThat(resultado.fila(PAGO_VISA)).isEqualTo(new FilaMes(0L, 0L, 30_000L));
+    }
+
+    private static PagoDeTarjeta pagoDeTarjeta(long cuentaId, long categoriaId) {
+        return new PagoDeTarjeta() {
+            @Override
+            public Long getCuentaId() {
+                return cuentaId;
+            }
+
+            @Override
+            public Long getCategoriaId() {
+                return categoriaId;
+            }
+        };
+    }
+
+    private static SumaTarjetaPorMes sumaTarjeta(long cuentaId, int anio, int mes, long total) {
+        return new SumaTarjetaPorMes() {
+            @Override
+            public Long getCuentaId() {
+                return cuentaId;
+            }
+
+            @Override
+            public Integer getAnio() {
+                return anio;
+            }
+
+            @Override
+            public Integer getMes() {
+                return mes;
+            }
+
+            @Override
+            public Long getTotal() {
+                return total;
+            }
+        };
     }
 
     private static AsignadoPorMes asignado(long categoriaId, LocalDate mes, long asignado) {

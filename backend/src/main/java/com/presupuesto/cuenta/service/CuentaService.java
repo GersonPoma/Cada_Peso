@@ -9,11 +9,16 @@ import com.presupuesto.cuenta.dto.request.CrearCuentaRequest;
 import com.presupuesto.cuenta.dto.response.CuentaResponse;
 import com.presupuesto.cuenta.entity.Cuenta;
 import com.presupuesto.cuenta.entity.TipoCuenta;
+import com.presupuesto.cuenta.evento.CuentaCerradaEvento;
+import com.presupuesto.cuenta.evento.CuentaCreadaEvento;
+import com.presupuesto.cuenta.evento.CuentaReabiertaEvento;
+import com.presupuesto.cuenta.evento.CuentaRenombradaEvento;
 import com.presupuesto.cuenta.repository.CuentaRepository;
 import com.presupuesto.presupuesto.entity.Presupuesto;
 import com.presupuesto.presupuesto.service.PresupuestoService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,9 +32,12 @@ public class CuentaService {
     static final String MENSAJE_YA_EXISTE = "Ya existe una cuenta con ese nombre";
     static final String MENSAJE_SALDO_NEGATIVO =
             "Solo las tarjetas de crédito y los préstamos admiten saldo inicial negativo";
+    static final String MENSAJE_TIPO_TARJETA =
+            "El tipo de una tarjeta de crédito no se puede cambiar, ni una cuenta pasar a tarjeta";
 
     private final CuentaRepository cuentaRepository;
     private final PresupuestoService presupuestoService;
+    private final ApplicationEventPublisher eventos;
 
     @Transactional
     public CuentaResponse crear(Long presupuestoId, Long usuarioId, CrearCuentaRequest request) {
@@ -40,14 +48,16 @@ public class CuentaService {
                 presupuestoId, normalizado)) {
             throw yaExiste();
         }
-        return CuentaResponse.desde(guardar(Cuenta.builder()
+        Cuenta cuenta = guardar(Cuenta.builder()
                 .presupuesto(presupuesto)
                 .nombre(request.nombre())
                 .nombreNormalizado(normalizado)
                 .tipo(request.tipo())
                 .enPresupuesto(request.enPresupuesto())
                 .saldoInicial(request.saldoInicial())
-                .build()));
+                .build());
+        eventos.publishEvent(new CuentaCreadaEvento(cuenta));
+        return CuentaResponse.desde(cuenta);
     }
 
     @Transactional(readOnly = true)
@@ -66,40 +76,62 @@ public class CuentaService {
         return CuentaResponse.desde(buscar(presupuestoId, usuarioId, id));
     }
 
-    /** Solo nombre y tipo; {@code saldoInicial} y {@code enPresupuesto} nunca cambian. */
+    /**
+     * Solo nombre y tipo; {@code saldoInicial} y {@code enPresupuesto} nunca cambian. El tipo no
+     * cambia desde ni hacia {@code TARJETA_CREDITO}: la tarjeta tiene una categoría de pago.
+     */
     @Transactional
     public CuentaResponse actualizar(
             Long presupuestoId, Long usuarioId, Long id, ActualizarCuentaRequest request) {
         Cuenta cuenta = buscar(presupuestoId, usuarioId, id);
+        exigirTipoCompatible(cuenta.getTipo(), request.tipo());
         exigirSaldoValido(cuenta.getSaldoInicial(), request.tipo());
         String normalizado = Cuenta.normalizar(request.nombre());
         if (cuentaRepository.existsByPresupuestoIdAndNombreNormalizadoAndIdNot(
                 presupuestoId, normalizado, id)) {
             throw yaExiste();
         }
+        boolean renombrada = !cuenta.getNombre().equals(request.nombre());
         cuenta.renombrar(request.nombre());
         cuenta.cambiarTipo(request.tipo());
-        return CuentaResponse.desde(guardar(cuenta));
+        Cuenta guardada = guardar(cuenta);
+        if (renombrada) {
+            eventos.publishEvent(new CuentaRenombradaEvento(guardada));
+        }
+        return CuentaResponse.desde(guardada);
     }
 
     @Transactional
     public CuentaResponse cerrar(Long presupuestoId, Long usuarioId, Long id) {
         Cuenta cuenta = buscar(presupuestoId, usuarioId, id);
         cuenta.cerrar();
-        return CuentaResponse.desde(cuentaRepository.saveAndFlush(cuenta));
+        Cuenta guardada = cuentaRepository.saveAndFlush(cuenta);
+        eventos.publishEvent(new CuentaCerradaEvento(guardada));
+        return CuentaResponse.desde(guardada);
     }
 
     @Transactional
     public CuentaResponse reabrir(Long presupuestoId, Long usuarioId, Long id) {
         Cuenta cuenta = buscar(presupuestoId, usuarioId, id);
         cuenta.reabrir();
-        return CuentaResponse.desde(cuentaRepository.saveAndFlush(cuenta));
+        Cuenta guardada = cuentaRepository.saveAndFlush(cuenta);
+        eventos.publishEvent(new CuentaReabiertaEvento(guardada));
+        return CuentaResponse.desde(guardada);
     }
 
     private Cuenta buscar(Long presupuestoId, Long usuarioId, Long id) {
         presupuestoService.obtenerDelUsuario(presupuestoId, usuarioId);
         return cuentaRepository.findByIdAndPresupuestoId(id, presupuestoId)
                 .orElseThrow(() -> new RecursoNoEncontradoException(MENSAJE_NO_ENCONTRADA));
+    }
+
+    private static void exigirTipoCompatible(TipoCuenta actual, TipoCuenta nuevo) {
+        boolean cambia = actual != nuevo;
+        boolean tocaTarjeta =
+                actual == TipoCuenta.TARJETA_CREDITO || nuevo == TipoCuenta.TARJETA_CREDITO;
+        if (cambia && tocaTarjeta) {
+            throw new ReglaNegocioException(MENSAJE_TIPO_TARJETA);
+        }
     }
 
     private static void exigirSaldoValido(long saldoInicial, TipoCuenta tipo) {

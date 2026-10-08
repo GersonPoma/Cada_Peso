@@ -49,7 +49,8 @@ public interface ActividadMensualRepository extends Repository<Transaccion, Long
     /**
      * Entradas sin categoría y sin subtransacciones hasta una fecha (inclusive). Excluye la
      * entrada de una transferencia cuya pata par está en una cuenta del presupuesto (mover dinero
-     * dentro del presupuesto no es un ingreso); {@code not exists} y no navegar a la pata par,
+     * dentro del presupuesto no es un ingreso) y toda entrada en una tarjeta de crédito (no entra
+     * dinero a ninguna cuenta que no sea tarjeta); {@code not exists} y no navegar a la pata par,
      * porque la navegación implícita haría un inner join y descartaría las que no tienen par.
      */
     @Query("""
@@ -57,6 +58,7 @@ public interface ActividadMensualRepository extends Repository<Transaccion, Long
             from Transaccion t
             where t.cuenta.presupuesto.id = :presupuestoId
               and t.cuenta.enPresupuesto = true
+              and t.cuenta.tipo <> com.presupuesto.cuenta.entity.TipoCuenta.TARJETA_CREDITO
               and t.monto > 0
               and t.categoria is null
               and not exists (select 1 from SubTransaccion s where s.transaccion = t)
@@ -77,6 +79,78 @@ public interface ActividadMensualRepository extends Repository<Transaccion, Long
               and c.tipo <> com.presupuesto.cuenta.entity.TipoCuenta.TARJETA_CREDITO
             """)
     long saldosInicialesPositivos(@Param("presupuestoId") Long presupuestoId);
+
+    /**
+     * Suma por tarjeta de crédito y mes de las transacciones con categoría hechas con ella: la
+     * base de la reserva de su categoría de pago. Solo tarjetas del presupuesto (abiertas y
+     * cerradas).
+     */
+    @Query("""
+            select t.cuenta.id as cuentaId,
+                   extract(year from t.fecha) as anio,
+                   extract(month from t.fecha) as mes,
+                   sum(t.monto) as total
+            from Transaccion t
+            where t.cuenta.presupuesto.id = :presupuestoId
+              and t.cuenta.enPresupuesto = true
+              and t.cuenta.tipo = com.presupuesto.cuenta.entity.TipoCuenta.TARJETA_CREDITO
+              and t.categoria is not null
+              and t.fecha <= :hasta
+            group by t.cuenta.id, extract(year from t.fecha), extract(month from t.fecha)
+            """)
+    List<SumaTarjetaPorMes> gastosTarjeta(
+            @Param("presupuestoId") Long presupuestoId, @Param("hasta") LocalDate hasta);
+
+    /** Igual, sobre las subtransacciones con categoría (por la fecha de su transacción). */
+    @Query("""
+            select t.cuenta.id as cuentaId,
+                   extract(year from t.fecha) as anio,
+                   extract(month from t.fecha) as mes,
+                   sum(s.monto) as total
+            from SubTransaccion s join s.transaccion t
+            where t.cuenta.presupuesto.id = :presupuestoId
+              and t.cuenta.enPresupuesto = true
+              and t.cuenta.tipo = com.presupuesto.cuenta.entity.TipoCuenta.TARJETA_CREDITO
+              and s.categoria is not null
+              and t.fecha <= :hasta
+            group by t.cuenta.id, extract(year from t.fecha), extract(month from t.fecha)
+            """)
+    List<SumaTarjetaPorMes> gastosTarjetaDivididos(
+            @Param("presupuestoId") Long presupuestoId, @Param("hasta") LocalDate hasta);
+
+    /**
+     * Suma por tarjeta y mes de sus patas de transferencia cuya otra pata está en una cuenta del
+     * presupuesto (los pagos, que entran positivos). {@code exists} y no navegar a la pata par,
+     * por el inner join implícito.
+     */
+    @Query("""
+            select t.cuenta.id as cuentaId,
+                   extract(year from t.fecha) as anio,
+                   extract(month from t.fecha) as mes,
+                   sum(t.monto) as total
+            from Transaccion t
+            where t.cuenta.presupuesto.id = :presupuestoId
+              and t.cuenta.enPresupuesto = true
+              and t.cuenta.tipo = com.presupuesto.cuenta.entity.TipoCuenta.TARJETA_CREDITO
+              and t.transaccionPar is not null
+              and exists (select 1 from Transaccion p
+                          where p = t.transaccionPar and p.cuenta.enPresupuesto = true)
+              and t.fecha <= :hasta
+            group by t.cuenta.id, extract(year from t.fecha), extract(month from t.fecha)
+            """)
+    List<SumaTarjetaPorMes> pagosATarjeta(
+            @Param("presupuestoId") Long presupuestoId, @Param("hasta") LocalDate hasta);
+
+    interface SumaTarjetaPorMes {
+
+        Long getCuentaId();
+
+        Integer getAnio();
+
+        Integer getMes();
+
+        Long getTotal();
+    }
 
     interface ActividadPorMes {
 

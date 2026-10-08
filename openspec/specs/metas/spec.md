@@ -248,7 +248,8 @@ mes (el de `GET /meses/{mes}/metas`). Una categoría sin meta SHALL responder `4
 `POST /meses/{mes}/auto-asignar` con `{ estrategia, categoriaIds?, simular? }` SHALL fijar el
 asignado del mes de las categorías según la estrategia. `estrategia` es obligatoria y una
 ausente o desconocida responde `400` `DATOS_INVALIDOS`. Si `categoriaIds` falta se consideran
-todas las categorías visibles del presupuesto; las ocultas solo si se listan; una lista vacía
+todas las categorías visibles del presupuesto, salvo las categorías de pago de tarjeta; las ocultas
+y las de pago solo si se listan; una lista vacía
 responde `400`; una categoría ajena o inexistente responde `404` y no se aplica nada. Con
 `simular` verdadero (por defecto `false`) se calcula y se responde sin guardar nada. Solo se
 cambian las categorías cuyo nuevo asignado difiere del actual. No hay límite por
@@ -319,3 +320,33 @@ asignadoAntes)`. Sin cambios, `cambios` es vacío y los dos `listoParaAsignar` s
 - **DADO** un cuerpo sin `estrategia` o con una desconocida
 - **CUANDO** se auto-asigna
 - **ENTONCES** el sistema responde `400` `DATOS_INVALIDOS` y no cambia nada
+
+#### Scenario: Sin categoriaIds se omiten las categorías de pago
+- **DADO** la categoría `Pago: Visa` con asignado `30000` y la estrategia `ASIGNADO_MES_PASADO`
+  con septiembre en `50000` para esa categoría
+- **CUANDO** se auto-asigna octubre sin `categoriaIds`
+- **ENTONCES** `Pago: Visa` no aparece en `cambios` y conserva su asignado de octubre
+
+#### Scenario: Con categoriaIds explícitos se procesan las de pago
+- **DADO** la misma situación
+- **CUANDO** se auto-asigna octubre con `categoriaIds` igual a `[id de Pago: Visa]`
+- **ENTONCES** `Pago: Visa` aparece en `cambios` con `asignadoDespues` `50000`
+
+### Requirement: Las categorías de pago de tarjeta admiten meta
+El sistema SHALL permitir guardar, consultar, borrar y posponer una meta en una categoría de
+pago de tarjeta con las mismas reglas que en cualquier categoría, y su estado del mes SHALL
+calcularse con el `asignado`, la `actividad` y el `disponible` de la categoría de pago.
+
+#### Scenario: Meta sobre la categoría de pago
+- **DADO** la categoría `Pago: Visa`
+- **CUANDO** se guarda `{tipo: MONTO_MENSUAL, monto: 100000, frecuencia: MENSUAL}`
+- **ENTONCES** el sistema responde `200` con esa meta y `GET` de la meta devuelve lo mismo
+
+#### Scenario: Estado de la meta de la categoría de pago
+- **DADO** una meta `MONTO_MENSUAL` `MENSUAL` de `50000` en `Pago: Visa`, con `asignado` `0` y un
+  gasto de `40000` con la tarjeta en el mes (la categoría de pago tiene `actividad` `40000` y
+  `disponible` `40000`)
+- **CUANDO** se consultan las metas del mes
+- **ENTONCES** la meta de `Pago: Visa` trae `disponible` `40000`, `necesidad` `50000`, `faltante`
+  `50000` y `estado` `FALTA`: la meta mide lo asignado en el mes y no cuenta la reserva
+  automática, porque la actividad del mes no entra en el inicial

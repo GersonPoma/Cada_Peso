@@ -26,3 +26,6 @@ npm-debug.log*
 Thumbs.db
 .DS_Store
 *.log
+
+# Respaldos locales de la base de datos
+respaldo-*.sql

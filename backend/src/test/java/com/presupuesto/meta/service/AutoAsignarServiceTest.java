@@ -20,6 +20,7 @@ import com.presupuesto.comun.excepcion.ConflictoException;
 import com.presupuesto.comun.excepcion.DatosInvalidosException;
 import com.presupuesto.comun.excepcion.NegocioException;
 import com.presupuesto.comun.excepcion.RecursoNoEncontradoException;
+import com.presupuesto.cuenta.entity.Cuenta;
 import com.presupuesto.meta.dto.request.AutoAsignarRequest;
 import com.presupuesto.meta.dto.request.EstrategiaAutoAsignar;
 import com.presupuesto.meta.dto.response.AutoAsignarResponse;
@@ -344,5 +345,50 @@ class AutoAsignarServiceTest {
         assertThat(AutoAsignarService.class.getMethod("autoAsignar", Long.class, Long.class,
                 String.class, AutoAsignarRequest.class)
                 .isAnnotationPresent(Transactional.class)).isTrue();
+    }
+
+    // ---------- categorías de pago de tarjeta ----------
+
+    private static final long PAGO_ID = 4L;
+
+    private Categoria pagoDeTarjeta(boolean oculta) {
+        Categoria pago = Categoria.builder().id(PAGO_ID).nombre("Pago: Visa")
+                .cuentaTarjeta(Cuenta.builder().id(44L).build()).build();
+        if (oculta) {
+            pago.ocultar();
+        }
+        return pago;
+    }
+
+    @Test
+    void sinCategoriaIdsSeIgnoranLasCategoriasDePagoDeTarjeta() {
+        when(categoriaRepository
+                .findByGrupoPresupuestoIdAndOcultaFalseOrderByGrupoOrdenAscOrdenAsc(PRESUPUESTO_ID))
+                .thenReturn(List.of(comida, pagoDeTarjeta(false), ocio));
+        mes(SEPTIEMBRE, 0L, Map.of(COMIDA_ID, asignado(50_000L), PAGO_ID, asignado(80_000L)));
+
+        AutoAsignarResponse respuesta = autoAsignar(EstrategiaAutoAsignar.ASIGNADO_MES_PASADO);
+
+        assertThat(respuesta.cambios()).extracting(CambioAsignacionResponse::categoriaId)
+                .containsExactly(COMIDA_ID);
+        verify(asignacionService).fijarAsignados(PRESUPUESTO_ID, OCTUBRE,
+                Map.of(COMIDA_ID, 50_000L));
+    }
+
+    @Test
+    void conCategoriaIdsExplicitosSeProcesaLaCategoriaDePagoAunqueEsteOculta() {
+        Categoria pago = pagoDeTarjeta(true);
+        when(categoriaRepository.findByGrupoPresupuestoIdAndIdInOrderByGrupoOrdenAscOrdenAsc(
+                any(), any())).thenReturn(List.of(pago));
+        mes(SEPTIEMBRE, 0L, Map.of(PAGO_ID, asignado(50_000L)));
+
+        AutoAsignarResponse respuesta = service.autoAsignar(PRESUPUESTO_ID, USUARIO_ID, "2026-10",
+                new AutoAsignarRequest(
+                        EstrategiaAutoAsignar.ASIGNADO_MES_PASADO, List.of(PAGO_ID), false));
+
+        assertThat(respuesta.cambios()).containsExactly(
+                new CambioAsignacionResponse(PAGO_ID, "Pago: Visa", 0L, 50_000L));
+        verify(asignacionService).fijarAsignados(PRESUPUESTO_ID, OCTUBRE,
+                Map.of(PAGO_ID, 50_000L));
     }
 }

@@ -16,6 +16,10 @@ import com.presupuesto.cuenta.dto.request.CrearCuentaRequest;
 import com.presupuesto.cuenta.dto.response.CuentaResponse;
 import com.presupuesto.cuenta.entity.Cuenta;
 import com.presupuesto.cuenta.entity.TipoCuenta;
+import com.presupuesto.cuenta.evento.CuentaCerradaEvento;
+import com.presupuesto.cuenta.evento.CuentaCreadaEvento;
+import com.presupuesto.cuenta.evento.CuentaReabiertaEvento;
+import com.presupuesto.cuenta.evento.CuentaRenombradaEvento;
 import com.presupuesto.cuenta.repository.CuentaRepository;
 import com.presupuesto.presupuesto.entity.Presupuesto;
 import com.presupuesto.presupuesto.service.PresupuestoService;
@@ -29,6 +33,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 
 @ExtendWith(MockitoExtension.class)
@@ -45,12 +50,15 @@ class CuentaServiceTest {
     @Mock
     private PresupuestoService presupuestoService;
 
+    @Mock
+    private ApplicationEventPublisher eventos;
+
     private CuentaService service;
     private Presupuesto presupuesto;
 
     @BeforeEach
     void preparar() {
-        service = new CuentaService(cuentaRepository, presupuestoService);
+        service = new CuentaService(cuentaRepository, presupuestoService, eventos);
         presupuesto = Presupuesto.builder().id(PRESUPUESTO_ID).build();
         when(presupuestoService.obtenerDelUsuario(PRESUPUESTO_ID, USUARIO_ID))
                 .thenReturn(presupuesto);
@@ -222,14 +230,17 @@ class CuentaServiceTest {
     }
 
     @Test
-    void cambiarElTipoConSaldoNegativoAOtroQueLoAdmiteEsValido() {
+    void cambiarElTipoDeUnaTarjetaAOtroQueAdmiteSaldoNegativoLanzaReglaYNoCambiaNada() {
+        Cuenta tarjeta = cuenta("Tarjeta", TipoCuenta.TARJETA_CREDITO, -500L);
         when(cuentaRepository.findByIdAndPresupuestoId(CUENTA_ID, PRESUPUESTO_ID))
-                .thenReturn(Optional.of(cuenta("Tarjeta", TipoCuenta.TARJETA_CREDITO, -500L)));
+                .thenReturn(Optional.of(tarjeta));
 
-        CuentaResponse response = service.actualizar(PRESUPUESTO_ID, USUARIO_ID, CUENTA_ID,
-                new ActualizarCuentaRequest("Tarjeta", TipoCuenta.PRESTAMO));
+        assertThrows(ReglaNegocioException.class,
+                () -> service.actualizar(PRESUPUESTO_ID, USUARIO_ID, CUENTA_ID,
+                        new ActualizarCuentaRequest("Tarjeta", TipoCuenta.PRESTAMO)));
 
-        assertThat(response.tipo()).isEqualTo(TipoCuenta.PRESTAMO);
+        assertThat(tarjeta.getTipo()).isEqualTo(TipoCuenta.TARJETA_CREDITO);
+        verify(cuentaRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -242,6 +253,88 @@ class CuentaServiceTest {
         assertThat(service.cerrar(PRESUPUESTO_ID, USUARIO_ID, CUENTA_ID).cerrada()).isTrue();
         assertThat(service.reabrir(PRESUPUESTO_ID, USUARIO_ID, CUENTA_ID).cerrada()).isFalse();
         assertThat(service.reabrir(PRESUPUESTO_ID, USUARIO_ID, CUENTA_ID).cerrada()).isFalse();
+    }
+
+    @Test
+    void cambiarUnaCuentaATarjetaDeCreditoLanzaReglaYNoCambiaNada() {
+        Cuenta corriente = cuenta("Banco", TipoCuenta.CORRIENTE, 0L);
+        when(cuentaRepository.findByIdAndPresupuestoId(CUENTA_ID, PRESUPUESTO_ID))
+                .thenReturn(Optional.of(corriente));
+
+        ReglaNegocioException excepcion = assertThrows(ReglaNegocioException.class,
+                () -> service.actualizar(PRESUPUESTO_ID, USUARIO_ID, CUENTA_ID,
+                        new ActualizarCuentaRequest("Banco", TipoCuenta.TARJETA_CREDITO)));
+
+        assertThat(excepcion.getMessage()).isEqualTo(CuentaService.MENSAJE_TIPO_TARJETA);
+        assertThat(corriente.getTipo()).isEqualTo(TipoCuenta.CORRIENTE);
+        verify(cuentaRepository, never()).saveAndFlush(any());
+        verify(eventos, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    void renombrarUnaTarjetaConservandoElTipoEsValido() {
+        when(cuentaRepository.findByIdAndPresupuestoId(CUENTA_ID, PRESUPUESTO_ID))
+                .thenReturn(Optional.of(cuenta("Visa", TipoCuenta.TARJETA_CREDITO, 0L)));
+
+        CuentaResponse response = service.actualizar(PRESUPUESTO_ID, USUARIO_ID, CUENTA_ID,
+                new ActualizarCuentaRequest("Visa Oro", TipoCuenta.TARJETA_CREDITO));
+
+        assertThat(response.nombre()).isEqualTo("Visa Oro");
+        assertThat(response.tipo()).isEqualTo(TipoCuenta.TARJETA_CREDITO);
+    }
+
+    @Test
+    void crearPublicaLaCuentaCreadaYSiFallaElGuardadoNoPublicaNada() {
+        service.crear(PRESUPUESTO_ID, USUARIO_ID,
+                new CrearCuentaRequest("Visa", TipoCuenta.TARJETA_CREDITO, null, null));
+
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(eventos).publishEvent(captor.capture());
+        assertThat(captor.getValue()).isInstanceOf(CuentaCreadaEvento.class);
+        assertThat(((CuentaCreadaEvento) captor.getValue()).cuenta().getNombre())
+                .isEqualTo("Visa");
+    }
+
+    @Test
+    void crearConUnNombreRepetidoNoPublicaElEvento() {
+        when(cuentaRepository.existsByPresupuestoIdAndNombreNormalizado(PRESUPUESTO_ID, "visa"))
+                .thenReturn(true);
+
+        assertThrows(ConflictoException.class, () -> service.crear(PRESUPUESTO_ID, USUARIO_ID,
+                new CrearCuentaRequest("Visa", TipoCuenta.TARJETA_CREDITO, null, null)));
+
+        verify(eventos, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    void actualizarPublicaLaRenombradaSoloSiElNombreCambio() {
+        when(cuentaRepository.findByIdAndPresupuestoId(CUENTA_ID, PRESUPUESTO_ID))
+                .thenReturn(Optional.of(cuenta("Visa", TipoCuenta.TARJETA_CREDITO, 0L)));
+
+        service.actualizar(PRESUPUESTO_ID, USUARIO_ID, CUENTA_ID,
+                new ActualizarCuentaRequest("Visa", TipoCuenta.TARJETA_CREDITO));
+        verify(eventos, never()).publishEvent(any(Object.class));
+
+        service.actualizar(PRESUPUESTO_ID, USUARIO_ID, CUENTA_ID,
+                new ActualizarCuentaRequest("VISA", TipoCuenta.TARJETA_CREDITO));
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(eventos).publishEvent(captor.capture());
+        assertThat(captor.getValue()).isInstanceOf(CuentaRenombradaEvento.class);
+    }
+
+    @Test
+    void cerrarYReabrirPublicanSusEventos() {
+        when(cuentaRepository.findByIdAndPresupuestoId(CUENTA_ID, PRESUPUESTO_ID))
+                .thenReturn(Optional.of(cuenta("Visa", TipoCuenta.TARJETA_CREDITO, 0L)));
+
+        service.cerrar(PRESUPUESTO_ID, USUARIO_ID, CUENTA_ID);
+        service.reabrir(PRESUPUESTO_ID, USUARIO_ID, CUENTA_ID);
+
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(eventos, org.mockito.Mockito.times(2)).publishEvent(captor.capture());
+        assertThat(captor.getAllValues()).hasSize(2);
+        assertThat(captor.getAllValues().get(0)).isInstanceOf(CuentaCerradaEvento.class);
+        assertThat(captor.getAllValues().get(1)).isInstanceOf(CuentaReabiertaEvento.class);
     }
 
     private Cuenta cuenta(String nombre, TipoCuenta tipo, long saldoInicial) {

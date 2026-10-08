@@ -14,12 +14,15 @@ import com.presupuesto.categoria.dto.response.CategoriaResponse;
 import com.presupuesto.categoria.dto.response.GrupoCategoriaConCategoriasResponse;
 import com.presupuesto.categoria.entity.Categoria;
 import com.presupuesto.categoria.entity.GrupoCategoria;
+import com.presupuesto.categoria.entity.TipoGrupoCategoria;
+import com.presupuesto.cuenta.entity.Cuenta;
 import com.presupuesto.categoria.repository.CategoriaRepository;
 import com.presupuesto.categoria.repository.GrupoCategoriaRepository;
 import com.presupuesto.comun.excepcion.CodigoError;
 import com.presupuesto.comun.excepcion.ConflictoException;
 import com.presupuesto.comun.excepcion.DatosInvalidosException;
 import com.presupuesto.comun.excepcion.RecursoNoEncontradoException;
+import com.presupuesto.comun.excepcion.ReglaNegocioException;
 import com.presupuesto.presupuesto.entity.Presupuesto;
 import com.presupuesto.presupuesto.service.PresupuestoService;
 import java.util.List;
@@ -401,5 +404,80 @@ class CategoriaServiceTest {
                 () -> service.mostrar(PRESUPUESTO_ID, USUARIO_ID, 77L));
         assertThrows(RecursoNoEncontradoException.class, () -> service.mover(
                 PRESUPUESTO_ID, USUARIO_ID, 77L, new MoverCategoriaRequest(1L, 0)));
+    }
+
+    // ---------- grupo y categorías de pago de tarjetas ----------
+
+    private GrupoCategoria grupoDePagos() {
+        GrupoCategoria pagos = GrupoCategoria.builder()
+                .id(9L).nombre("Pagos").nombreNormalizado("pagos").orden(2)
+                .tipo(TipoGrupoCategoria.PAGOS_TARJETA).build();
+        when(grupoRepository.findByIdAndPresupuestoId(9L, PRESUPUESTO_ID))
+                .thenReturn(Optional.of(pagos));
+        return pagos;
+    }
+
+    private Categoria categoriaDePago(long id, GrupoCategoria pagos) {
+        Categoria pago = Categoria.builder()
+                .id(id).grupo(pagos).nombre("Pago: Visa").nombreNormalizado("pago: visa")
+                .orden(0).cuentaTarjeta(Cuenta.builder().id(44L).build()).build();
+        when(categoriaRepository.findByIdAndGrupoPresupuestoId(id, PRESUPUESTO_ID))
+                .thenReturn(Optional.of(pago));
+        return pago;
+    }
+
+    @Test
+    void unaCategoriaDePagoNoSeEditaOcultaMuestraNiMueve() {
+        GrupoCategoria pagos = grupoDePagos();
+        Categoria pago = categoriaDePago(50L, pagos);
+
+        assertThrows(ReglaNegocioException.class, () -> service.actualizar(
+                PRESUPUESTO_ID, USUARIO_ID, 50L, new ActualizarCategoriaRequest("Otra", "nota")));
+        assertThrows(ReglaNegocioException.class,
+                () -> service.ocultar(PRESUPUESTO_ID, USUARIO_ID, 50L));
+        assertThrows(ReglaNegocioException.class,
+                () -> service.mostrar(PRESUPUESTO_ID, USUARIO_ID, 50L));
+        assertThrows(ReglaNegocioException.class, () -> service.mover(
+                PRESUPUESTO_ID, USUARIO_ID, 50L, new MoverCategoriaRequest(9L, 0)));
+        assertThrows(ReglaNegocioException.class, () -> service.mover(
+                PRESUPUESTO_ID, USUARIO_ID, 50L, new MoverCategoriaRequest(1L, 0)));
+
+        assertThat(pago.getNombre()).isEqualTo("Pago: Visa");
+        assertThat(pago.isOculta()).isFalse();
+        assertThat(pago.getNota()).isNull();
+        assertThat(pago.getGrupo()).isSameAs(pagos);
+        verify(categoriaRepository, never()).saveAndFlush(any());
+        verify(categoriaRepository, never()).saveAllAndFlush(any());
+    }
+
+    @Test
+    void noSeCreanCategoriasEnElGrupoDePagos() {
+        grupoDePagos();
+
+        assertThrows(ReglaNegocioException.class, () -> service.crear(PRESUPUESTO_ID, USUARIO_ID,
+                new CrearCategoriaRequest(9L, "Mi pago", null)));
+
+        verify(categoriaRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void noSeMueveUnaCategoriaNormalAlGrupoDePagos() {
+        grupoDePagos();
+        Categoria comida = categoria(7L, x, "Comida", 0);
+
+        assertThrows(ReglaNegocioException.class, () -> service.mover(
+                PRESUPUESTO_ID, USUARIO_ID, 7L, new MoverCategoriaRequest(9L, 0)));
+
+        assertThat(comida.getGrupo()).isSameAs(x);
+        verify(categoriaRepository, never()).saveAllAndFlush(any());
+    }
+
+    @Test
+    void unaCategoriaDePagoDeOtroPresupuestoSigueDandoNoEncontrado() {
+        when(categoriaRepository.findByIdAndGrupoPresupuestoId(77L, PRESUPUESTO_ID))
+                .thenReturn(Optional.empty());
+
+        assertThrows(RecursoNoEncontradoException.class,
+                () -> service.ocultar(PRESUPUESTO_ID, USUARIO_ID, 77L));
     }
 }

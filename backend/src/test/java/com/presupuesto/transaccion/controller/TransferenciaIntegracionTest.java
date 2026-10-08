@@ -546,6 +546,53 @@ class TransferenciaIntegracionTest {
 
     // ---------- ayudas ----------
 
+
+    // ---------- categoría de pago de tarjeta ----------
+
+    @Test
+    void crearConLaCategoriaDePagoDa422YNoGuardaNada() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long banco = crearCuenta(ana, ana.presupuestoId, "Banco", true);
+        long externa = crearCuenta(ana, ana.presupuestoId, "Externa", false);
+        long pago = crearCategoriaDePago(ana, ana.presupuestoId, "Visa");
+
+        esperarReglaNegocio(crear(ana, ana.presupuestoId, cuerpo(banco, externa, 100, pago)));
+
+        esperarTotalTransacciones(ana, 0);
+    }
+
+    @Test
+    void editarConLaCategoriaDePagoDa422YNoCambiaLasPatas() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long banco = crearCuenta(ana, ana.presupuestoId, "Banco", true);
+        long externa = crearCuenta(ana, ana.presupuestoId, "Externa", false);
+        long comida = crearCategoria(ana, "Comida");
+        long pago = crearCategoriaDePago(ana, ana.presupuestoId, "Visa");
+        Transferencia t = crearOk(ana, banco, externa, 100, comida);
+
+        esperarReglaNegocio(editar(ana, ana.presupuestoId, t.salida(), edicion(250, pago)));
+
+        obtener(ana, ana.presupuestoId, t.salida())
+                .andExpect(jsonPath("$.salida.monto").value(-100))
+                .andExpect(jsonPath("$.salida.categoriaId").value(comida));
+    }
+
+    @Test
+    void unPagoDeTarjetaEntreCuentasDelPresupuestoSigueSiendoValidoSinCategoria()
+            throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long banco = crearCuenta(ana, ana.presupuestoId, "Banco", true);
+        Map<String, Object> tarjeta = new LinkedHashMap<>();
+        tarjeta.put("nombre", "Visa");
+        tarjeta.put("tipo", "TARJETA_CREDITO");
+        long visa = idDe(enviar(post(RUTA_PRESUPUESTOS + "/" + ana.presupuestoId + "/cuentas"),
+                ana, tarjeta));
+
+        crearOk(ana, banco, visa, 300, null);
+
+        esperarTotalTransacciones(ana, 2);
+    }
+
     private record Sesion(String token, long presupuestoId) {
     }
 
@@ -608,6 +655,29 @@ class TransferenciaIntegracionTest {
         cuerpo.put("nombre", nombre);
         return idDe(enviar(post(RUTA_PRESUPUESTOS + "/" + presupuestoId + "/categorias"),
                 sesion, cuerpo));
+    }
+
+    /** Crea una tarjeta de crédito y devuelve el id de su categoría de pago. */
+    private long crearCategoriaDePago(Sesion sesion, long presupuestoId, String tarjeta)
+            throws Exception {
+        Map<String, Object> cuenta = new LinkedHashMap<>();
+        cuenta.put("nombre", tarjeta);
+        cuenta.put("tipo", "TARJETA_CREDITO");
+        idDe(enviar(post(RUTA_PRESUPUESTOS + "/" + presupuestoId + "/cuentas"), sesion, cuenta));
+        String arbol = mockMvc.perform(get(RUTA_PRESUPUESTOS + "/" + presupuestoId + "/categorias")
+                        .param("incluirOcultas", "true")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(sesion.token)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        for (JsonNode grupo : objectMapper.readTree(arbol)) {
+            for (JsonNode categoria : grupo.get("categorias")) {
+                if (categoria.get("esPagoTarjeta").asBoolean()
+                        && categoria.get("nombre").asString().equals("Pago: " + tarjeta)) {
+                    return categoria.get("id").asLong();
+                }
+            }
+        }
+        throw new AssertionError("No hay categoría de pago de " + tarjeta);
     }
 
     private ResultActions enviar(

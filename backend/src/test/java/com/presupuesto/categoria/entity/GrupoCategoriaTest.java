@@ -59,4 +59,17 @@ class GrupoCategoriaTest {
         assertThat(Arrays.stream(GrupoCategoria.class.getMethods()).map(Method::getName))
                 .doesNotContain("setNombre", "setNombreNormalizado", "setOrden", "setOculto");
     }
+
+    @Test
+    void elTipoPorDefectoEsNormalYNoTieneSetter() {
+        GrupoCategoria grupo = GrupoCategoria.builder().build();
+        GrupoCategoria pagos =
+                GrupoCategoria.builder().tipo(TipoGrupoCategoria.PAGOS_TARJETA).build();
+
+        assertThat(grupo.getTipo()).isEqualTo(TipoGrupoCategoria.NORMAL);
+        assertThat(grupo.esPagosTarjeta()).isFalse();
+        assertThat(pagos.esPagosTarjeta()).isTrue();
+        assertThat(Arrays.stream(GrupoCategoria.class.getMethods()).map(Method::getName))
+                .doesNotContain("setTipo");
+    }
 }

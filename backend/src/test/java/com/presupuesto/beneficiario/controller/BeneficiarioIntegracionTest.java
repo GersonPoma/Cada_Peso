@@ -411,6 +411,57 @@ class BeneficiarioIntegracionTest {
 
     // ---------- ayudas ----------
 
+
+    // ---------- categoría de pago de tarjeta ----------
+
+    @Test
+    void crearConUnaCategoriaDePagoDa422YNoCreaElBeneficiario() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long pago = crearCategoriaDePago(ana, ana.presupuestoId, "Visa");
+
+        esperarReglaNegocio(crear(ana, ana.presupuestoId, "Tienda", pago));
+
+        listar(ana, ana.presupuestoId, null, null)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    void editarConUnaCategoriaDePagoDa422YElBeneficiarioConservaNombreYCategoria()
+            throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long comida = crearCategoria(ana, ana.presupuestoId, "Comida");
+        long pago = crearCategoriaDePago(ana, ana.presupuestoId, "Visa");
+        long id = idDe(crear(ana, ana.presupuestoId, "Tienda", comida));
+
+        esperarReglaNegocio(editar(ana, ana.presupuestoId, id, cuerpo("Otra tienda", pago)));
+
+        obtener(ana, ana.presupuestoId, id)
+                .andExpect(jsonPath("$.nombre").value("Tienda"))
+                .andExpect(jsonPath("$.categoriaPredeterminadaId").value(comida));
+    }
+
+    @Test
+    void quitarLaCategoriaPredeterminadaSigueDevolviendo200() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        long comida = crearCategoria(ana, ana.presupuestoId, "Comida");
+        crearCategoriaDePago(ana, ana.presupuestoId, "Visa");
+        long id = idDe(crear(ana, ana.presupuestoId, "Tienda", comida));
+
+        editar(ana, ana.presupuestoId, id, cuerpo("Tienda", null))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.categoriaPredeterminadaId").doesNotExist());
+    }
+
+    @Test
+    void laCategoriaDePagoDeOtroPresupuestoDa404() throws Exception {
+        Sesion ana = registrar("ana@ejemplo.com");
+        Sesion beto = registrar("beto@ejemplo.com");
+        long deBeto = crearCategoriaDePago(beto, beto.presupuestoId, "Visa");
+
+        esperarNoEncontrado(crear(ana, ana.presupuestoId, "Tienda", deBeto));
+    }
+
     private record Sesion(String token, long presupuestoId) {
     }
 
@@ -468,6 +519,35 @@ class BeneficiarioIntegracionTest {
         cuerpo.put("nombre", nombre);
         return idDe(enviar(post(RUTA_PRESUPUESTOS + "/" + presupuestoId + "/categorias"),
                 sesion, cuerpo));
+    }
+
+    /** Crea una tarjeta de crédito y devuelve el id de su categoría de pago. */
+    private long crearCategoriaDePago(Sesion sesion, long presupuestoId, String tarjeta)
+            throws Exception {
+        Map<String, Object> cuenta = new LinkedHashMap<>();
+        cuenta.put("nombre", tarjeta);
+        cuenta.put("tipo", "TARJETA_CREDITO");
+        idDe(enviar(post(RUTA_PRESUPUESTOS + "/" + presupuestoId + "/cuentas"), sesion, cuenta));
+        String arbol = mockMvc.perform(get(RUTA_PRESUPUESTOS + "/" + presupuestoId + "/categorias")
+                        .param("incluirOcultas", "true")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(sesion.token)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        for (tools.jackson.databind.JsonNode grupo : objectMapper.readTree(arbol)) {
+            for (tools.jackson.databind.JsonNode categoria : grupo.get("categorias")) {
+                if (categoria.get("esPagoTarjeta").asBoolean()
+                        && categoria.get("nombre").asString().equals("Pago: " + tarjeta)) {
+                    return categoria.get("id").asLong();
+                }
+            }
+        }
+        throw new AssertionError("No hay categoría de pago de " + tarjeta);
+    }
+
+    private static void esperarReglaNegocio(ResultActions resultado) throws Exception {
+        resultado
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.codigo").value("REGLA_NEGOCIO_VIOLADA"));
     }
 
     private ResultActions accion(

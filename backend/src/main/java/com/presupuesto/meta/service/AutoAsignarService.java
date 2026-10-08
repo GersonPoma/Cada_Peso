@@ -75,12 +75,18 @@ public class AutoAsignarService {
         return AutoAsignarResponse.desde(!request.simular(), actual.listoParaAsignar(), cambios);
     }
 
-    /** Sin ids, las categorías visibles; con ids, solo esas (ocultas incluidas) o 404. */
+    /**
+     * Sin ids, las categorías visibles salvo las de pago de tarjeta (no se pisa lo que la persona
+     * financió a mano); con ids, solo esas (ocultas y de pago incluidas) o 404.
+     */
     private List<Categoria> categoriasObjetivo(Long presupuestoId, List<Long> categoriaIds) {
         if (categoriaIds == null) {
             return categoriaRepository
                     .findByGrupoPresupuestoIdAndOcultaFalseOrderByGrupoOrdenAscOrdenAsc(
-                            presupuestoId);
+                            presupuestoId)
+                    .stream()
+                    .filter(categoria -> !categoria.esPagoTarjeta())
+                    .toList();
         }
         Set<Long> ids = new LinkedHashSet<>(categoriaIds);
         List<Categoria> categorias = categoriaRepository

@@ -11,6 +11,7 @@ import com.presupuesto.comun.excepcion.CodigoError;
 import com.presupuesto.comun.excepcion.ConflictoException;
 import com.presupuesto.comun.excepcion.DatosInvalidosException;
 import com.presupuesto.comun.excepcion.RecursoNoEncontradoException;
+import com.presupuesto.comun.excepcion.ReglaNegocioException;
 import com.presupuesto.presupuesto.entity.Presupuesto;
 import com.presupuesto.presupuesto.service.PresupuestoService;
 import java.util.List;
@@ -31,6 +32,8 @@ public class BeneficiarioService {
     static final String MENSAJE_NO_ENCONTRADO = "Beneficiario no encontrado";
     static final String MENSAJE_CATEGORIA_NO_ENCONTRADA = "Categoría no encontrada";
     static final String MENSAJE_YA_EXISTE = "Ya existe un beneficiario con ese nombre";
+    static final String MENSAJE_CATEGORIA_DE_PAGO =
+            "Una categoría de pago de tarjeta no puede ser la categoría predeterminada";
     static final String MENSAJE_LIMITE_INVALIDO = "El límite debe estar entre 1 y 50";
 
     private final BeneficiarioRepository beneficiarioRepository;
@@ -124,14 +127,22 @@ public class BeneficiarioService {
                 .orElseThrow(() -> new RecursoNoEncontradoException(MENSAJE_NO_ENCONTRADO));
     }
 
-    /** {@code null} si no se indica categoría; 404 si no es del presupuesto (oculta sí sirve). */
+    /**
+     * {@code null} si no se indica categoría; 404 si no es del presupuesto (oculta sí sirve) y
+     * 422 si es una categoría de pago de tarjeta, que no admite transacciones.
+     */
     private Categoria categoria(Long categoriaId, Long presupuestoId) {
         if (categoriaId == null) {
             return null;
         }
-        return categoriaRepository.findByIdAndGrupoPresupuestoId(categoriaId, presupuestoId)
+        Categoria categoria = categoriaRepository
+                .findByIdAndGrupoPresupuestoId(categoriaId, presupuestoId)
                 .orElseThrow(
                         () -> new RecursoNoEncontradoException(MENSAJE_CATEGORIA_NO_ENCONTRADA));
+        if (categoria.esPagoTarjeta()) {
+            throw new ReglaNegocioException(MENSAJE_CATEGORIA_DE_PAGO);
+        }
+        return categoria;
     }
 
     /** Minúsculas, con {@code !}, {@code %} y {@code _} escapados con {@code !}; termina en %. */

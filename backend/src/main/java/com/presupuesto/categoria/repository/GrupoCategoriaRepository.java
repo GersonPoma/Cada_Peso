@@ -1,6 +1,7 @@
 package com.presupuesto.categoria.repository;
 
 import com.presupuesto.categoria.entity.GrupoCategoria;
+import com.presupuesto.categoria.entity.TipoGrupoCategoria;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,6 +13,10 @@ public interface GrupoCategoriaRepository extends JpaRepository<GrupoCategoria, 
     List<GrupoCategoria> findByPresupuestoIdOrderByOrden(Long presupuestoId);
 
     List<GrupoCategoria> findByPresupuestoIdAndOcultoFalseOrderByOrden(Long presupuestoId);
+
+    /** El grupo de pagos de tarjetas del presupuesto: siempre por tipo, nunca por nombre. */
+    Optional<GrupoCategoria> findFirstByPresupuestoIdAndTipo(
+            Long presupuestoId, TipoGrupoCategoria tipo);
 
     long countByPresupuestoId(Long presupuestoId);
 

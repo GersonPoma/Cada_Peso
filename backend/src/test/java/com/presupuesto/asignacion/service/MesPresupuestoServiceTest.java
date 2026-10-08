@@ -12,6 +12,7 @@ import com.presupuesto.asignacion.service.CalculoMensual.FilaMes;
 import com.presupuesto.asignacion.service.CalculoMensual.ResultadoMes;
 import com.presupuesto.categoria.entity.Categoria;
 import com.presupuesto.categoria.entity.GrupoCategoria;
+import com.presupuesto.cuenta.entity.Cuenta;
 import com.presupuesto.categoria.repository.CategoriaRepository;
 import com.presupuesto.categoria.repository.GrupoCategoriaRepository;
 import com.presupuesto.comun.excepcion.DatosInvalidosException;
@@ -146,5 +147,27 @@ class MesPresupuestoServiceTest {
 
         assertThat(resultado.listoParaAsignar()).isEqualTo(380_000L);
         verify(presupuestoService, never()).obtenerDelUsuario(any(), any());
+    }
+
+    @Test
+    void laFilaDeUnaCategoriaDePagoTraeLaMarcaYLaTarjeta() {
+        Categoria pago = Categoria.builder().id(14L).grupo(hogar).nombre("Pago: Visa").orden(3)
+                .cuentaTarjeta(Cuenta.builder().id(44L).build()).build();
+        when(categoriaRepository.findByGrupoPresupuestoIdAndOcultaFalseOrderByOrden(PRESUPUESTO_ID))
+                .thenReturn(List.of(comida, pago));
+        when(calculadora.calcular(PRESUPUESTO_ID, ENERO)).thenReturn(new ResultadoMes(
+                350_000L,
+                Map.of(10L, new FilaMes(100_000L, -30_000L, 70_000L),
+                        14L, new FilaMes(0L, 30_000L, 30_000L))));
+
+        MesPresupuestoResponse mes = service.obtener(PRESUPUESTO_ID, USUARIO_ID, "2026-01", false);
+
+        assertThat(mes.grupos().get(0).categorias()).hasSize(2);
+        assertThat(mes.grupos().get(0).categorias().get(0).esPagoTarjeta()).isFalse();
+        assertThat(mes.grupos().get(0).categorias().get(0).cuentaId()).isNull();
+        assertThat(mes.grupos().get(0).categorias().get(1).esPagoTarjeta()).isTrue();
+        assertThat(mes.grupos().get(0).categorias().get(1).cuentaId()).isEqualTo(44L);
+        assertThat(mes.grupos().get(0).categorias().get(1).disponible()).isEqualTo(30_000L);
+        assertThat(mes.totalDisponible()).isEqualTo(100_000L);
     }
 }

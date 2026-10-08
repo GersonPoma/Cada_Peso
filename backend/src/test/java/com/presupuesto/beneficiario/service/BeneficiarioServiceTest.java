@@ -21,6 +21,8 @@ import com.presupuesto.comun.excepcion.CodigoError;
 import com.presupuesto.comun.excepcion.ConflictoException;
 import com.presupuesto.comun.excepcion.DatosInvalidosException;
 import com.presupuesto.comun.excepcion.RecursoNoEncontradoException;
+import com.presupuesto.comun.excepcion.ReglaNegocioException;
+import com.presupuesto.cuenta.entity.Cuenta;
 import com.presupuesto.presupuesto.entity.Presupuesto;
 import com.presupuesto.presupuesto.service.PresupuestoService;
 import java.util.List;
@@ -347,5 +349,51 @@ class BeneficiarioServiceTest {
                 () -> service.obtenerOCrear(presupuesto, "Spotify"));
 
         assertThat(error.getCodigo()).isEqualTo(CodigoError.BENEFICIARIO_YA_EXISTE);
+    }
+
+    // ---------- categoría de pago de tarjeta ----------
+
+    private static final long PAGO_ID = 41L;
+
+    private void hayCategoriaDePago() {
+        Categoria pago = Categoria.builder().id(PAGO_ID)
+                .cuentaTarjeta(Cuenta.builder().id(44L).build()).build();
+        when(categoriaRepository.findByIdAndGrupoPresupuestoId(PAGO_ID, PRESUPUESTO_ID))
+                .thenReturn(Optional.of(pago));
+    }
+
+    @Test
+    void crearConUnaCategoriaDePagoDa422SinGuardar() {
+        hayCategoriaDePago();
+
+        ReglaNegocioException error = assertThrows(ReglaNegocioException.class,
+                () -> service.crear(PRESUPUESTO_ID, USUARIO_ID,
+                        new CrearBeneficiarioRequest("Tienda", PAGO_ID)));
+
+        assertThat(error.getCodigo()).isEqualTo(CodigoError.REGLA_NEGOCIO_VIOLADA);
+        verify(beneficiarioRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void actualizarConUnaCategoriaDePagoDa422YConservaNombreYCategoria() {
+        hayCategoriaDePago();
+
+        assertThrows(ReglaNegocioException.class,
+                () -> service.actualizar(PRESUPUESTO_ID, USUARIO_ID, BENEFICIARIO_ID,
+                        new ActualizarBeneficiarioRequest("Otro nombre", PAGO_ID)));
+
+        assertThat(existente.getNombre()).isEqualTo("Netflix");
+        assertThat(existente.getCategoriaPredeterminada()).isSameAs(ocio);
+        verify(beneficiarioRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void quitarLaCategoriaSigueSiendoValidoAunqueExistaUnaDePago() {
+        hayCategoriaDePago();
+
+        BeneficiarioResponse respuesta = service.actualizar(PRESUPUESTO_ID, USUARIO_ID,
+                BENEFICIARIO_ID, new ActualizarBeneficiarioRequest("Netflix", null));
+
+        assertThat(respuesta.categoriaPredeterminadaId()).isNull();
     }
 }
