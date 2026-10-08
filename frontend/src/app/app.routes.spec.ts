@@ -121,6 +121,12 @@ describe('rutas', () => {
       backend.expectOne('/api/v1/presupuestos').flush(PRESUPUESTOS);
       await harness.fixture.whenStable();
       (await esperarPeticion('/api/v1/presupuestos/3/meses/2026-10')).flush(MES_OCTUBRE);
+      // El mes pide sus metas junto con el mes.
+      (await esperarPeticion('/api/v1/presupuestos/3/meses/2026-10/metas')).flush({
+        mes: '2026-10',
+        totalFaltante: 0,
+        metas: [],
+      });
       await harness.fixture.whenStable();
       backend.verify();
     }
@@ -191,6 +197,39 @@ describe('rutas', () => {
 
       expect(url()).toBe('/presupuestos/3/cuentas');
       expect(texto()).toContain('Banco');
+      const enlaces = Array.from(
+        (harness.routeNativeElement as HTMLElement).querySelectorAll('mat-sidenav a'),
+      ).map((a) => a.querySelector('[matListItemTitle]')?.textContent?.trim());
+      expect(enlaces).toEqual([
+        'Presupuesto',
+        'Inicio',
+        'Cuentas',
+        'Transacciones',
+        'Categorías',
+        'Beneficiarios',
+      ]);
+    });
+
+    it('/presupuestos/3/cuentas/5/conciliacion se muestra sin entrada en el menú', async () => {
+      await harness.navigateByUrl('/presupuestos/3/cuentas/5/conciliacion');
+      const backend = TestBed.inject(HttpTestingController);
+      backend.expectOne('/api/v1/presupuestos').flush(PRESUPUESTOS);
+      await harness.fixture.whenStable();
+      (await esperarPeticion('/api/v1/presupuestos/3/cuentas/5')).flush({
+        id: 5,
+        nombre: 'Banco',
+        tipo: 'CORRIENTE',
+        enPresupuesto: true,
+        cerrada: false,
+      });
+      backend.expectOne((p) => p.url === '/api/v1/presupuestos/3/categorias').flush([]);
+      backend.expectOne('/api/v1/presupuestos/3/cuentas/5/conciliacion').flush([]);
+      await harness.fixture.whenStable();
+      backend.verify();
+
+      expect(url()).toBe('/presupuestos/3/cuentas/5/conciliacion');
+      expect(texto()).toContain('Conciliar Banco');
+      expect(texto()).toContain('Aún no has conciliado esta cuenta');
       const enlaces = Array.from(
         (harness.routeNativeElement as HTMLElement).querySelectorAll('mat-sidenav a'),
       ).map((a) => a.querySelector('[matListItemTitle]')?.textContent?.trim());

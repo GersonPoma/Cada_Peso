@@ -17,6 +17,16 @@
       }
     </div>
     <div class="botones-encabezado">
+      @if (cuentaConciliable(); as cuentaId) {
+        <a
+          mat-stroked-button
+          class="conciliar"
+          [routerLink]="['/presupuestos', presupuestoId(), 'cuentas', cuentaId, 'conciliacion']"
+        >
+          <mat-icon>fact_check</mat-icon>
+          Conciliar
+        </a>
+      }
       <button mat-stroked-button type="button" (click)="agregarTransferencia()">
         <mat-icon>swap_horiz</mat-icon>
         Agregar transferencia

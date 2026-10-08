@@ -797,6 +797,11 @@ src/app/
     │   ├── models/
     │   ├── pages/
     │   └── services/
+    ├── conciliacion/
+    │   ├── components/
+    │   ├── models/
+    │   ├── pages/
+    │   └── services/
     ├── cuentas/
     │   ├── components/
     │   ├── models/
@@ -883,6 +888,17 @@ como same-origin, evitando configurar CORS en el backend.
 - Cada feature con pantallas dentro de un presupuesto agrega su ruta como hija de
   `presupuestos/:presupuestoId` en `app.routes.ts`, con `data: seccion('<Etiqueta>', '<icono>')`
   (`loadComponent`, no `loadChildren`); el menú lateral se arma solo a partir de esas rutas.
+- Las **metas** del frontend viven en `features/presupuesto-mensual`, sin ruta ni entrada propia
+  en el menú: se crean, editan, quitan, posponen y reanudan solo desde el menú de cada categoría
+  del mes, y `Auto-asignar` está en la misma pantalla. El mes pide `GET .../meses/{mes}/metas`
+  junto con el mes (mismo `incluirOcultas`); `GET .../metas` (todas, sin datos del mes) no se usa.
+- La **conciliación** vive en `features/conciliacion`, en la ruta hija
+  `cuentas/:cuentaId/conciliacion` **sin** `data: seccion(...)` (no tiene entrada en el menú
+  lateral): se llega con `routerLink` desde el menú de cada cuenta en Cuentas (`Conciliar` en
+  las abiertas, `Ver conciliaciones` en las cerradas) y desde el botón `Conciliar` de
+  Transacciones filtrada por una cuenta abierta. La categoría del ajuste sigue
+  `reglaCategoriaAjuste` (igual que el backend): sin categoría fuera del presupuesto,
+  obligatoria si el ajuste es negativo o la cuenta es tarjeta, opcional si no.
 
 ## Sesión y autenticación del frontend
 

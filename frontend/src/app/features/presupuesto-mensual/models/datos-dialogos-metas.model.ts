@@ -6,7 +6,8 @@ export interface DatosDialogoMeta {
 }
 
 /** Cómo terminó el diálogo de meta; cualquiera de los tres pide recargar el mes. */
-export type ResultadoDialogoMeta = { tipo: 'guardada' } | { tipo: 'quitada' } | { tipo: 'recargar' };
+export type ResultadoDialogoMeta =
+  { tipo: 'guardada' } | { tipo: 'quitada' } | { tipo: 'recargar' };
 
 /** Datos del diálogo de confirmación de las metas. */
 export interface DatosDialogoConfirmacionMeta {
@@ -30,4 +31,5 @@ export interface DatosDialogoAutoAsignar {
 }
 
 /** Cómo terminó el diálogo de auto-asignar. */
-export type ResultadoDialogoAutoAsignar = { tipo: 'aplicado'; cambios: number } | { tipo: 'recargar' };
+export type ResultadoDialogoAutoAsignar =
+  { tipo: 'aplicado'; cambios: number } | { tipo: 'recargar' };

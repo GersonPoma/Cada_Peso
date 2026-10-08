@@ -21,10 +21,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { proveerMaterial } from '../../../core/material/proveer-material';
 import { PresupuestoActivoService } from '../../../core/presupuesto-activo/presupuesto-activo.service';
 import { MENSAJE_ERROR_GENERICO } from '../../../shared/api/problema-api';
+import { DialogoAutoAsignarComponent } from '../components/dialogo-auto-asignar.component';
+import { DialogoMetaComponent } from '../components/dialogo-meta.component';
 import { DialogoMoverDineroComponent } from '../components/dialogo-mover-dinero.component';
 import { CategoriaMesResponse } from '../models/categoria-mes-response.model';
 import { MesPresupuestoResponse } from '../models/mes-presupuesto-response.model';
-import { PresupuestoMensualPage } from './presupuesto-mensual.page';
+import { MetaMesResponse, MetasMesResponse } from '../models/metas-mes-response.model';
+import {
+  MENSAJE_META_QUITADA,
+  PresupuestoMensualPage,
+  mensajeAutoAsignado,
+} from './presupuesto-mensual.page';
 
 const BASE = '/api/v1/presupuestos/3/meses';
 
@@ -44,6 +51,8 @@ function categoria(
     actividad,
     disponible,
     sobregastada: disponible < 0,
+    esPagoTarjeta: false,
+    cuentaId: null,
     ...extra,
   };
 }
@@ -77,6 +86,25 @@ function mesDePrueba(mes = '2026-10', cambios: Partial<MesPresupuestoResponse> =
     ...cambios,
   };
   return respuesta;
+}
+
+function metaDePrueba(cambios: Partial<MetaMesResponse> = {}): MetaMesResponse {
+  return {
+    categoriaId: 7,
+    nombre: 'Luz',
+    tipo: 'MONTO_MENSUAL',
+    monto: 100000,
+    necesidad: 100000,
+    asignado: 60000,
+    disponible: 60000,
+    faltante: 40000,
+    estado: 'FALTA',
+    ...cambios,
+  };
+}
+
+function metasDePrueba(mes = '2026-10', metas: MetaMesResponse[] = []): MetasMesResponse {
+  return { mes, totalFaltante: metas.reduce((suma, m) => suma + m.faltante, 0), metas };
 }
 
 function normalizar(texto: string | null | undefined): string {
@@ -114,10 +142,31 @@ describe('PresupuestoMensualPage', () => {
     );
   }
 
-  async function entrar(mes = '2026-10', respuesta = mesDePrueba(mes)): Promise<void> {
-    await harness.navigateByUrl(`/presupuestos/3/presupuesto/${mes}`);
-    peticionMes(mes).flush(respuesta);
+  function peticionMetas(mes = '2026-10', ocultas = false): TestRequest {
+    return backend.expectOne(
+      (p) => p.url === `${BASE}/${mes}/metas` && p.params.get('incluirOcultas') === String(ocultas),
+    );
+  }
+
+  /** Responde el mes y sus metas (se piden juntos); por defecto, sin metas. */
+  async function responder(
+    mes = '2026-10',
+    respuesta = mesDePrueba(mes),
+    opciones: { ocultas?: boolean; metas?: MetasMesResponse } = {},
+  ): Promise<void> {
+    const ocultas = opciones.ocultas ?? false;
+    peticionMes(mes, ocultas).flush(respuesta);
+    peticionMetas(mes, ocultas).flush(opciones.metas ?? metasDePrueba(mes));
     await estable();
+  }
+
+  async function entrar(
+    mes = '2026-10',
+    respuesta = mesDePrueba(mes),
+    metas = metasDePrueba(mes),
+  ): Promise<void> {
+    await harness.navigateByUrl(`/presupuestos/3/presupuesto/${mes}`);
+    await responder(mes, respuesta, { metas });
   }
 
   async function editar(nombre: string, valor: string, tecla = 'Enter'): Promise<void> {
@@ -182,7 +231,7 @@ describe('PresupuestoMensualPage', () => {
         await estable();
 
         expect(url()).toBe('/presupuestos/3/presupuesto/2026-10');
-        peticionMes('2026-10').flush(mesDePrueba());
+        await responder();
         await estable();
       },
     );
@@ -194,7 +243,7 @@ describe('PresupuestoMensualPage', () => {
       await estable();
 
       expect(url()).toBe('/presupuestos/3/presupuesto/2027-01');
-      peticionMes('2027-01').flush(mesDePrueba('2027-01'));
+      await responder('2027-01');
       await estable();
       expect(texto()).toContain('January 2027');
     });
@@ -208,17 +257,19 @@ describe('PresupuestoMensualPage', () => {
       await estable();
 
       expect(url()).toBe('/presupuestos/3/presupuesto/2026-10');
-      peticionMes('2026-10').flush(mesDePrueba());
+      await responder();
       await estable();
     });
 
     it('ignora la respuesta atrasada de un mes anterior', async () => {
       await harness.navigateByUrl('/presupuestos/3/presupuesto/2026-10');
       const vieja = peticionMes('2026-10');
+      const metasViejas = peticionMetas('2026-10');
 
       await harness.navigateByUrl('/presupuestos/3/presupuesto/2026-11');
       expect(vieja.cancelled).toBe(true);
-      peticionMes('2026-11').flush(mesDePrueba('2026-11', { listoParaAsignar: 7000 }));
+      expect(metasViejas.cancelled).toBe(true);
+      await responder('2026-11', mesDePrueba('2026-11', { listoParaAsignar: 7000 }));
       await estable();
 
       expect(texto()).toContain('November 2026');
@@ -247,7 +298,7 @@ describe('PresupuestoMensualPage', () => {
       await (await cargador.getHarness(MatSlideToggleHarness)).toggle();
       await estable();
 
-      peticionMes('2026-10', true).flush(mesDePrueba());
+      await responder('2026-10', mesDePrueba(), { ocultas: true });
       await estable();
       expect(texto()).toContain('Facturas');
     });
@@ -258,16 +309,19 @@ describe('PresupuestoMensualPage', () => {
       await harness.navigateByUrl('/presupuestos/3/presupuesto/2026-10');
 
       expect(elemento().querySelector('mat-progress-spinner')).not.toBeNull();
-      peticionMes().flush(mesDePrueba());
+      await responder();
       await estable();
       expect(elemento().querySelector('mat-progress-spinner')).toBeNull();
     });
 
     it('un error muestra el aviso con Reintentar, que vuelve a pedir el mes', async () => {
       await harness.navigateByUrl('/presupuestos/3/presupuesto/2026-10');
+      const metas = peticionMetas();
       peticionMes().flush({}, { status: 500, statusText: 'Internal Server Error' });
       await estable();
 
+      // Sin el mes, sus metas ya no se esperan.
+      expect(metas.cancelled).toBe(true);
       expect(abrirAviso).toHaveBeenCalledWith(MENSAJE_ERROR_GENERICO, 'Reintentar', {
         duration: 6000,
       });
@@ -275,7 +329,7 @@ describe('PresupuestoMensualPage', () => {
 
       accionAviso.next();
       await estable();
-      peticionMes().flush(mesDePrueba());
+      await responder();
       await estable();
       expect(texto()).toContain('Facturas');
     });
@@ -352,7 +406,7 @@ describe('PresupuestoMensualPage', () => {
       await estable();
 
       expect(abrirAviso).toHaveBeenCalled();
-      peticionMes().flush(mesDePrueba());
+      await responder();
       await estable();
     });
 
@@ -425,7 +479,7 @@ describe('PresupuestoMensualPage', () => {
       await menu.clickItem({ text: /Mover dinero/ });
       await estable();
 
-      peticionMes().flush(mesDePrueba());
+      await responder();
       await estable();
     });
 
@@ -450,6 +504,282 @@ describe('PresupuestoMensualPage', () => {
 
       expect(texto()).not.toContain('Grupo oculto');
       expect(texto()).not.toContain('Vieja');
+    });
+  });
+
+  describe('metas', () => {
+    const fila = (nombre: string) =>
+      Array.from(elemento().querySelectorAll('.fila.categoria')).find((f) =>
+        f.querySelector('.nombre-categoria')?.textContent?.includes(nombre),
+      ) as HTMLElement;
+    const indicador = (nombre: string) =>
+      normalizar(fila(nombre)?.querySelector('app-indicador-meta')?.textContent) || null;
+    const botonPorTexto = (t: string) =>
+      Array.from(elemento().querySelectorAll('button')).find((b) => b.textContent?.trim() === t) as
+        HTMLButtonElement | undefined;
+
+    async function elegirDelMenu(nombre: string, item: RegExp): Promise<void> {
+      const menu = await cargador.getHarness(
+        MatMenuHarness.with({ selector: `[aria-label="Acciones de ${nombre}"]` }),
+      );
+      await menu.open();
+      await menu.clickItem({ text: item });
+      await estable();
+    }
+
+    const METAS = metasDePrueba('2026-10', [
+      metaDePrueba(),
+      metaDePrueba({ categoriaId: 9, nombre: 'Ocio', faltante: 10000, asignado: 90000 }),
+    ]);
+
+    it('muestra el indicador en las filas con meta y el total faltante', async () => {
+      await entrar('2026-10', mesDePrueba(), METAS);
+
+      expect(indicador('Luz')).toContain('Falta $40.00');
+      expect(indicador('Luz')).toContain('Meta del mes: $100.00');
+      expect(indicador('Ocio')).toContain('Falta $10.00');
+      expect(indicador('Agua')).toBeNull();
+      expect(texto()).toContain('Falta para tus metas: $50.00');
+    });
+
+    it('sin faltante no muestra el total de las metas', async () => {
+      await entrar();
+
+      expect(texto()).not.toContain('Falta para tus metas');
+    });
+
+    it('en un mes pasado el faltante se ve como Faltaron', async () => {
+      await entrar(
+        '2026-08',
+        mesDePrueba('2026-08'),
+        metasDePrueba('2026-08', [metaDePrueba({ asignado: 0, faltante: 100000 })]),
+      );
+
+      expect(indicador('Luz')).toContain('Faltaron $100.00');
+    });
+
+    it('Mostrar ocultas pide el mes y las metas con incluirOcultas=true', async () => {
+      await entrar();
+      await (await cargador.getHarness(MatSlideToggleHarness)).toggle();
+      await estable();
+
+      await responder('2026-10', mesDePrueba(), {
+        ocultas: true,
+        metas: metasDePrueba('2026-10', [metaDePrueba()]),
+      });
+      expect(indicador('Luz')).toContain('Falta $40.00');
+    });
+
+    it('ignora las metas atrasadas de un mes anterior', async () => {
+      await harness.navigateByUrl('/presupuestos/3/presupuesto/2026-10');
+      peticionMes('2026-10').flush(mesDePrueba());
+      const metasViejas = peticionMetas('2026-10');
+
+      await harness.navigateByUrl('/presupuestos/3/presupuesto/2026-11');
+      expect(metasViejas.cancelled).toBe(true);
+      await responder('2026-11', mesDePrueba('2026-11'), {
+        metas: metasDePrueba('2026-11', [metaDePrueba({ faltante: 7000 })]),
+      });
+
+      expect(texto()).toContain('November 2026');
+      expect(indicador('Luz')).toContain('Falta $7.00');
+    });
+
+    it('si solo fallan las metas, muestra el mes sin indicadores y permite reintentar', async () => {
+      await harness.navigateByUrl('/presupuestos/3/presupuesto/2026-10');
+      peticionMes().flush(mesDePrueba());
+      peticionMetas().flush({}, { status: 500, statusText: 'Internal Server Error' });
+      await estable();
+
+      expect(texto()).toContain('Luz');
+      expect(texto()).toContain('No pudimos cargar las metas');
+      expect(elemento().querySelector('app-indicador-meta')).toBeNull();
+      expect(totalDelMes('total-asignado')).toBe('$150.00');
+
+      botonPorTexto('Reintentar')?.click();
+      await estable();
+      await responder('2026-10', mesDePrueba(), { metas: METAS });
+
+      expect(texto()).not.toContain('No pudimos cargar las metas');
+      expect(indicador('Luz')).toContain('Falta $40.00');
+    });
+
+    describe('diálogo de meta', () => {
+      it.each([
+        ['Agregar meta', 9, 'Ocio', false],
+        ['Editar meta', 7, 'Luz', true],
+      ] as const)('%s abre el diálogo con la categoría', async (item, id, nombre, tieneMeta) => {
+        await entrar('2026-10', mesDePrueba(), metasDePrueba('2026-10', [metaDePrueba()]));
+        const abrir = simularDialogo(undefined);
+
+        await elegirDelMenu(nombre, new RegExp(item));
+
+        expect(abrir).toHaveBeenCalledWith(DialogoMetaComponent, {
+          data: { categoriaId: id, nombre, tieneMeta },
+          width: '480px',
+        });
+        // El foco vuelve al botón del menú al cerrar: restoreFocus queda por defecto.
+        expect(abrir.mock.calls[0][1]).not.toHaveProperty('restoreFocus');
+      });
+
+      it.each([{ tipo: 'guardada' }, { tipo: 'quitada' }, { tipo: 'recargar' }])(
+        'con el resultado %o vuelve a pedir el mes y sus metas',
+        async (resultado) => {
+          await entrar();
+          simularDialogo(resultado);
+
+          await elegirDelMenu('Luz', /Agregar meta/);
+
+          await responder();
+        },
+      );
+
+      it('al cancelar no vuelve a pedir nada', async () => {
+        await entrar();
+        simularDialogo(undefined);
+
+        await elegirDelMenu('Luz', /Agregar meta/);
+
+        backend.expectNone((p) => p.url.startsWith(`${BASE}/2026-10`));
+      });
+    });
+
+    describe('posponer y reanudar', () => {
+      beforeEach(() =>
+        entrar(
+          '2026-10',
+          mesDePrueba(),
+          metasDePrueba('2026-10', [
+            metaDePrueba(),
+            metaDePrueba({ categoriaId: 9, nombre: 'Ocio', estado: 'POSPUESTA', necesidad: 0 }),
+          ]),
+        ),
+      );
+
+      it('Posponer este mes envía el POST, deshabilita la fila y recarga', async () => {
+        await elegirDelMenu('Luz', /Posponer este mes/);
+        const peticion = backend.expectOne(`${BASE}/2026-10/metas/7/posponer`);
+        expect(peticion.request.method).toBe('POST');
+
+        const menu = await cargador.getHarness(
+          MatMenuHarness.with({ selector: '[aria-label="Acciones de Luz"]' }),
+        );
+        await menu.open();
+        const items = await menu.getItems();
+        expect(await items[items.length - 1].isDisabled()).toBe(true);
+        await menu.close();
+
+        peticion.flush(metaDePrueba({ estado: 'POSPUESTA' }));
+        await estable();
+        await responder('2026-10', mesDePrueba(), {
+          metas: metasDePrueba('2026-10', [
+            metaDePrueba({ estado: 'POSPUESTA', necesidad: 0, faltante: 0 }),
+          ]),
+        });
+
+        expect(indicador('Luz')).toContain('Pospuesta este mes');
+        expect(indicador('Luz')).toContain('Meta del mes: $0.00');
+      });
+
+      it('Reanudar este mes envía /reanudar y recarga', async () => {
+        await elegirDelMenu('Ocio', /Reanudar este mes/);
+        backend.expectOne(`${BASE}/2026-10/metas/9/reanudar`).flush(metaDePrueba());
+        await estable();
+
+        await responder('2026-10', mesDePrueba(), { metas: METAS });
+        expect(indicador('Ocio')).toContain('Falta $10.00');
+      });
+
+      it('un 404 avisa que ya no tiene meta y recarga', async () => {
+        await elegirDelMenu('Luz', /Posponer este mes/);
+        backend
+          .expectOne(`${BASE}/2026-10/metas/7/posponer`)
+          .flush({ codigo: 'RECURSO_NO_ENCONTRADO' }, { status: 404, statusText: 'Not Found' });
+        await estable();
+
+        expect(abrirAviso).toHaveBeenCalledWith(MENSAJE_META_QUITADA, 'Cerrar', {
+          duration: 6000,
+        });
+        await responder();
+      });
+
+      it('otro error avisa de forma genérica', async () => {
+        await elegirDelMenu('Luz', /Posponer este mes/);
+        backend
+          .expectOne(`${BASE}/2026-10/metas/7/posponer`)
+          .flush({}, { status: 500, statusText: 'Internal Server Error' });
+        await estable();
+
+        expect(abrirAviso).toHaveBeenCalledWith(MENSAJE_ERROR_GENERICO, 'Cerrar', {
+          duration: 6000,
+        });
+        await responder();
+      });
+    });
+
+    describe('auto-asignar', () => {
+      it('está deshabilitado mientras no hay datos del mes', async () => {
+        await harness.navigateByUrl('/presupuestos/3/presupuesto/2026-10');
+
+        expect(botonPorTexto('Auto-asignar')?.disabled).toBe(true);
+        await responder();
+        expect(botonPorTexto('Auto-asignar')?.disabled).toBe(false);
+      });
+
+      it('abre el diálogo con las categorías del mes y si tienen meta', async () => {
+        const mes = mesDePrueba();
+        mes.grupos[1].categorias.push(
+          categoria(20, 'Pago: Visa', 0, 0, 0, { esPagoTarjeta: true, cuentaId: 4 }),
+        );
+        await entrar('2026-10', mes, metasDePrueba('2026-10', [metaDePrueba()]));
+        const abrir = simularDialogo(undefined);
+
+        botonPorTexto('Auto-asignar')?.click();
+        await estable();
+
+        expect(abrir).toHaveBeenCalledWith(DialogoAutoAsignarComponent, {
+          data: {
+            mes: '2026-10',
+            categorias: [
+              { categoriaId: 7, nombre: 'Luz', esPagoTarjeta: false, tieneMeta: true },
+              { categoriaId: 8, nombre: 'Agua', esPagoTarjeta: false, tieneMeta: false },
+              { categoriaId: 9, nombre: 'Ocio', esPagoTarjeta: false, tieneMeta: false },
+              { categoriaId: 20, nombre: 'Pago: Visa', esPagoTarjeta: true, tieneMeta: false },
+            ],
+          },
+          width: '520px',
+        });
+        expect(abrir.mock.calls[0][1]).not.toHaveProperty('restoreFocus');
+      });
+
+      it('tras aplicar avisa la cantidad real de categorías y recarga', async () => {
+        await entrar();
+        simularDialogo({ tipo: 'aplicado', cambios: 2 });
+
+        botonPorTexto('Auto-asignar')?.click();
+        await estable();
+
+        expect(abrirAviso).toHaveBeenCalledWith('Se actualizaron 2 categorías', 'Cerrar', {
+          duration: 6000,
+        });
+        await responder();
+      });
+
+      it('si el diálogo pide recargar, vuelve a pedir el mes sin aviso', async () => {
+        await entrar();
+        simularDialogo({ tipo: 'recargar' });
+
+        botonPorTexto('Auto-asignar')?.click();
+        await estable();
+
+        expect(abrirAviso).not.toHaveBeenCalled();
+        await responder();
+      });
+
+      it('mensajeAutoAsignado usa el singular con una categoría', () => {
+        expect(mensajeAutoAsignado(1)).toBe('Se actualizó 1 categoría');
+        expect(mensajeAutoAsignado(0)).toBe('Se actualizaron 0 categorías');
+      });
     });
   });
 });

@@ -23,7 +23,11 @@ describe('MetaService', () => {
 
   it('guardar hace PUT /categorias/{id}/meta con el cuerpo', () => {
     let respuesta: unknown;
-    const cuerpo = { tipo: 'MONTO_MENSUAL' as const, monto: 100000, frecuencia: 'MENSUAL' as const };
+    const cuerpo = {
+      tipo: 'MONTO_MENSUAL' as const,
+      monto: 100000,
+      frecuencia: 'MENSUAL' as const,
+    };
 
     servicio.guardar(3, 7, cuerpo).subscribe((r) => (respuesta = r));
     const peticion = backend.expectOne(URL_META);

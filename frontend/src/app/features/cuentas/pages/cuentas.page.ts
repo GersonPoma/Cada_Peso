@@ -14,6 +14,7 @@ import { MatMenu, MatMenuContent, MatMenuItem, MatMenuTrigger } from '@angular/m
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatSlideToggle } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { RouterLink } from '@angular/router';
 import { EMPTY, Observable, catchError, filter, forkJoin, switchMap, tap } from 'rxjs';
 import { PresupuestoActivoService } from '../../../core/presupuesto-activo/presupuesto-activo.service';
 import { MENSAJE_ERROR_GENERICO, leerProblemaApi } from '../../../shared/api/problema-api';
@@ -62,6 +63,7 @@ interface Seccion {
     MatProgressSpinner,
     MatSlideToggle,
     MontoPipe,
+    RouterLink,
   ],
   templateUrl: './cuentas.page.html',
   styleUrl: './cuentas.page.scss',
@@ -75,6 +77,7 @@ export class CuentasPage {
 
   protected readonly etiquetas = ETIQUETAS_TIPO_CUENTA;
   protected readonly moneda = computed(() => this.presupuestoActivo.presupuesto()?.moneda ?? null);
+  protected readonly presupuestoId = computed(() => this.presupuestoActivo.presupuesto()?.id);
 
   protected readonly estado = signal<Estado>('cargando');
   protected readonly incluirCerradas = signal(false);

@@ -29,7 +29,12 @@
       @for (categoria of grupo().categorias; track categoria.categoriaId) {
         <div class="fila categoria" role="listitem" [class.oculta]="categoria.oculta">
           <div class="col-nombre">
-            <span class="nombre-categoria">{{ categoria.nombre }}</span>
+            <div class="nombre-y-meta">
+              <span class="nombre-categoria">{{ categoria.nombre }}</span>
+              @if (metas().get(categoria.categoriaId); as meta) {
+                <app-indicador-meta [meta]="meta" [moneda]="moneda()" [mesPasado]="mesPasado()" />
+              }
+            </div>
             <button
               mat-icon-button
               type="button"
@@ -89,6 +94,37 @@
         <mat-icon>healing</mat-icon>
         <span>Cubrir sobregasto</span>
       </button>
+    }
+    @let meta = metas().get(categoria.categoriaId);
+    @let enCurso = metasEnCurso().has(categoria.categoriaId);
+    <button mat-menu-item type="button" [disabled]="enCurso" (click)="editarMeta.emit(categoria)">
+      <mat-icon>flag</mat-icon>
+      <span>{{ meta ? 'Editar meta' : 'Agregar meta' }}</span>
+    </button>
+    @if (meta) {
+      <!-- SOBREGASTADA puede ocultar que está pospuesta: se ofrecen las dos (idempotentes). -->
+      @if (meta.estado !== 'POSPUESTA') {
+        <button
+          mat-menu-item
+          type="button"
+          [disabled]="enCurso"
+          (click)="posponerMeta.emit(categoria)"
+        >
+          <mat-icon>pause_circle</mat-icon>
+          <span>Posponer este mes</span>
+        </button>
+      }
+      @if (meta.estado === 'POSPUESTA' || meta.estado === 'SOBREGASTADA') {
+        <button
+          mat-menu-item
+          type="button"
+          [disabled]="enCurso"
+          (click)="reanudarMeta.emit(categoria)"
+        >
+          <mat-icon>play_circle</mat-icon>
+          <span>Reanudar este mes</span>
+        </button>
+      }
     }
   </ng-template>
 </mat-menu>

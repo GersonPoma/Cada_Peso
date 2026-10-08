@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { proveerMaterial } from '../../../core/material/proveer-material';
 import { CategoriaMesResponse } from '../models/categoria-mes-response.model';
 import { GrupoMesResponse } from '../models/grupo-mes-response.model';
+import { MetaMesResponse } from '../models/metas-mes-response.model';
 import { GrupoMesComponent } from './grupo-mes.component';
 
 function categoria(
@@ -22,6 +23,8 @@ function categoria(
     actividad: 0,
     disponible: 0,
     sobregastada: false,
+    esPagoTarjeta: false,
+    cuentaId: null,
     ...cifras,
   };
 }
@@ -45,6 +48,11 @@ const FACTURAS: GrupoMesResponse = {
 
 function normalizar(texto: string | null | undefined): string {
   return (texto ?? '').replace(/[  ]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/** El texto de un ítem del menú sin el nombre de su ícono (`swap_horizMover dinero...`). */
+function sinIcono(texto: string): string {
+  return texto.replace(/^[a-z_]+(?=[A-Z])/, '').trim();
 }
 
 describe('GrupoMesComponent', () => {
@@ -147,8 +155,9 @@ describe('GrupoMesComponent', () => {
     );
     await menuLuz.open();
     const itemsLuz = await Promise.all((await menuLuz.getItems()).map((i) => i.getText()));
-    expect(itemsLuz).toHaveLength(1);
+    expect(itemsLuz).toHaveLength(2);
     expect(itemsLuz[0]).toContain('Mover dinero...');
+    expect(itemsLuz.some((t) => t.includes('Cubrir sobregasto'))).toBe(false);
     await menuLuz.clickItem({ text: /Mover dinero/ });
 
     const menuAgua = await cargador.getHarness(
@@ -159,5 +168,136 @@ describe('GrupoMesComponent', () => {
 
     expect(mover.map((c) => c.nombre)).toEqual(['Luz']);
     expect(cubrir.map((c) => c.nombre)).toEqual(['Agua']);
+  });
+
+  describe('metas', () => {
+    function meta(categoriaId: number, cambios: Partial<MetaMesResponse> = {}): MetaMesResponse {
+      return {
+        categoriaId,
+        nombre: 'Luz',
+        tipo: 'MONTO_MENSUAL',
+        monto: 100000,
+        necesidad: 100000,
+        asignado: 60000,
+        disponible: 60000,
+        faltante: 40000,
+        estado: 'FALTA',
+        ...cambios,
+      };
+    }
+
+    async function conMetas(...metas: MetaMesResponse[]): Promise<void> {
+      fixture.componentRef.setInput('metas', new Map(metas.map((m) => [m.categoriaId, m])));
+      await estable();
+    }
+
+    async function textosDelMenu(nombre: string): Promise<string[]> {
+      const menu = await cargador.getHarness(
+        MatMenuHarness.with({ selector: `[aria-label="Acciones de ${nombre}"]` }),
+      );
+      await menu.open();
+      const textos = await Promise.all((await menu.getItems()).map((i) => i.getText()));
+      await menu.close();
+      return textos.map(sinIcono);
+    }
+
+    it('el indicador va debajo del nombre solo en las categorías con meta', async () => {
+      await conMetas(meta(7));
+
+      const indicadorLuz = fila('Luz').querySelector('.col-nombre app-indicador-meta');
+      expect(indicadorLuz).not.toBeNull();
+      expect(normalizar(indicadorLuz?.textContent)).toContain('Falta $40.00');
+      expect(fila('Agua').querySelector('app-indicador-meta')).toBeNull();
+    });
+
+    it('en un mes pasado el indicador usa el tono neutro', async () => {
+      fixture.componentRef.setInput('mesPasado', true);
+      await conMetas(meta(7));
+
+      expect(normalizar(fila('Luz').querySelector('.estado')?.textContent)).toContain('Faltaron');
+    });
+
+    it('sin meta ofrece Agregar meta y nada para posponer', async () => {
+      expect(await textosDelMenu('Luz')).toEqual(['Mover dinero...', 'Agregar meta']);
+    });
+
+    it('con meta en FALTA ofrece Editar meta y Posponer este mes', async () => {
+      await conMetas(meta(7));
+
+      expect(await textosDelMenu('Luz')).toEqual([
+        'Mover dinero...',
+        'Editar meta',
+        'Posponer este mes',
+      ]);
+    });
+
+    it('con meta pospuesta ofrece Reanudar este mes', async () => {
+      await conMetas(meta(7, { estado: 'POSPUESTA' }));
+
+      expect(await textosDelMenu('Luz')).toEqual([
+        'Mover dinero...',
+        'Editar meta',
+        'Reanudar este mes',
+      ]);
+    });
+
+    it('con meta sobregastada ofrece posponer y reanudar', async () => {
+      await conMetas(meta(8, { nombre: 'Agua', estado: 'SOBREGASTADA' }));
+
+      expect(await textosDelMenu('Agua')).toEqual([
+        'Mover dinero...',
+        'Cubrir sobregasto',
+        'Editar meta',
+        'Posponer este mes',
+        'Reanudar este mes',
+      ]);
+    });
+
+    it('emite editar, posponer y reanudar con la categoría', async () => {
+      const editar: string[] = [];
+      const posponer: string[] = [];
+      const reanudar: string[] = [];
+      fixture.componentInstance.editarMeta.subscribe((c) => editar.push(c.nombre));
+      fixture.componentInstance.posponerMeta.subscribe((c) => posponer.push(c.nombre));
+      fixture.componentInstance.reanudarMeta.subscribe((c) => reanudar.push(c.nombre));
+      await conMetas(meta(8, { nombre: 'Agua', estado: 'SOBREGASTADA' }));
+
+      for (const [nombre, item] of [
+        ['Luz', /Agregar meta/],
+        ['Agua', /Editar meta/],
+        ['Agua', /Posponer este mes/],
+        ['Agua', /Reanudar este mes/],
+      ] as const) {
+        const menu = await cargador.getHarness(
+          MatMenuHarness.with({ selector: `[aria-label="Acciones de ${nombre}"]` }),
+        );
+        await menu.open();
+        await menu.clickItem({ text: item });
+      }
+
+      expect(editar).toEqual(['Luz', 'Agua']);
+      expect(posponer).toEqual(['Agua']);
+      expect(reanudar).toEqual(['Agua']);
+    });
+
+    it('con una acción en curso las acciones de meta de esa fila se deshabilitan', async () => {
+      await conMetas(meta(7));
+      fixture.componentRef.setInput('metasEnCurso', new Set([7]));
+      await estable();
+      const menu = await cargador.getHarness(
+        MatMenuHarness.with({ selector: '[aria-label="Acciones de Luz"]' }),
+      );
+      await menu.open();
+      const items = await menu.getItems();
+      const estados = await Promise.all(
+        items.map(async (i) => [await i.getText(), await i.isDisabled()] as const),
+      );
+
+      expect(estados.map(([texto, deshabilitado]) => [sinIcono(texto), deshabilitado])).toEqual([
+        ['Mover dinero...', false],
+        ['Editar meta', true],
+        ['Posponer este mes', true],
+      ]);
+    });
   });
 });

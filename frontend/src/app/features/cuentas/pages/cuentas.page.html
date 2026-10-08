@@ -82,11 +82,25 @@
           <mat-icon>lock_open</mat-icon>
           <span>Reabrir</span>
         </button>
+        <a
+          mat-menu-item
+          [routerLink]="['/presupuestos', presupuestoId(), 'cuentas', cuenta.id, 'conciliacion']"
+        >
+          <mat-icon>history</mat-icon>
+          <span>Ver conciliaciones</span>
+        </a>
       } @else {
         <button mat-menu-item type="button" (click)="editar(cuenta)">
           <mat-icon>edit</mat-icon>
           <span>Editar</span>
         </button>
+        <a
+          mat-menu-item
+          [routerLink]="['/presupuestos', presupuestoId(), 'cuentas', cuenta.id, 'conciliacion']"
+        >
+          <mat-icon>fact_check</mat-icon>
+          <span>Conciliar</span>
+        </a>
         <button mat-menu-item type="button" (click)="cerrar(cuenta)">
           <mat-icon>lock</mat-icon>
           <span>Cerrar</span>

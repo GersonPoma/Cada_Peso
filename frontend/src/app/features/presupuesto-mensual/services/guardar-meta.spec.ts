@@ -25,9 +25,9 @@ describe('aGuardarMetaRequest', () => {
   });
 
   it('semanal: agrega el día de la semana', () => {
-    expect(aGuardarMetaRequest(valor({ frecuencia: 'SEMANAL', diaSemana: 1, monto: 20000 }))).toEqual(
-      { tipo: 'MONTO_MENSUAL', monto: 20000, frecuencia: 'SEMANAL', diaSemana: 1 },
-    );
+    expect(
+      aGuardarMetaRequest(valor({ frecuencia: 'SEMANAL', diaSemana: 1, monto: 20000 })),
+    ).toEqual({ tipo: 'MONTO_MENSUAL', monto: 20000, frecuencia: 'SEMANAL', diaSemana: 1 });
   });
 
   it('personalizada: agrega el intervalo y la fecha de inicio local', () => {

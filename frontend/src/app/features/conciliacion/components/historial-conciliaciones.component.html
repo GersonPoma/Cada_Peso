@@ -1,0 +1,50 @@
+<section class="historial" aria-labelledby="titulo-historial">
+  <h2 id="titulo-historial" class="titulo">Historial de conciliaciones</h2>
+  @switch (estado()) {
+    @case ('cargando') {
+      <div class="centrado">
+        <mat-progress-spinner
+          mode="indeterminate"
+          diameter="40"
+          aria-label="Cargando el historial"
+        />
+      </div>
+    }
+    @case ('error') {
+      <div class="centrado">
+        <p class="error" role="alert">No pudimos cargar el historial.</p>
+        <button mat-stroked-button type="button" (click)="reintentar.emit()">Reintentar</button>
+      </div>
+    }
+    @case ('listo') {
+      @if (conciliaciones().length === 0) {
+        <p class="vacio">Aún no has conciliado esta cuenta</p>
+      } @else {
+        <ol class="lista">
+          @for (c of conciliaciones(); track c.id) {
+            <li class="conciliacion">
+              <div class="dato">
+                <span class="etiqueta">Fecha</span>
+                <span class="fecha">{{ c.fecha | fecha }}</span>
+              </div>
+              <div class="dato">
+                <span class="etiqueta">Saldo del extracto</span>
+                <span class="saldo">{{ c.saldoExtracto | monto: moneda() }}</span>
+              </div>
+              <div class="dato">
+                <span class="etiqueta">Ajuste</span>
+                <span class="ajuste">{{
+                  c.ajuste === 0 ? '—' : (c.ajuste | monto: moneda())
+                }}</span>
+              </div>
+              <div class="dato">
+                <span class="etiqueta">Reconciliadas</span>
+                <span class="cantidad">{{ c.cantidadReconciliadas }}</span>
+              </div>
+            </li>
+          }
+        </ol>
+      }
+    }
+  }
+</section>

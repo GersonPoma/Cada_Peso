@@ -6,7 +6,7 @@ import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatSlideToggle } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { EMPTY, catchError, filter, map, switchMap, tap } from 'rxjs';
+import { EMPTY, catchError, filter, forkJoin, map, of, switchMap, tap } from 'rxjs';
 import { PresupuestoActivoService } from '../../../core/presupuesto-activo/presupuesto-activo.service';
 import {
   CODIGOS_API,
@@ -15,22 +15,41 @@ import {
 } from '../../../shared/api/problema-api';
 import { MontoPipe } from '../../../shared/formato/monto.pipe';
 import { BarraMesComponent } from '../components/barra-mes.component';
+import { DialogoAutoAsignarComponent } from '../components/dialogo-auto-asignar.component';
+import { DialogoMetaComponent } from '../components/dialogo-meta.component';
 import { DialogoMoverDineroComponent } from '../components/dialogo-mover-dinero.component';
 import { Asignacion, GrupoMesComponent } from '../components/grupo-mes.component';
 import { ResumenListoParaAsignarComponent } from '../components/resumen-listo-para-asignar.component';
 import { CategoriaMesResponse } from '../models/categoria-mes-response.model';
 import { DatosDialogoMoverDinero } from '../models/datos-dialogo-mover-dinero.model';
+import {
+  DatosDialogoAutoAsignar,
+  DatosDialogoMeta,
+  ResultadoDialogoAutoAsignar,
+  ResultadoDialogoMeta,
+} from '../models/datos-dialogos-metas.model';
 import { MesPresupuestoResponse } from '../models/mes-presupuesto-response.model';
+import { MetaMesResponse, MetasMesResponse } from '../models/metas-mes-response.model';
 import { ResultadoMoverDinero } from '../models/resultado-mover-dinero.model';
 import { MesPresupuestoService } from '../services/mes-presupuesto.service';
 import { esMesValido, mesActual } from '../services/mes';
+import { MetaService } from '../services/meta.service';
+
+export const MENSAJE_META_QUITADA = 'La categoría ya no tiene meta';
+
+/** Aviso tras aplicar una auto-asignación, con la cantidad real de categorías que cambiaron. */
+export function mensajeAutoAsignado(cambios: number): string {
+  return cambios === 1 ? 'Se actualizó 1 categoría' : `Se actualizaron ${cambios} categorías`;
+}
 
 type Estado = 'cargando' | 'listo' | 'error';
 
 /**
  * Presupuesto mensual (base cero) del presupuesto activo. El mes manda desde la URL
  * (`presupuesto/:mes`). Permite asignar dinero a cada categoría (con actualización optimista),
- * ver actividad y disponible, el "Listo para asignar" y mover dinero entre categorías.
+ * ver actividad y disponible, el "Listo para asignar" y mover dinero entre categorías. Con el mes
+ * pide sus metas (mismo `incluirOcultas`): muestra su estado en cada fila, permite agregarlas,
+ * editarlas, quitarlas, posponerlas o reanudarlas en el mes y auto-asignar con vista previa.
  */
 @Component({
   selector: 'app-presupuesto-mensual',
@@ -52,6 +71,7 @@ export class PresupuestoMensualPage {
   private readonly ruta = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly servicio = inject(MesPresupuestoService);
+  private readonly metaService = inject(MetaService);
   private readonly presupuestoActivo = inject(PresupuestoActivoService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
@@ -73,6 +93,22 @@ export class PresupuestoMensualPage {
   /** Mensaje del backend por categoría (un 400 al asignar). */
   protected readonly errores = signal<ReadonlyMap<number, string>>(new Map());
   private readonly recargas = signal(0);
+
+  /** Metas del mes mostrado; `null` mientras carga o si fallaron. */
+  protected readonly metas = signal<MetasMesResponse | null>(null);
+  /** El mes cargó pero sus metas no. */
+  protected readonly errorMetas = signal(false);
+  /** Categorías con un posponer o reanudar en curso. */
+  protected readonly metasEnCurso = signal<ReadonlySet<number>>(new Set());
+
+  protected readonly metasPorCategoria = computed(
+    () =>
+      new Map<number, MetaMesResponse>(
+        (this.metas()?.metas ?? []).map((meta) => [meta.categoriaId, meta]),
+      ),
+  );
+  /** El mes mostrado es anterior al actual (local): sus faltantes se ven en tono neutro. */
+  protected readonly mesPasado = computed(() => this.mesValido() && this.mes() < mesActual());
 
   /** Totales del mes sumando las categorías mostradas (siguen al día tras editar). */
   protected readonly totales = computed(() => {
@@ -114,12 +150,20 @@ export class PresupuestoMensualPage {
           // Otro mes: no se muestran los datos del anterior mientras llega el nuevo.
           if (this.datos()?.mes !== mes) {
             this.datos.set(null);
+            this.metas.set(null);
             this.estado.set('cargando');
           }
         }),
-        // switchMap descarta la respuesta de un mes viejo si se cambia de mes rápido.
+        // switchMap descarta la respuesta de un mes viejo si se cambia de mes rápido; el mes y
+        // sus metas viajan juntos, así una respuesta atrasada se descarta entera.
         switchMap(({ presupuestoId, mes, incluirOcultas }) =>
-          this.servicio.obtener(presupuestoId as number, mes, incluirOcultas).pipe(
+          forkJoin([
+            this.servicio.obtener(presupuestoId as number, mes, incluirOcultas),
+            // Si solo fallan las metas, el mes sigue usable sin indicadores.
+            this.metaService
+              .delMes(presupuestoId as number, mes, incluirOcultas)
+              .pipe(catchError(() => of(null))),
+          ]).pipe(
             catchError((error: unknown) => {
               this.alFallarCarga(error);
               return EMPTY;
@@ -128,7 +172,11 @@ export class PresupuestoMensualPage {
         ),
         takeUntilDestroyed(),
       )
-      .subscribe((mes) => this.mostrar(mes));
+      .subscribe(([mes, metas]) => {
+        this.mostrar(mes);
+        this.metas.set(metas);
+        this.errorMetas.set(metas === null);
+      });
   }
 
   protected irAMes(mes: string, reemplazar = false): Promise<boolean> {
@@ -191,6 +239,107 @@ export class PresupuestoMensualPage {
     this.abrirMoverDinero({
       destinoId: categoria.categoriaId,
       monto: Math.max(0, -categoria.disponible),
+    });
+  }
+
+  /** Agregar o editar la meta; cualquier cierre con resultado vuelve a pedir el mes y sus metas. */
+  protected editarMeta(categoria: CategoriaMesResponse): void {
+    this.dialog
+      .open<DialogoMetaComponent, DatosDialogoMeta, ResultadoDialogoMeta>(DialogoMetaComponent, {
+        data: {
+          categoriaId: categoria.categoriaId,
+          nombre: categoria.nombre,
+          tieneMeta: this.metasPorCategoria().has(categoria.categoriaId),
+        },
+        width: '480px',
+      })
+      .afterClosed()
+      .subscribe((resultado) => {
+        if (resultado) {
+          this.recargar();
+        }
+      });
+  }
+
+  protected posponerMeta(categoria: CategoriaMesResponse): void {
+    this.cambiarPausaMeta(categoria, 'posponer');
+  }
+
+  protected reanudarMeta(categoria: CategoriaMesResponse): void {
+    this.cambiarPausaMeta(categoria, 'reanudar');
+  }
+
+  protected autoAsignar(): void {
+    const mes = this.datos();
+    if (!mes) {
+      return;
+    }
+    const metas = this.metasPorCategoria();
+    const categorias = mes.grupos.flatMap((grupo) =>
+      grupo.categorias.map((c) => ({
+        categoriaId: c.categoriaId,
+        nombre: c.nombre,
+        esPagoTarjeta: c.esPagoTarjeta,
+        tieneMeta: metas.has(c.categoriaId),
+      })),
+    );
+    this.dialog
+      .open<DialogoAutoAsignarComponent, DatosDialogoAutoAsignar, ResultadoDialogoAutoAsignar>(
+        DialogoAutoAsignarComponent,
+        { data: { mes: mes.mes, categorias }, width: '520px' },
+      )
+      .afterClosed()
+      .subscribe((resultado) => {
+        if (resultado?.tipo === 'aplicado') {
+          this.snackBar.open(mensajeAutoAsignado(resultado.cambios), 'Cerrar', {
+            duration: 6000,
+          });
+        }
+        if (resultado) {
+          this.recargar();
+        }
+      });
+  }
+
+  /** Posponer o reanudar la meta en el mes; al terminar (bien o mal) vuelve a pedir el mes. */
+  private cambiarPausaMeta(categoria: CategoriaMesResponse, accion: 'posponer' | 'reanudar') {
+    const presupuestoId = this.presupuestoId();
+    const mes = this.datos()?.mes;
+    const { categoriaId } = categoria;
+    if (presupuestoId === undefined || !mes || this.metasEnCurso().has(categoriaId)) {
+      return;
+    }
+    this.marcarMetaEnCurso(categoriaId, true);
+    this.metaService[accion](presupuestoId, mes, categoriaId).subscribe({
+      next: () => {
+        this.marcarMetaEnCurso(categoriaId, false);
+        this.recargar();
+      },
+      error: (error: unknown) => {
+        this.marcarMetaEnCurso(categoriaId, false);
+        const problema = leerProblemaApi(error);
+        if (problema?.status === 401) {
+          return;
+        }
+        const mensaje =
+          problema?.codigo === CODIGOS_API.RECURSO_NO_ENCONTRADO
+            ? MENSAJE_META_QUITADA
+            : MENSAJE_ERROR_GENERICO;
+        this.snackBar.open(mensaje, 'Cerrar', { duration: 6000 });
+        this.recargar();
+      },
+    });
+  }
+
+  private marcarMetaEnCurso(categoriaId: number, enCurso: boolean): void {
+    this.metasEnCurso.update((actual) => {
+      const nuevo = new Set(actual);
+      if (enCurso) {
+        nuevo.add(categoriaId);
+      } else {
+        nuevo.delete(categoriaId);
+      }
+      return nuevo;
     });
   }
 

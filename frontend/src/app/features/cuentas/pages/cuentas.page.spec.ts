@@ -318,6 +318,37 @@ describe('CuentasPage', () => {
       expect(seccion('Cerradas')).toBeUndefined();
     });
 
+    /** Enlaces del menú abierto de la cuenta, con su texto y su destino. */
+    async function enlacesDelMenu(nombre: string): Promise<[string, string | null][]> {
+      const menu = await cargador.getHarness(
+        MatMenuHarness.with({ selector: `[aria-label="Acciones de ${nombre}"]` }),
+      );
+      await menu.open();
+      await estable();
+      return Array.from(document.querySelectorAll('.mat-mdc-menu-panel a[mat-menu-item]')).map(
+        (a) => [
+          normalizar(a.querySelector('.mat-mdc-menu-item-text')?.textContent ?? '').trim(),
+          a.getAttribute('href'),
+        ],
+      );
+    }
+
+    it('Conciliar aparece en el menú de una abierta y lleva a su conciliación', async () => {
+      expect(await enlacesDelMenu('Banco')).toEqual([
+        ['Conciliar', '/presupuestos/3/cuentas/5/conciliacion'],
+      ]);
+    });
+
+    it('Ver conciliaciones aparece en el menú de una cerrada', async () => {
+      await (await cargador.getHarness(MatSlideToggleHarness)).toggle();
+      await estable();
+      await responder([BANCO, VIEJA], SALDOS, true);
+
+      expect(await enlacesDelMenu('Vieja')).toEqual([
+        ['Ver conciliaciones', '/presupuestos/3/cuentas/8/conciliacion'],
+      ]);
+    });
+
     it('un 500 al cerrar muestra el aviso genérico', async () => {
       await accionDe('Banco', 'Cerrar');
 

@@ -41,6 +41,8 @@ function categoria(
     actividad: 0,
     disponible,
     sobregastada: disponible < 0,
+    esPagoTarjeta: false,
+    cuentaId: null,
     ...extra,
   };
 }

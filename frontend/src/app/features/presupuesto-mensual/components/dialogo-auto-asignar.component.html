@@ -1,0 +1,108 @@
+<h2 mat-dialog-title>Auto-asignar</h2>
+<form [formGroup]="formulario" (ngSubmit)="vistaPrevia()" novalidate>
+  <mat-dialog-content class="contenido">
+    <mat-form-field appearance="outline">
+      <mat-label>Estrategia</mat-label>
+      <mat-select formControlName="estrategia" cdkFocusInitial>
+        @for (opcion of estrategias; track opcion.valor) {
+          <mat-option [value]="opcion.valor">{{ opcion.texto }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-radio-group
+      class="alcance"
+      formControlName="alcance"
+      aria-label="Categorías a las que se asigna"
+    >
+      <mat-radio-button value="todas">Todas las categorías visibles</mat-radio-button>
+      <mat-radio-button value="elegidas">Elegir categorías</mat-radio-button>
+    </mat-radio-group>
+
+    @if (alcance() === 'todas') {
+      <p class="ayuda">{{ ayudaTodas }}</p>
+    } @else {
+      <mat-selection-list
+        class="categorias"
+        formControlName="elegidas"
+        aria-label="Categorías elegidas"
+      >
+        @for (categoria of datos.categorias; track categoria.categoriaId) {
+          <mat-list-option [value]="categoria.categoriaId" togglePosition="before">
+            {{ categoria.nombre }}
+            @if (categoria.esPagoTarjeta) {
+              <span class="pago-tarjeta">(pago de tarjeta)</span>
+            }
+          </mat-list-option>
+        }
+      </mat-selection-list>
+      @if (sinCategorias()) {
+        <p class="aviso-error">{{ mensajeSinCategorias }}</p>
+      }
+    }
+
+    @if (hayCategoriasSinMeta()) {
+      <p class="ayuda">{{ mensajeSinMeta }}</p>
+    }
+
+    @if (previa(); as resultado) {
+      <section class="previa" aria-label="Vista previa">
+        @if (resultado.cambios.length === 0) {
+          <p class="sin-cambios">{{ mensajeSinCambios }}</p>
+        } @else {
+          <ul class="cambios">
+            @for (cambio of resultado.cambios; track cambio.categoriaId) {
+              <li class="cambio">
+                <span class="nombre">{{ cambio.nombre }}</span>
+                <span class="montos">
+                  {{ cambio.asignadoAntes | monto: moneda }} →
+                  {{ cambio.asignadoDespues | monto: moneda }}
+                </span>
+              </li>
+            }
+          </ul>
+        }
+        <dl class="listo">
+          <div>
+            <dt>Listo para asignar antes</dt>
+            <dd class="listo-antes" [class.negativo]="resultado.listoParaAsignarAntes < 0">
+              {{ resultado.listoParaAsignarAntes | monto: moneda }}
+              @if (resultado.listoParaAsignarAntes < 0) {
+                <span class="texto-negativo">(asignaste de más)</span>
+              }
+            </dd>
+          </div>
+          <div>
+            <dt>Listo para asignar después</dt>
+            <dd class="listo-despues" [class.negativo]="resultado.listoParaAsignarDespues < 0">
+              {{ resultado.listoParaAsignarDespues | monto: moneda }}
+              @if (resultado.listoParaAsignarDespues < 0) {
+                <span class="texto-negativo">(asignaste de más)</span>
+              }
+            </dd>
+          </div>
+        </dl>
+      </section>
+    }
+
+    @if (errorGeneral(); as texto) {
+      <p class="aviso-error" role="alert">{{ texto }}</p>
+    }
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" [mat-dialog-close]="undefined" [disabled]="enviando()">
+      Cancelar
+    </button>
+    <button mat-stroked-button type="submit" [disabled]="formulario.invalid || enviando()">
+      Vista previa
+    </button>
+    <button
+      mat-flat-button
+      type="button"
+      [disabled]="!previa()?.cambios?.length || enviando()"
+      (click)="aplicar()"
+    >
+      Aplicar
+    </button>
+  </mat-dialog-actions>
+</form>

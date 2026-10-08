@@ -23,7 +23,5 @@ export class IndicadorMetaComponent {
   /** El mes mostrado es anterior al actual: `Falta` se ve en tono neutro. */
   readonly mesPasado = input(false);
 
-  protected readonly presentacion = computed(() =>
-    presentacionMeta(this.meta(), this.mesPasado()),
-  );
+  protected readonly presentacion = computed(() => presentacionMeta(this.meta(), this.mesPasado()));
 }

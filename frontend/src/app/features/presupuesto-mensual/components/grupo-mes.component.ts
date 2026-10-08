@@ -5,7 +5,9 @@ import { MatMenu, MatMenuContent, MatMenuItem, MatMenuTrigger } from '@angular/m
 import { MontoPipe } from '../../../shared/formato/monto.pipe';
 import { CategoriaMesResponse } from '../models/categoria-mes-response.model';
 import { GrupoMesResponse } from '../models/grupo-mes-response.model';
+import { MetaMesResponse } from '../models/metas-mes-response.model';
 import { CeldaAsignadoComponent } from './celda-asignado.component';
+import { IndicadorMetaComponent } from './indicador-meta.component';
 
 /** Pedido de asignar un monto (milésimas) a una categoría. */
 export interface Asignacion {
@@ -17,8 +19,8 @@ let siguienteId = 0;
 
 /**
  * Un grupo del mes: encabezado plegable con la suma de sus categorías y una fila por categoría
- * (asignado editable, actividad y disponible con su indicador de sobregasto). Solo presenta y
- * emite: la página hace las peticiones.
+ * (asignado editable, actividad y disponible con su indicador de sobregasto) y, si tiene meta, su
+ * indicador debajo del nombre. Solo presenta y emite: la página hace las peticiones.
  */
 @Component({
   selector: 'app-grupo-mes',
@@ -31,6 +33,7 @@ let siguienteId = 0;
     MatMenuTrigger,
     MontoPipe,
     CeldaAsignadoComponent,
+    IndicadorMetaComponent,
   ],
   templateUrl: './grupo-mes.component.html',
   styleUrl: './grupo-mes.component.scss',
@@ -43,10 +46,20 @@ export class GrupoMesComponent {
   readonly guardando = input<ReadonlySet<number>>(new Set());
   /** Mensaje de error del backend por categoría. */
   readonly errores = input<ReadonlyMap<number, string>>(new Map());
+  /** Meta del mes por categoría; las categorías sin meta no están. */
+  readonly metas = input<ReadonlyMap<number, MetaMesResponse>>(new Map());
+  /** Categorías con un posponer o reanudar en curso: sus acciones de meta se deshabilitan. */
+  readonly metasEnCurso = input<ReadonlySet<number>>(new Set());
+  /** El mes mostrado es anterior al actual (el indicador usa un tono neutro). */
+  readonly mesPasado = input(false);
 
   readonly asignar = output<Asignacion>();
   readonly moverDinero = output<CategoriaMesResponse>();
   readonly cubrirSobregasto = output<CategoriaMesResponse>();
+  /** Agregar o editar la meta (según si la categoría está en `metas`). */
+  readonly editarMeta = output<CategoriaMesResponse>();
+  readonly posponerMeta = output<CategoriaMesResponse>();
+  readonly reanudarMeta = output<CategoriaMesResponse>();
 
   protected readonly idLista = `categorias-grupo-${siguienteId++}`;
   protected readonly desplegado = signal(true);
