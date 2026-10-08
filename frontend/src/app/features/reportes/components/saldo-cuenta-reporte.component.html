@@ -1,0 +1,102 @@
+<app-estado-reporte [estado]="estadoCuentas()" (reintentar)="reintentarCuentas()">
+  <div class="reporte">
+    <mat-form-field appearance="outline" class="campo-cuenta" subscriptSizing="dynamic">
+      <mat-label>Cuenta</mat-label>
+      <mat-select [value]="cuenta()?.id ?? null" (selectionChange)="elegir($event.value)">
+        @if (abiertas().length > 0) {
+          <mat-optgroup label="Abiertas">
+            @for (c of abiertas(); track c.id) {
+              <mat-option [value]="c.id">
+                {{ c.nombre }}{{ c.enPresupuesto ? '' : ' · Fuera del presupuesto' }}
+              </mat-option>
+            }
+          </mat-optgroup>
+        }
+        @if (cerradas().length > 0) {
+          <mat-optgroup label="Cerradas">
+            @for (c of cerradas(); track c.id) {
+              <mat-option [value]="c.id">
+                {{ c.nombre }} · Cerrada{{ c.enPresupuesto ? '' : ' · Fuera del presupuesto' }}
+              </mat-option>
+            }
+          </mat-optgroup>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <div aria-live="polite">
+      @if (aviso(); as texto) {
+        <p class="aviso" role="alert">{{ texto }}</p>
+      }
+    </div>
+
+    @if (cuenta(); as c) {
+      <app-estado-reporte [estado]="estado()" (reintentar)="reintentar()">
+        @if (datos(); as datos) {
+          <div class="detalle">
+            <p class="resumen">
+              <span class="nombre">{{ c.nombre }}</span>
+              @if (c.cerrada) {
+                <span class="marca">Cerrada</span>
+              }
+              @if (!c.enPresupuesto) {
+                <span class="marca">Fuera del presupuesto</span>
+              }
+              <span class="saldo-inicial">
+                Saldo inicial: {{ datos.saldoInicial | monto: moneda() }}
+              </span>
+            </p>
+            <app-grafico-barras-mensuales
+              [meses]="meses()"
+              [series]="series()"
+              [linea]="saldo()"
+              [moneda]="moneda()"
+              [descripcion]="descripcion()"
+            />
+            <p class="nota">{{ notaSaldoInicial }}</p>
+
+            <div class="contenedor-tabla">
+              <table mat-table [dataSource]="datos.meses" aria-label="Entradas, salidas y saldo">
+                <ng-container matColumnDef="mes">
+                  <th mat-header-cell *matHeaderCellDef scope="col">Mes</th>
+                  <td mat-cell *matCellDef="let fila">{{ textoMes(fila.mes) }}</td>
+                </ng-container>
+                <ng-container matColumnDef="entradas">
+                  <th mat-header-cell *matHeaderCellDef scope="col" class="numero">Entradas</th>
+                  <td mat-cell *matCellDef="let fila" class="numero">
+                    {{ fila.entradas | monto: moneda() }}
+                  </td>
+                </ng-container>
+                <ng-container matColumnDef="salidas">
+                  <th mat-header-cell *matHeaderCellDef scope="col" class="numero">Salidas</th>
+                  <td mat-cell *matCellDef="let fila" class="numero">
+                    {{ fila.salidas | monto: moneda() }}
+                  </td>
+                </ng-container>
+                <ng-container matColumnDef="saldo">
+                  <th mat-header-cell *matHeaderCellDef scope="col" class="numero">Saldo</th>
+                  <td mat-cell *matCellDef="let fila" class="numero">
+                    {{ fila.saldo | monto: moneda() }}
+                  </td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="columnas"></tr>
+                <tr mat-row *matRowDef="let fila; columns: columnas"></tr>
+              </table>
+            </div>
+
+            <a
+              class="enlace"
+              [routerLink]="enlaceTransacciones().ruta"
+              [queryParams]="enlaceTransacciones().queryParams"
+            >
+              Ver transacciones<span class="oculto-visual"> de {{ c.nombre }}</span>
+            </a>
+          </div>
+        }
+      </app-estado-reporte>
+    } @else {
+      <p class="elegir">{{ mensajeElegir }}</p>
+    }
+  </div>
+</app-estado-reporte>

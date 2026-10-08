@@ -1,0 +1,35 @@
+<ul class="filas">
+  @for (fila of filas(); track fila.clave) {
+    <li class="fila">
+      <div class="encabezado-fila">
+        <span class="etiqueta">
+          {{ fila.etiqueta }}
+          @if (fila.marca) {
+            <span class="marca">{{ fila.marca }}</span>
+          }
+        </span>
+        <span class="cifras">
+          <span class="monto">{{ fila.valor | monto: moneda() }}</span>
+          <span class="porcentaje">{{ fila.porcentaje }}</span>
+        </span>
+      </div>
+      <div class="pista" aria-hidden="true">
+        @if (ancho(fila.valor) > 0) {
+          <div class="barra" [style.width.%]="ancho(fila.valor) / 10"></div>
+        }
+      </div>
+      @if (fila.nota || fila.enlace) {
+        <div class="pie-fila">
+          @if (fila.nota) {
+            <span class="nota">{{ fila.nota }}</span>
+          }
+          @if (fila.enlace; as enlace) {
+            <a class="enlace" [routerLink]="enlace.ruta" [queryParams]="enlace.queryParams">
+              {{ enlace.texto }}<span class="oculto-visual"> de {{ fila.etiqueta }}</span>
+            </a>
+          }
+        </div>
+      }
+    </li>
+  }
+</ul>

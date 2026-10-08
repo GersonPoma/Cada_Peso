@@ -207,6 +207,7 @@ describe('rutas', () => {
         'Transacciones',
         'Categorías',
         'Beneficiarios',
+        'Reportes',
       ]);
     });
 
@@ -240,6 +241,7 @@ describe('rutas', () => {
         'Transacciones',
         'Categorías',
         'Beneficiarios',
+        'Reportes',
       ]);
     });
 
@@ -310,6 +312,29 @@ describe('rutas', () => {
 
       expect(texto()).toContain('Transacciones');
       expect(enlaceDelMenu('Transacciones')).toBeDefined();
+    });
+
+    it('/presupuestos/3/reportes muestra el gasto con el enlace Reportes en el menú', async () => {
+      await harness.navigateByUrl('/presupuestos/3/reportes');
+      const backend = TestBed.inject(HttpTestingController);
+      backend.expectOne('/api/v1/presupuestos').flush(PRESUPUESTOS);
+      await harness.fixture.whenStable();
+      const gasto = await esperarPeticion('/api/v1/presupuestos/3/reportes/gasto-por-categoria');
+      expect(gasto.request.params.get('desde')).toBe('2026-05');
+      expect(gasto.request.params.get('hasta')).toBe('2026-10');
+      gasto.flush({
+        desde: '2026-05',
+        hasta: '2026-10',
+        total: 0,
+        grupos: [],
+        sinCategoria: { total: 0, porcentaje: 0 },
+      });
+      await harness.fixture.whenStable();
+      backend.verify();
+
+      expect(url()).toBe('/presupuestos/3/reportes?desde=2026-05&hasta=2026-10');
+      expect(texto()).toContain('Sin movimientos en este rango');
+      expect(enlaceDelMenu('Reportes')).toBeDefined();
     });
   });
 });

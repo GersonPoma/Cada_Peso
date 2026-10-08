@@ -612,8 +612,8 @@ asignado del presupuesto mensual, que se edita en el lugar, usa `leerMonto()` di
   (`getFullYear()`, `getMonth()`, `getDate()`), nunca de `toISOString()`, `toJSON()` ni
   `getUTC*()`: en Bolivia, desde las 20:00, la fecha en UTC ya es la del día siguiente y, el
   último día del mes, la del mes siguiente. El mes `yyyy-MM` del presupuesto se arma con
-  `mesActual()` (`features/presupuesto-mensual/services/mes.ts`), y sus tests fijan el reloj en al
-  menos dos zonas horarias.
+  `mesActual()` (`shared/fecha/mes.ts`; `features/presupuesto-mensual/services/mes.ts` solo lo
+  reexporta), y sus tests fijan el reloj en al menos dos zonas horarias.
 
 ## Formato regional (frontend)
 
@@ -852,6 +852,11 @@ src/app/
     │   ├── models/
     │   ├── pages/
     │   └── services/
+    ├── reportes/
+    │   ├── components/
+    │   ├── models/
+    │   ├── pages/
+    │   └── services/
     ├── transacciones/
     │   ├── components/
     │   ├── models/
@@ -870,7 +875,8 @@ src/app/
   configuración global de Angular Material).
 - `shared/`: componentes, pipes, directivas y utilidades reutilizables entre features (hoy,
   `formato/` con los pipes de monto y fecha y las funciones de dinero `leerMonto()`,
-  `aMilliunits()` y `deMilliunits()`, `fecha/` con `aFechaNegocio()` y `deFechaNegocio()`,
+  `aMilliunits()` y `deMilliunits()`, `fecha/` con `aFechaNegocio()`, `deFechaNegocio()` y las
+  funciones de meses `yyyy-MM` (`mesActual()`, `sumarMeses()`, `esMesValido()`, `textoMes()`),
   `api/` con la lectura de errores del API, `cabecera/`, `calculadora/` con `evaluarMonto()` y el
   campo `app-campo-monto`, `formulario/` con los mensajes de error y `validacion/` con los
   validadores, entre ellos `montoValido()`).
@@ -930,6 +936,15 @@ como same-origin, evitando configurar CORS en el backend.
   Transacciones filtrada por una cuenta abierta. La categoría del ajuste sigue
   `reglaCategoriaAjuste` (igual que el backend): sin categoría fuera del presupuesto,
   obligatoria si el ajuste es negativo o la cuenta es tarjeta, opcional si no.
+- Los **reportes** viven en `features/reportes`, en la ruta hija `reportes` (entrada `Reportes`
+  del menú): una sola pantalla con una pestaña por reporte, no rutas hijas. La pestaña, el rango
+  y la cuenta van en la URL (`reporte`, `desde`, `hasta`, `cuentaId`, escritos con `replaceUrl`);
+  sin rango válido se usan los últimos 6 meses. Cada pestaña se crea al elegirla
+  (`matTabContent`) y pide su reporte solo mientras está activa (`mientrasActiva`), cancelando la
+  petición anterior con `switchMap`. Los gráficos son **SVG propio** (sin librería de gráficos:
+  `ng2-charts@11` exige Angular 22 y Chart.js dibuja en `<canvas>`), con colores de los tokens,
+  patrones o trazos además del color y su tabla con las mismas cifras. Los porcentajes llegan en
+  centésimas de punto y se pasan a texto solo al mostrar (`textoPorcentaje`).
 
 ## Sesión y autenticación del frontend
 

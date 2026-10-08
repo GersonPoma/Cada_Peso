@@ -136,7 +136,7 @@ presupuesto.` con la opción de recargar; cualquier otro error SHALL mostrar el 
 Todo monto SHALL mostrarse con el pipe `monto` y la moneda del presupuesto activo, y todo mes con
 su texto según la región. Los porcentajes SHALL llegar en centésimas de punto porcentual y
 convertirse a texto solo al mostrar, con dos decimales y el formato de la región (`5283` →
-`52,83 %` en `es-BO`). Ninguna suma, resta ni comparación de dinero o porcentaje SHALL hacerse
+`52,83%` en `es-BO`). Ninguna suma, resta ni comparación de dinero o porcentaje SHALL hacerse
 con coma flotante; las proporciones de las barras y las alturas de los gráficos SHALL calcularse
 con enteros. La interfaz SHALL mostrar los porcentajes que da la API, sin recalcularlos ni
 forzar que sumen 100 %.
@@ -144,7 +144,7 @@ forzar que sumen 100 %.
 #### Scenario: Porcentaje en la región
 - **DADO** la región `es-BO`
 - **CUANDO** se muestra el porcentaje `5283`
-- **ENTONCES** se lee `52,83 %`
+- **ENTONCES** se lee `52,83%`
 
 #### Scenario: Porcentajes que no suman 100
 - **DADO** un reporte cuyos porcentajes suman `10001`
@@ -154,7 +154,7 @@ forzar que sumen 100 %.
 #### Scenario: Porcentaje mayor que 100
 - **DADO** una meta con porcentaje `12500`
 - **CUANDO** se muestra
-- **ENTONCES** se lee `125,00 %` y su barra queda llena con la marca `Más de lo necesario`
+- **ENTONCES** se lee `125,00%` y su barra queda llena con la marca `Más de lo necesario`
 
 ### Requirement: Gasto por categoría
 La pestaña `Gasto` SHALL pedir `GET .../reportes/gasto-por-categoria?desde&hasta` y mostrar el

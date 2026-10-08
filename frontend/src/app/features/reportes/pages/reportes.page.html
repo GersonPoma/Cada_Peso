@@ -1,0 +1,79 @@
+<main class="pagina">
+  <h1 class="titulo">Reportes</h1>
+
+  <app-selector-rango
+    [rango]="rango()"
+    [mesLocal]="mesLocal"
+    (rangoCambiado)="cambiarRango($event)"
+  />
+
+  @if (presupuestoId(); as id) {
+    <mat-tab-group
+      class="pestanas"
+      [selectedIndex]="indice()"
+      (selectedIndexChange)="cambiarPestana($event)"
+      [preserveContent]="true"
+      mat-stretch-tabs="false"
+      aria-label="Reportes"
+    >
+      <mat-tab [label]="pestanas[0].etiqueta">
+        <ng-template matTabContent>
+          <app-gasto-reporte
+            class="contenido-pestana"
+            [presupuestoId]="id"
+            [rango]="rango()"
+            [moneda]="moneda()"
+            [activa]="indice() === 0"
+          />
+        </ng-template>
+      </mat-tab>
+      <mat-tab [label]="pestanas[1].etiqueta">
+        <ng-template matTabContent>
+          <app-ingresos-gastos-reporte
+            class="contenido-pestana"
+            [presupuestoId]="id"
+            [rango]="rango()"
+            [moneda]="moneda()"
+            [activa]="indice() === 1"
+          />
+        </ng-template>
+      </mat-tab>
+      <mat-tab [label]="pestanas[2].etiqueta">
+        <ng-template matTabContent>
+          <app-patrimonio-reporte
+            class="contenido-pestana"
+            [presupuestoId]="id"
+            [rango]="rango()"
+            [moneda]="moneda()"
+            [activa]="indice() === 2"
+          />
+        </ng-template>
+      </mat-tab>
+      <mat-tab [label]="pestanas[3].etiqueta">
+        <ng-template matTabContent>
+          <app-saldo-cuenta-reporte
+            class="contenido-pestana"
+            [presupuestoId]="id"
+            [rango]="rango()"
+            [moneda]="moneda()"
+            [activa]="indice() === 3"
+            [cuentaId]="cuentaId()"
+            (cuentaCambiada)="cambiarCuenta($event)"
+          />
+        </ng-template>
+      </mat-tab>
+      <mat-tab [label]="pestanas[4].etiqueta">
+        <ng-template matTabContent>
+          <app-metas-reporte
+            class="contenido-pestana"
+            [presupuestoId]="id"
+            [rango]="rango()"
+            [moneda]="moneda()"
+            [activa]="indice() === 4"
+            [mesLocal]="mesLocal"
+          />
+        </ng-template>
+      </mat-tab>
+    </mat-tab-group>
+  }
+</main>

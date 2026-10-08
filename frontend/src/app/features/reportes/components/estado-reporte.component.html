@@ -1,0 +1,23 @@
+@switch (vista()) {
+  @case ('cargando') {
+    <div class="centrado">
+      <mat-progress-spinner mode="indeterminate" diameter="40" aria-label="Cargando el reporte" />
+    </div>
+  }
+  @case ('error') {
+    <div class="centrado">
+      <p class="error" role="alert">{{ aviso()?.mensaje }}</p>
+      @if (aviso()?.accion === 'recargar') {
+        <button mat-stroked-button type="button" (click)="recargar()">Recargar</button>
+      } @else {
+        <button mat-stroked-button type="button" (click)="reintentar.emit()">Reintentar</button>
+      }
+    </div>
+  }
+  @case ('vacio') {
+    <p class="vacio" role="status">{{ mensajeVacio() }}</p>
+  }
+  @case ('listo') {
+    <ng-content />
+  }
+}

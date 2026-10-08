@@ -1,0 +1,71 @@
+<section class="selector" aria-label="Rango de meses">
+  <div class="atajos" role="group" aria-label="Atajos de rango">
+    @for (opcion of atajos; track opcion.tipo) {
+      <button mat-stroked-button type="button" (click)="elegirAtajo(opcion.tipo)">
+        {{ opcion.texto }}
+      </button>
+    }
+  </div>
+
+  <div class="extremos">
+    <fieldset class="extremo">
+      <legend>Desde</legend>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Mes desde</mat-label>
+        <mat-select
+          [value]="borrador().mesDesde"
+          (selectionChange)="cambiar('mesDesde', $event.value)"
+        >
+          @for (m of meses; track m.numero) {
+            <mat-option [value]="m.numero">{{ m.nombre }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Año desde</mat-label>
+        <mat-select
+          [value]="borrador().anioDesde"
+          (selectionChange)="cambiar('anioDesde', $event.value)"
+        >
+          @for (a of anios; track a) {
+            <mat-option [value]="a">{{ a }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </fieldset>
+
+    <fieldset class="extremo">
+      <legend>Hasta</legend>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Mes hasta</mat-label>
+        <mat-select
+          [value]="borrador().mesHasta"
+          (selectionChange)="cambiar('mesHasta', $event.value)"
+        >
+          @for (m of meses; track m.numero) {
+            <mat-option [value]="m.numero">{{ m.nombre }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Año hasta</mat-label>
+        <mat-select
+          [value]="borrador().anioHasta"
+          (selectionChange)="cambiar('anioHasta', $event.value)"
+        >
+          @for (a of anios; track a) {
+            <mat-option [value]="a">{{ a }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </fieldset>
+  </div>
+
+  <div class="estado-rango" aria-live="polite">
+    @if (error(); as mensaje) {
+      <p class="error" role="alert">{{ mensaje }}</p>
+    } @else {
+      <p class="texto-rango">{{ texto() }}</p>
+    }
+  </div>
+</section>

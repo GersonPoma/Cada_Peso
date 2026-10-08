@@ -85,6 +85,12 @@ export const routes: Routes = [
           ),
         data: seccion('Beneficiarios', 'storefront'),
       },
+      {
+        path: 'reportes',
+        loadComponent: () =>
+          import('./features/reportes/pages/reportes.page').then((m) => m.ReportesPage),
+        data: seccion('Reportes', 'bar_chart'),
+      },
     ],
   },
   {

@@ -1,0 +1,38 @@
+<app-estado-reporte [estado]="estado()" [vacio]="vacio()" (reintentar)="reintentar()">
+  @if (datos(); as datos) {
+    <div class="reporte">
+      <p class="total">
+        <span class="etiqueta-total">Gasto total</span>
+        <span class="monto-total">{{ datos.total | monto: moneda() }}</span>
+      </p>
+      <p class="nota">{{ notaPagos }}</p>
+
+      <section class="grupos" [attr.aria-label]="'Gasto por categoría, ' + textoDelRango()">
+        @for (item of grupos(); track item.grupo.grupoId) {
+          <section class="grupo" [attr.aria-labelledby]="'grupo-' + item.grupo.grupoId">
+            <h3 class="encabezado-grupo" [id]="'grupo-' + item.grupo.grupoId">
+              <span>{{ item.grupo.nombre }}</span>
+              <span class="cifras-grupo">
+                <span>{{ item.grupo.total | monto: moneda() }}</span>
+                <span class="porcentaje">{{ item.porcentaje }}</span>
+              </span>
+            </h3>
+            <app-grafico-barras-horizontales
+              [filas]="item.filas"
+              [moneda]="moneda()"
+              [maximo]="maximoBarras()"
+            />
+          </section>
+        }
+
+        <section class="grupo sin-categoria" aria-label="Gasto sin categoría">
+          <app-grafico-barras-horizontales
+            [filas]="filaSinCategoria()"
+            [moneda]="moneda()"
+            [maximo]="maximoBarras()"
+          />
+        </section>
+      </section>
+    </div>
+  }
+</app-estado-reporte>

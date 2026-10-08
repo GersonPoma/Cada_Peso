@@ -1,0 +1,100 @@
+<figure class="grafico">
+  <svg
+    role="img"
+    [attr.aria-label]="descripcion()"
+    [attr.viewBox]="'0 0 ' + lienzo.ancho + ' ' + lienzo.alto"
+    preserveAspectRatio="xMidYMid meet"
+  >
+    <defs>
+      <pattern
+        [attr.id]="idPatron"
+        width="6"
+        height="6"
+        patternUnits="userSpaceOnUse"
+        patternTransform="rotate(45)"
+      >
+        <rect class="fondo-rayado" width="6" height="6" />
+        <line class="raya" x1="0" y1="0" x2="0" y2="6" />
+      </pattern>
+    </defs>
+
+    @for (marca of marcas(); track marca.y) {
+      <line
+        class="guia"
+        [attr.x1]="lienzo.izquierda"
+        [attr.x2]="lienzo.ancho - lienzo.derecha"
+        [attr.y1]="marca.y"
+        [attr.y2]="marca.y"
+      />
+      <text
+        class="texto-eje"
+        text-anchor="end"
+        [attr.x]="lienzo.izquierda - 6"
+        [attr.y]="marca.y + 4"
+      >
+        {{ marca.texto }}
+      </text>
+    }
+
+    @for (barra of barras(); track barra.clave) {
+      <rect
+        [class]="'barra barra-' + barra.patron"
+        [attr.x]="barra.x"
+        [attr.y]="barra.y"
+        [attr.width]="barra.ancho"
+        [attr.height]="barra.alto"
+        [attr.fill]="barra.patron === 'rayado' ? 'url(#' + idPatron + ')' : null"
+      >
+        <title>{{ barra.titulo }}</title>
+      </rect>
+    }
+
+    <line
+      class="cero"
+      [attr.x1]="lienzo.izquierda"
+      [attr.x2]="lienzo.ancho - lienzo.derecha"
+      [attr.y1]="ceroY()"
+      [attr.y2]="ceroY()"
+    />
+
+    @if (linea()) {
+      <polyline class="linea" [attr.points]="trazoLinea()" />
+      @for (punto of puntos(); track $index) {
+        <circle class="punto" [attr.cx]="punto.x" [attr.cy]="punto.y" r="4">
+          <title>{{ punto.titulo }}</title>
+        </circle>
+      }
+    }
+
+    @for (rotulo of rotulos(); track rotulo.i) {
+      <text class="texto-eje" text-anchor="middle" [attr.x]="rotulo.x" [attr.y]="lienzo.alto - 10">
+        {{ rotulo.texto }}
+      </text>
+    }
+  </svg>
+
+  <figcaption class="leyenda">
+    @for (serie of series(); track serie.nombre) {
+      <span class="elemento-leyenda">
+        <svg class="muestra" viewBox="0 0 12 12" aria-hidden="true">
+          <rect
+            [class]="'barra barra-' + serie.patron"
+            width="12"
+            height="12"
+            [attr.fill]="serie.patron === 'rayado' ? 'url(#' + idPatron + ')' : null"
+          />
+        </svg>
+        {{ serie.nombre }}
+      </span>
+    }
+    @if (linea(); as l) {
+      <span class="elemento-leyenda">
+        <svg class="muestra" viewBox="0 0 12 12" aria-hidden="true">
+          <line class="linea" x1="0" y1="6" x2="12" y2="6" />
+          <circle class="punto" cx="6" cy="6" r="3" />
+        </svg>
+        {{ l.nombre }}
+      </span>
+    }
+  </figcaption>
+</figure>

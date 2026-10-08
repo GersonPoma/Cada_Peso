@@ -1,0 +1,31 @@
+.reporte {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.nota {
+  margin: 0;
+  font: var(--mat-sys-body-small);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.contenedor-tabla {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  min-width: 480px;
+}
+
+.numero {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.negativo {
+  color: var(--mat-sys-error);
+}

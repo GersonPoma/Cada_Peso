@@ -1,0 +1,23 @@
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 1080px;
+  min-width: 0;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.titulo {
+  margin: 0;
+  font: var(--mat-sys-headline-medium);
+}
+
+.pestanas {
+  min-width: 0;
+}
+
+.contenido-pestana {
+  display: block;
+  padding: 16px 0;
+}

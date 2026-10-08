@@ -1,0 +1,50 @@
+<app-estado-reporte [estado]="estado()" [vacio]="vacio()" (reintentar)="reintentar()">
+  @if (datos(); as datos) {
+    <div class="reporte">
+      <app-grafico-lineas
+        [meses]="meses()"
+        [series]="series()"
+        [moneda]="moneda()"
+        [descripcion]="descripcion()"
+      />
+      @for (nota of notas; track nota) {
+        <p class="nota">{{ nota }}</p>
+      }
+
+      <div class="contenedor-tabla">
+        <table mat-table [dataSource]="datos.meses" aria-label="Activos, pasivos y patrimonio">
+          <ng-container matColumnDef="mes">
+            <th mat-header-cell *matHeaderCellDef scope="col">Mes</th>
+            <td mat-cell *matCellDef="let fila">{{ textoMes(fila.mes) }}</td>
+          </ng-container>
+          <ng-container matColumnDef="activos">
+            <th mat-header-cell *matHeaderCellDef scope="col" class="numero">Activos</th>
+            <td mat-cell *matCellDef="let fila" class="numero">
+              {{ fila.activos | monto: moneda() }}
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="pasivos">
+            <th mat-header-cell *matHeaderCellDef scope="col" class="numero">Pasivos</th>
+            <td mat-cell *matCellDef="let fila" class="numero">
+              {{ fila.pasivos | monto: moneda() }}
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="patrimonio">
+            <th mat-header-cell *matHeaderCellDef scope="col" class="numero">Patrimonio</th>
+            <td
+              mat-cell
+              *matCellDef="let fila"
+              class="numero"
+              [class.negativo]="fila.patrimonio < 0"
+            >
+              {{ fila.patrimonio | monto: moneda() }}
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="columnas"></tr>
+          <tr mat-row *matRowDef="let fila; columns: columnas"></tr>
+        </table>
+      </div>
+    </div>
+  }
+</app-estado-reporte>

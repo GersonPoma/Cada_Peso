@@ -1,0 +1,51 @@
+.selector {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.atajos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.extremos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.extremo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+
+  legend {
+    padding: 0;
+    margin-bottom: 4px;
+    font: var(--mat-sys-label-large);
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  mat-form-field {
+    width: 160px;
+    max-width: 100%;
+  }
+}
+
+.estado-rango p {
+  margin: 0;
+}
+
+.texto-rango {
+  font: var(--mat-sys-title-medium);
+}
+
+.error {
+  color: var(--mat-sys-error);
+}

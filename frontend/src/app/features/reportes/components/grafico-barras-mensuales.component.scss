@@ -1,0 +1,74 @@
+.grafico {
+  margin: 0;
+  min-width: 0;
+
+  > svg {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+}
+
+.guia {
+  stroke: var(--mat-sys-outline-variant);
+  stroke-width: 1;
+}
+
+.cero {
+  stroke: var(--mat-sys-on-surface);
+  stroke-width: 1.5;
+}
+
+.texto-eje {
+  font-size: 11px;
+  fill: var(--mat-sys-on-surface-variant);
+}
+
+.barra-solido {
+  fill: var(--mat-sys-primary);
+}
+
+.barra-rayado {
+  stroke: var(--mat-sys-tertiary);
+  stroke-width: 1;
+}
+
+.fondo-rayado {
+  fill: var(--mat-sys-tertiary-container);
+}
+
+.raya {
+  stroke: var(--mat-sys-tertiary);
+  stroke-width: 3;
+}
+
+.linea {
+  fill: none;
+  stroke: var(--mat-sys-on-surface);
+  stroke-width: 2;
+}
+
+.punto {
+  fill: var(--mat-sys-surface);
+  stroke: var(--mat-sys-on-surface);
+  stroke-width: 2;
+}
+
+.leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 8px;
+  font: var(--mat-sys-body-small);
+}
+
+.elemento-leyenda {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.muestra {
+  width: 14px;
+  height: 14px;
+}

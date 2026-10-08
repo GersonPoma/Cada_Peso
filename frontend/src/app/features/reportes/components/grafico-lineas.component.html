@@ -1,0 +1,101 @@
+<figure class="grafico">
+  <svg
+    role="img"
+    [attr.aria-label]="descripcion()"
+    [attr.viewBox]="'0 0 ' + lienzo.ancho + ' ' + lienzo.alto"
+    preserveAspectRatio="xMidYMid meet"
+  >
+    @for (marca of marcas(); track marca.y) {
+      <line
+        class="guia"
+        [attr.x1]="lienzo.izquierda"
+        [attr.x2]="lienzo.ancho - lienzo.derecha"
+        [attr.y1]="marca.y"
+        [attr.y2]="marca.y"
+      />
+      <text
+        class="texto-eje"
+        text-anchor="end"
+        [attr.x]="lienzo.izquierda - 6"
+        [attr.y]="marca.y + 4"
+      >
+        {{ marca.texto }}
+      </text>
+    }
+
+    @if (hayNegativos()) {
+      <line
+        class="cero"
+        [attr.x1]="lienzo.izquierda"
+        [attr.x2]="lienzo.ancho - lienzo.derecha"
+        [attr.y1]="ceroY()"
+        [attr.y2]="ceroY()"
+      />
+    }
+
+    @for (trazo of trazos(); track trazo.serie.nombre; let s = $index) {
+      <g [class]="'serie serie-' + s + ' trazo-' + trazo.serie.trazo">
+        @if (trazo.puntos.length > 1) {
+          <polyline class="linea" [attr.points]="trazo.recorrido" />
+        }
+        @for (punto of trazo.puntos; track $index) {
+          @switch (trazo.serie.marcador) {
+            @case ('cuadrado') {
+              <rect
+                class="marcador"
+                [attr.x]="punto.x - 4"
+                [attr.y]="punto.y - 4"
+                width="8"
+                height="8"
+              >
+                <title>{{ punto.titulo }}</title>
+              </rect>
+            }
+            @case ('triangulo') {
+              <polygon class="marcador" [attr.points]="triangulo(punto.x, punto.y)">
+                <title>{{ punto.titulo }}</title>
+              </polygon>
+            }
+            @default {
+              <circle class="marcador" [attr.cx]="punto.x" [attr.cy]="punto.y" r="4">
+                <title>{{ punto.titulo }}</title>
+              </circle>
+            }
+          }
+        }
+      </g>
+    }
+
+    @for (rotulo of rotulos(); track rotulo.i) {
+      <text class="texto-eje" text-anchor="middle" [attr.x]="rotulo.x" [attr.y]="lienzo.alto - 10">
+        {{ rotulo.texto }}
+      </text>
+    }
+  </svg>
+
+  <figcaption class="leyenda">
+    @for (serie of series(); track serie.nombre; let s = $index) {
+      <span class="elemento-leyenda">
+        <svg
+          [class]="'muestra serie serie-' + s + ' trazo-' + serie.trazo"
+          viewBox="0 0 24 12"
+          aria-hidden="true"
+        >
+          <line class="linea" x1="0" y1="6" x2="24" y2="6" />
+          @switch (serie.marcador) {
+            @case ('cuadrado') {
+              <rect class="marcador" x="8" y="2" width="8" height="8" />
+            }
+            @case ('triangulo') {
+              <polygon class="marcador" points="12,1 7,10 17,10" />
+            }
+            @default {
+              <circle class="marcador" cx="12" cy="6" r="4" />
+            }
+          }
+        </svg>
+        {{ serie.nombre }}
+      </span>
+    }
+  </figcaption>
+</figure>

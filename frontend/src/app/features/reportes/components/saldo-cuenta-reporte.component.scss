@@ -1,0 +1,82 @@
+.reporte,
+.detalle {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.campo-cuenta {
+  width: 360px;
+  max-width: 100%;
+}
+
+.aviso {
+  margin: 0;
+  color: var(--mat-sys-error);
+}
+
+.resumen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 0;
+}
+
+.nombre {
+  font: var(--mat-sys-title-medium);
+}
+
+.marca {
+  font: var(--mat-sys-label-medium);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.saldo-inicial {
+  font-variant-numeric: tabular-nums;
+}
+
+.nota,
+.elegir {
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.nota {
+  font: var(--mat-sys-body-small);
+}
+
+.contenedor-tabla {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  min-width: 480px;
+}
+
+.numero {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.enlace {
+  align-self: flex-start;
+  color: var(--mat-sys-primary);
+
+  &:focus-visible {
+    outline: 2px solid var(--mat-sys-primary);
+    outline-offset: 2px;
+  }
+}
+
+.oculto-visual {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

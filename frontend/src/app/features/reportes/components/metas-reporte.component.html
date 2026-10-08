@@ -1,0 +1,110 @@
+<app-estado-reporte
+  [estado]="estado()"
+  [vacio]="vacio()"
+  [mensajeVacio]="sinMetas"
+  (reintentar)="reintentar()"
+>
+  <div class="reporte">
+    <p class="nota">{{ nota }}</p>
+
+    @for (item of metas(); track claveMeta(item.meta)) {
+      <section class="meta" [attr.aria-labelledby]="'meta-' + item.meta.categoriaId">
+        <header class="encabezado-meta">
+          <h3 class="nombre" [id]="'meta-' + item.meta.categoriaId">
+            {{ item.meta.nombre }}
+            @if (item.meta.oculta) {
+              <span class="marca">Oculta</span>
+            }
+          </h3>
+          <p class="tipo">{{ tipos[item.meta.tipo] }} · {{ item.meta.monto | monto: moneda() }}</p>
+        </header>
+
+        <dl class="totales">
+          <div>
+            <dt>Necesidad del rango</dt>
+            <dd>{{ item.meta.necesidad | monto: moneda() }}</dd>
+          </div>
+          <div>
+            <dt>Asignado</dt>
+            <dd>{{ item.meta.asignado | monto: moneda() }}</dd>
+          </div>
+          <div>
+            <dt>Gastado</dt>
+            <dd>{{ item.meta.gastado | monto: moneda() }}</dd>
+          </div>
+          <div>
+            <dt>Cumplimiento</dt>
+            <dd>
+              {{ item.cumplimiento.texto }}
+              @if (item.cumplimiento.excedido) {
+                <span class="marca">Más de lo necesario</span>
+              }
+            </dd>
+          </div>
+        </dl>
+        <div class="pista" aria-hidden="true">
+          <div class="barra" [style.width.%]="item.cumplimiento.ancho / 10"></div>
+        </div>
+
+        <div class="contenedor-tabla">
+          <table
+            mat-table
+            [dataSource]="item.meses"
+            [attr.aria-label]="'Cumplimiento por mes de ' + item.meta.nombre"
+          >
+            <ng-container matColumnDef="mes">
+              <th mat-header-cell *matHeaderCellDef scope="col">Mes</th>
+              <td mat-cell *matCellDef="let fila">{{ textoMes(fila.mes) }}</td>
+            </ng-container>
+            <ng-container matColumnDef="necesidad">
+              <th mat-header-cell *matHeaderCellDef scope="col" class="numero">Necesidad</th>
+              <td mat-cell *matCellDef="let fila" class="numero">
+                {{ fila.necesidad | monto: moneda() }}
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="asignado">
+              <th mat-header-cell *matHeaderCellDef scope="col" class="numero">Asignado</th>
+              <td mat-cell *matCellDef="let fila" class="numero">
+                {{ fila.asignado | monto: moneda() }}
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="gastado">
+              <th mat-header-cell *matHeaderCellDef scope="col" class="numero">Gastado</th>
+              <td mat-cell *matCellDef="let fila" class="numero">
+                {{ fila.gastado | monto: moneda() }}
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="disponible">
+              <th mat-header-cell *matHeaderCellDef scope="col" class="numero">Disponible</th>
+              <td mat-cell *matCellDef="let fila" class="numero">
+                {{ fila.disponible | monto: moneda() }}
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="faltante">
+              <th mat-header-cell *matHeaderCellDef scope="col" class="numero">Faltante</th>
+              <td mat-cell *matCellDef="let fila" class="numero">
+                {{ fila.faltante | monto: moneda() }}
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="estado">
+              <th mat-header-cell *matHeaderCellDef scope="col">Estado</th>
+              <td mat-cell *matCellDef="let fila">
+                <span [class]="'estado tono-' + fila.presentacion.tono">
+                  <mat-icon aria-hidden="true">{{ fila.presentacion.icono }}</mat-icon>
+                  {{ fila.presentacion.texto }}
+                </span>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="porcentaje">
+              <th mat-header-cell *matHeaderCellDef scope="col" class="numero">Porcentaje</th>
+              <td mat-cell *matCellDef="let fila" class="numero">{{ fila.textoPorcentaje }}</td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="columnas"></tr>
+            <tr mat-row *matRowDef="let fila; columns: columnas"></tr>
+          </table>
+        </div>
+      </section>
+    }
+  </div>
+</app-estado-reporte>
