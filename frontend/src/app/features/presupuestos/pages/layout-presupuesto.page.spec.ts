@@ -288,6 +288,16 @@ describe('LayoutPresupuestoPage', () => {
     expect(url()).toBe('/login');
   });
 
+  it('Mi perfil es un enlace de ícono a la sección perfil, fuera del menú lateral', async () => {
+    await entrar('/presupuestos/3');
+
+    const enlace = elemento().querySelector('app-cabecera a[aria-label="Mi perfil"]');
+    expect(enlace).not.toBeNull();
+    expect(enlace?.getAttribute('href')).toBe('/presupuestos/3/perfil');
+    expect(enlace?.querySelector('mat-icon')?.textContent?.trim()).toBe('account_circle');
+    expect(elemento().querySelector('mat-sidenav')?.textContent).not.toContain('Perfil');
+  });
+
   describe('menú lateral', () => {
     it('en pantalla ancha está abierto, en modo side y sin botón de menú', async () => {
       await entrar('/presupuestos/3');

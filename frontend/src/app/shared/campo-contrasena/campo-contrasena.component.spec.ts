@@ -1,8 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormControl, ValidatorFn, Validators } from '@angular/forms';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { maxBytesUtf8 } from '../../../shared/validacion/max-bytes-utf8.validator';
-import { sobreTextoRecortado } from '../../../shared/validacion/sobre-texto-recortado.validator';
+import { maxBytesUtf8 } from '../validacion/max-bytes-utf8.validator';
+import { sobreTextoRecortado } from '../validacion/sobre-texto-recortado.validator';
 import { CampoContrasenaComponent } from './campo-contrasena.component';
 
 describe('CampoContrasenaComponent', () => {
@@ -131,6 +131,44 @@ describe('CampoContrasenaComponent', () => {
       expect(error()).toBeUndefined();
 
       control.setValue('');
+      await fixture.whenStable();
+
+      expect(error()).toBe('La contraseña es obligatoria');
+    });
+  });
+
+  describe('mensajes extra', () => {
+    const noCoincide: ValidatorFn = (c) => (c.value === 'x' ? { noCoincide: true } : null);
+
+    it('muestra el texto de un error que el campo no conoce', async () => {
+      const control = await crear([noCoincide], 'x');
+      fixture.componentRef.setInput('mensajesExtra', {
+        noCoincide: 'Las contraseñas no coinciden',
+      });
+
+      control.markAsTouched();
+      await fixture.whenStable();
+
+      expect(error()).toBe('Las contraseñas no coinciden');
+    });
+
+    it('sin mensajes extra un error desconocido no muestra nada', async () => {
+      const control = await crear([noCoincide], 'x');
+
+      control.markAsTouched();
+      await fixture.whenStable();
+
+      expect(error()).toBeUndefined();
+    });
+
+    it('los mensajes propios del campo siguen teniendo prioridad sobre los extra', async () => {
+      const control = await crear([sobreTextoRecortado(Validators.required), noCoincide], '');
+      fixture.componentRef.setInput('mensajesExtra', {
+        noCoincide: 'Las contraseñas no coinciden',
+      });
+
+      control.setErrors({ required: true, noCoincide: true });
+      control.markAsTouched();
       await fixture.whenStable();
 
       expect(error()).toBe('La contraseña es obligatoria');

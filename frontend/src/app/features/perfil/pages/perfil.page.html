@@ -1,0 +1,56 @@
+<main class="pagina">
+  <h1 class="titulo">Mi perfil</h1>
+
+  @switch (estado()) {
+    @case ('cargando') {
+      <div class="centrado">
+        <mat-progress-spinner mode="indeterminate" diameter="48" aria-label="Cargando" />
+      </div>
+    }
+    @case ('error') {
+      <div class="centrado">
+        <p class="error" role="alert">No pudimos cargar tus datos.</p>
+        <button mat-stroked-button type="button" (click)="cargar()">Reintentar</button>
+      </div>
+    }
+    @case ('listo') {
+      @if (perfil(); as actual) {
+        <div class="secciones">
+          <mat-card appearance="outlined" role="region" aria-labelledby="titulo-datos">
+            <mat-card-header>
+              <h2 mat-card-title id="titulo-datos">Mis datos</h2>
+            </mat-card-header>
+            <mat-card-content>
+              <app-datos-perfil [perfil]="actual" />
+            </mat-card-content>
+          </mat-card>
+
+          <mat-card appearance="outlined" role="region" aria-labelledby="titulo-nombre">
+            <mat-card-header>
+              <h2 mat-card-title id="titulo-nombre">Cambiar nombre</h2>
+            </mat-card-header>
+            <mat-card-content>
+              <app-formulario-nombre
+                [nombreActual]="actual.nombre"
+                (guardado)="alGuardarNombre($event)"
+              />
+            </mat-card-content>
+          </mat-card>
+
+          <mat-card appearance="outlined" role="region" aria-labelledby="titulo-contrasena">
+            <mat-card-header>
+              <h2 mat-card-title id="titulo-contrasena">Cambiar contraseña</h2>
+            </mat-card-header>
+            <mat-card-content>
+              <p class="ayuda">
+                Al cambiarla se cierra tu sesión en este navegador y tendrás que iniciar sesión de
+                nuevo.
+              </p>
+              <app-formulario-contrasena [email]="actual.email" />
+            </mat-card-content>
+          </mat-card>
+        </div>
+      }
+    }
+  }
+</main>

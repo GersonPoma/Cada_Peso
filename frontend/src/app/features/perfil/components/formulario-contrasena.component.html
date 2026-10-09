@@ -1,0 +1,32 @@
+<form class="formulario" [formGroup]="formulario" (ngSubmit)="enviar()" novalidate>
+  <!-- Solo para los gestores de contraseñas: asocian la contraseña nueva a esta cuenta. -->
+  <input
+    class="usuario-oculto"
+    type="text"
+    autocomplete="username"
+    readonly
+    tabindex="-1"
+    aria-hidden="true"
+    [value]="email()"
+  />
+
+  <app-campo-contrasena
+    [control]="formulario.controls.contrasenaActual"
+    etiqueta="Contraseña actual"
+    [autocompletar]="'current-password'"
+  />
+  <app-campo-contrasena
+    [control]="formulario.controls.contrasenaNueva"
+    etiqueta="Contraseña nueva"
+    [autocompletar]="'new-password'"
+    [mensajesExtra]="mensajesNueva"
+  />
+  <app-campo-contrasena
+    [control]="formulario.controls.confirmacion"
+    etiqueta="Confirmar contraseña nueva"
+    [autocompletar]="'new-password'"
+    [mensajesExtra]="mensajesConfirmacion"
+  />
+
+  <button mat-flat-button type="submit" [disabled]="deshabilitado()">Cambiar contraseña</button>
+</form>

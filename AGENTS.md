@@ -808,6 +808,7 @@ src/app/
 │   ├── api/
 │   ├── cabecera/
 │   ├── calculadora/
+│   ├── campo-contrasena/
 │   ├── fecha/
 │   ├── formato/
 │   ├── formulario/
@@ -839,6 +840,11 @@ src/app/
     │   ├── pages/
     │   └── services/
     ├── inicio/
+    │   ├── models/
+    │   ├── pages/
+    │   └── services/
+    ├── perfil/
+    │   ├── components/
     │   ├── models/
     │   ├── pages/
     │   └── services/
@@ -883,8 +889,10 @@ src/app/
   `aMilliunits()` y `deMilliunits()`, `fecha/` con `aFechaNegocio()`, `deFechaNegocio()` y las
   funciones de meses `yyyy-MM` (`mesActual()`, `sumarMeses()`, `esMesValido()`, `textoMes()`),
   `api/` con la lectura de errores del API, `cabecera/`, `calculadora/` con `evaluarMonto()` y el
-  campo `app-campo-monto`, `formulario/` con los mensajes de error y `validacion/` con los
-  validadores, entre ellos `montoValido()`).
+  campo `app-campo-monto`, `campo-contrasena/` con `app-campo-contrasena` (mostrar y ocultar),
+  `formulario/` con los mensajes de error y `validacion/` con los validadores, entre ellos
+  `montoValido()`, `validadoresContrasenaNueva()` y `validadoresNombrePersona()`, las reglas
+  únicas de contraseña nueva y de nombre que usan el registro y el perfil).
 - `features/<feature>/`: una carpeta por feature de negocio (`cuentas/`, `categorias/`,
   `transacciones/`, etc.), con solo las subcarpetas que necesite:
   - `pages/`: componentes enrutables, uno por ruta.
@@ -973,6 +981,29 @@ como same-origin, evitando configurar CORS en el backend.
   (el email, además, en minúsculas).
 - Los errores del API se interpretan por `codigo` (`leerProblemaApi`), nunca por `detail`.
 - Las fechas del registro se envían con `aFechaNegocio()`.
+
+## Perfil (frontend)
+
+`features/perfil` (`/presupuestos/:presupuestoId/perfil`, `PerfilPage`) muestra los datos de la
+persona, cambia su nombre (`PUT /usuarios/yo`) y su contraseña (`POST /usuarios/yo/contrasena`).
+
+- **Entrada**: el botón de ícono `Mi perfil` en la cabecera del layout (junto al engranaje, que es
+  `Gestionar presupuestos`, no ajustes). La ruta es hija del layout, **sin** `data: seccion(...)`,
+  así que no aparece en el menú lateral. No hay pantalla de idioma, formato ni moneda: la región se
+  detecta sola y la moneda (predeterminada y de cada presupuesto) solo se muestra, el backend no la
+  cambia.
+- **Reutilización**: `app-campo-contrasena` y las reglas de contraseña nueva y de nombre viven en
+  `shared/` y las usan registro y perfil. El nombre en Inicio se actualiza porque Inicio consulta
+  `GET /usuarios/yo` cada vez que se abre; no hay estado compartido del usuario.
+- **Contraseña**: la actual, la nueva y la confirmación (esta no se envía) viven solo en el
+  formulario y se vacían al terminar; nunca se escriben en la consola. La comprobación "nueva
+  distinta de la actual" es solo del frontend, así que un 422 `REGLA_NEGOCIO_VIOLADA` significa
+  contraseña actual incorrecta (mensaje junto a ese campo, sin cerrar la sesión).
+- **Tras el `204`**: `SesionService.cerrar()`, navegar a `/login` y, si la navegación llegó, el
+  aviso `Contraseña cambiada, inicia sesión de nuevo` (un `MatSnackBar` de la raíz, de 8 s). El
+  token anterior **sigue válido** en el servidor hasta expirar (24 h): el cierre es solo de este
+  navegador. `Cerrar sesión` no se repite en la pantalla (está en la cabecera).
+- Solo un `204` o un 401 real cierran la sesión; ningún 400 ni 422 lo hace.
 
 ## Estilo de código
 

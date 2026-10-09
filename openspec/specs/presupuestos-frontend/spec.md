@@ -224,14 +224,16 @@ SHALL quedar abierto con lo escrito.
 
 ### Requirement: Estructura de la pantalla del presupuesto
 El sistema SHALL mostrar en `/presupuestos/:presupuestoId` la cabecera `Cada Peso` con el
-selector, las acciones de crear y renombrar y el botón `Cerrar sesión`; debajo, un menú lateral
-con los enlaces de las secciones del presupuesto (`Presupuesto`, `Inicio`, `Cuentas`,
-`Transacciones`, `Categorías` y `Beneficiarios`, en ese orden) y, junto a él, el contenido de la
-sección elegida. La sección por defecto SHALL ser `Presupuesto`: `/presupuestos/:presupuestoId`
-SHALL llevar a `/presupuestos/:presupuestoId/presupuesto`, que a su vez lleva al mes actual. En
+selector, las acciones de crear y renombrar, el acceso `Mi perfil` y el botón `Cerrar sesión`;
+debajo, un menú lateral con los enlaces de las secciones del presupuesto (`Presupuesto`,
+`Inicio`, `Cuentas`, `Transacciones`, `Categorías` y `Beneficiarios`, en ese orden) y, junto a
+él, el contenido de la sección elegida. La sección por defecto SHALL ser `Presupuesto`:
+`/presupuestos/:presupuestoId` SHALL llevar a `/presupuestos/:presupuestoId/presupuesto`, que a
+su vez lleva al mes actual. En
 pantallas anchas el menú SHALL estar siempre visible; en pantallas estrechas SHALL ocultarse y
 abrirse sobre el contenido con un botón de menú en la cabecera, cerrándose al elegir un enlace.
-`Cerrar sesión` SHALL borrar la sesión y llevar a `/login`.
+`Cerrar sesión` SHALL borrar la sesión y llevar a `/login`. El acceso `Mi perfil` SHALL llevar a
+`/presupuestos/:presupuestoId/perfil` y SHALL NOT aparecer como enlace del menú lateral.
 
 #### Scenario: Sección por defecto
 - **DADO** una persona con el presupuesto `3` y hoy en octubre de 2026
@@ -257,3 +259,9 @@ abrirse sobre el contenido con un botón de menú en la cabecera, cerrándose al
 - **ENTONCES** la sesión se borra del almacenamiento local
 - **Y** no hay presupuesto activo
 - **Y** la persona llega a `/login`
+
+#### Scenario: Acceso al perfil desde la cabecera
+- **DADO** una persona en el presupuesto `3`
+- **CUANDO** pulsa `Mi perfil` en la cabecera
+- **ENTONCES** llega a `/presupuestos/3/perfil`
+- **Y** el menú lateral conserva solo sus seis enlaces, sin `Perfil`

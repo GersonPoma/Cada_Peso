@@ -1,0 +1,23 @@
+.formulario {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+app-campo-contrasena {
+  width: 100%;
+}
+
+/* Fuera de la vista pero presente: los gestores de contraseñas lo necesitan en el DOM. */
+.usuario-oculto {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}

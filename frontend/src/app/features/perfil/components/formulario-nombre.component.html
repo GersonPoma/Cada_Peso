@@ -1,0 +1,11 @@
+<form class="formulario" [formGroup]="formulario" (ngSubmit)="guardar()" novalidate>
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Nombre</mat-label>
+    <input matInput type="text" formControlName="nombre" autocomplete="given-name" />
+    @if (mensaje(); as texto) {
+      <mat-error>{{ texto }}</mat-error>
+    }
+  </mat-form-field>
+  <p class="contador">{{ largo() }}/{{ limite }}</p>
+  <button mat-flat-button type="submit" [disabled]="deshabilitado()">Guardar nombre</button>
+</form>

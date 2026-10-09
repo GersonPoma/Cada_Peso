@@ -18,7 +18,7 @@ import {
   mensajeDeError,
 } from '../../../shared/formulario/errores-formulario';
 import { sobreTextoRecortado } from '../../../shared/validacion/sobre-texto-recortado.validator';
-import { CampoContrasenaComponent } from '../components/campo-contrasena.component';
+import { CampoContrasenaComponent } from '../../../shared/campo-contrasena/campo-contrasena.component';
 import { AuthService } from '../services/auth.service';
 
 const MENSAJE_CREDENCIALES_INCORRECTAS = 'Email o contraseña incorrectos';

@@ -1,0 +1,43 @@
+.pagina {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.titulo {
+  margin: 0 0 16px;
+  font: var(--mat-sys-headline-small);
+}
+
+/* Una sola columna también en pantallas anchas: apilado, sin desplazamiento horizontal. */
+.secciones {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+mat-card-content {
+  padding-top: 8px;
+}
+
+.ayuda {
+  margin: 0 0 12px;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-medium);
+}
+
+.centrado {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px 0;
+}
+
+.error {
+  margin: 0;
+  color: var(--mat-sys-error);
+  font: var(--mat-sys-body-large);
+}

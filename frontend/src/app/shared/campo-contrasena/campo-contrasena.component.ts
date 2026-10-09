@@ -6,12 +6,13 @@ import { MatError, MatFormField, MatLabel, MatSuffix } from '@angular/material/f
 import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
 import { switchMap } from 'rxjs';
-import { MensajesDeError, mensajeDeError } from '../../../shared/formulario/errores-formulario';
+import { MensajesDeError, mensajeDeError } from '../formulario/errores-formulario';
 
 /**
  * Campo de contraseña con botón para mostrarla u ocultarla. Recibe el control por entrada y no
  * modifica su valor. Los mensajes dependen de los validadores que tenga el control: en el login
- * solo `required`, así que no se muestra ninguna regla de longitud.
+ * solo `required`, así que no se muestra ninguna regla de longitud. `mensajesExtra` agrega textos
+ * para errores que el campo no conoce (el campo no los define: los pone quien lo usa).
  */
 @Component({
   selector: 'app-campo-contrasena',
@@ -33,6 +34,8 @@ export class CampoContrasenaComponent {
   readonly control = input.required<FormControl<string>>();
   readonly etiqueta = input('Contraseña');
   readonly autocompletar = input<'current-password' | 'new-password'>('current-password');
+  /** Mensajes de errores propios de la pantalla (ej. `noCoincide`), tras los del campo. */
+  readonly mensajesExtra = input<MensajesDeError>({});
 
   protected readonly visible = signal(false);
 
@@ -46,7 +49,7 @@ export class CampoContrasenaComponent {
 
   protected readonly mensaje = computed(() => {
     this.eventosDelControl();
-    return mensajeDeError(this.control().errors, MENSAJES);
+    return mensajeDeError(this.control().errors, { ...MENSAJES, ...this.mensajesExtra() });
   });
 
   protected alternar(): void {

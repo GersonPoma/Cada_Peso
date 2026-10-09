@@ -24,10 +24,14 @@ import {
   aplicarErroresDeCampos,
   mensajeDeError,
 } from '../../../shared/formulario/errores-formulario';
-import { maxBytesUtf8 } from '../../../shared/validacion/max-bytes-utf8.validator';
+import { validadoresContrasenaNueva } from '../../../shared/validacion/contrasena-nueva.validator';
 import { mayorDeEdad } from '../../../shared/validacion/mayor-de-edad.validator';
+import {
+  MENSAJES_NOMBRE_PERSONA,
+  validadoresNombrePersona,
+} from '../../../shared/validacion/nombre-persona.validator';
 import { sobreTextoRecortado } from '../../../shared/validacion/sobre-texto-recortado.validator';
-import { CampoContrasenaComponent } from '../components/campo-contrasena.component';
+import { CampoContrasenaComponent } from '../../../shared/campo-contrasena/campo-contrasena.component';
 import { RegistroRequest } from '../models/registro-request.model';
 import { AuthService } from '../services/auth.service';
 
@@ -48,12 +52,6 @@ const MENSAJES_EMAIL: MensajesDeError = {
   required: 'El email es obligatorio',
   maxlength: 'El email no puede superar 254 caracteres',
   email: 'Ingresa un email válido',
-};
-
-const MENSAJES_NOMBRE: MensajesDeError = {
-  required: 'El nombre es obligatorio',
-  minlength: 'El nombre debe tener al menos 2 caracteres',
-  maxlength: 'El nombre no puede superar 100 caracteres',
 };
 
 const MENSAJES_APELLIDO: MensajesDeError = {
@@ -119,19 +117,11 @@ export class RegistroPage {
     // La contraseña nunca se recorta: solo `required` ignora los espacios de los extremos.
     contrasena: new FormControl('', {
       nonNullable: true,
-      validators: [
-        sobreTextoRecortado(Validators.required),
-        Validators.minLength(8),
-        maxBytesUtf8(72),
-      ],
+      validators: validadoresContrasenaNueva(),
     }),
     nombre: new FormControl('', {
       nonNullable: true,
-      validators: [
-        sobreTextoRecortado(Validators.required),
-        sobreTextoRecortado(Validators.minLength(2)),
-        sobreTextoRecortado(Validators.maxLength(100)),
-      ],
+      validators: validadoresNombrePersona(),
     }),
     apellido: new FormControl('', {
       nonNullable: true,
@@ -159,7 +149,7 @@ export class RegistroPage {
   }
 
   protected mensajeNombre(): string | null {
-    return mensajeDeError(this.formulario.controls.nombre.errors, MENSAJES_NOMBRE);
+    return mensajeDeError(this.formulario.controls.nombre.errors, MENSAJES_NOMBRE_PERSONA);
   }
 
   protected mensajeApellido(): string | null {

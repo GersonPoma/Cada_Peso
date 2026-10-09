@@ -87,4 +87,19 @@ describe('InicioPage', () => {
     expect(abrirAviso).not.toHaveBeenCalled();
     expect(texto()).not.toContain('No pudimos cargar tus datos.');
   });
+
+  it('consulta el nombre cada vez que se abre: reabierta muestra el nombre cambiado', async () => {
+    backend.expectOne(URL_USUARIO).flush({ nombre: 'Ana' });
+    await fixture.whenStable();
+    expect(texto()).toContain('Hola, Ana');
+    fixture.destroy();
+
+    fixture = TestBed.createComponent(InicioPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    backend.expectOne(URL_USUARIO).flush({ nombre: 'María José' });
+    await fixture.whenStable();
+
+    expect(texto()).toContain('Hola, María José');
+  });
 });

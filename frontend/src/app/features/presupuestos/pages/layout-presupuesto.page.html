@@ -43,6 +43,9 @@
           </button>
         }
       </mat-menu>
+      <a mat-icon-button routerLink="perfil" aria-label="Mi perfil">
+        <mat-icon>account_circle</mat-icon>
+      </a>
       @if (!estrecha()) {
         <button mat-button type="button" (click)="cerrarSesion()">Cerrar sesión</button>
       }

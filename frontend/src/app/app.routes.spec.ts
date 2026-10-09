@@ -295,6 +295,42 @@ describe('rutas', () => {
       expect(enlaceDelMenu('Beneficiarios')).toBeDefined();
     });
 
+    it('/presupuestos/3/perfil muestra el perfil sin entrada en el menú', async () => {
+      await harness.navigateByUrl('/presupuestos/3/perfil');
+      const backend = TestBed.inject(HttpTestingController);
+      backend.expectOne('/api/v1/presupuestos').flush(PRESUPUESTOS);
+      await harness.fixture.whenStable();
+      (await esperarPeticion('/api/v1/usuarios/yo')).flush({
+        email: 'ana@ejemplo.com',
+        rol: 'USUARIO',
+        nombre: 'Ana',
+        apellido: 'Pérez',
+        fechaNacimiento: '2003-03-05',
+        telefono: null,
+        monedaPredeterminada: 'BOB',
+      });
+      await harness.fixture.whenStable();
+      backend.verify();
+
+      expect(url()).toBe('/presupuestos/3/perfil');
+      expect(texto()).toContain('Mi perfil');
+      expect(texto()).toContain('ana@ejemplo.com');
+      expect(texto()).toContain('Casa (BOB)');
+      const enlaces = Array.from(
+        (harness.routeNativeElement as HTMLElement).querySelectorAll('mat-sidenav a'),
+      ).map((a) => a.querySelector('[matListItemTitle]')?.textContent?.trim());
+      expect(enlaces).toEqual([
+        'Presupuesto',
+        'Inicio',
+        'Cuentas',
+        'Transacciones',
+        'Programadas',
+        'Categorías',
+        'Beneficiarios',
+        'Reportes',
+      ]);
+    });
+
     it('/presupuestos/3/transacciones?cuentaId=5 muestra la pantalla filtrada', async () => {
       await harness.navigateByUrl('/presupuestos/3/transacciones?cuentaId=5');
       const backend = TestBed.inject(HttpTestingController);

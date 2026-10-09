@@ -99,6 +99,12 @@ export const routes: Routes = [
           import('./features/reportes/pages/reportes.page').then((m) => m.ReportesPage),
         data: seccion('Reportes', 'bar_chart'),
       },
+      {
+        // Sin `seccion`: se llega desde el botón `Mi perfil` de la cabecera, no desde el menú.
+        path: 'perfil',
+        loadComponent: () =>
+          import('./features/perfil/pages/perfil.page').then((m) => m.PerfilPage),
+      },
     ],
   },
   {

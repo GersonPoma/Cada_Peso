@@ -1,0 +1,33 @@
+<dl class="datos">
+  <div class="dato">
+    <dt>Correo</dt>
+    <dd>{{ perfil().email }}</dd>
+  </div>
+  <div class="dato">
+    <dt>Apellido</dt>
+    <dd>{{ perfil().apellido }}</dd>
+  </div>
+  <div class="dato">
+    <dt>Fecha de nacimiento</dt>
+    <dd>{{ perfil().fechaNacimiento | fecha }}</dd>
+  </div>
+  <div class="dato">
+    <dt>Teléfono</dt>
+    <dd>{{ perfil().telefono ?? 'No registrado' }}</dd>
+  </div>
+  <div class="dato">
+    <dt>Moneda predeterminada</dt>
+    <dd>
+      {{ moneda() }}
+      <span class="ayuda">
+        Se usa al crear presupuestos nuevos. Cada presupuesto tiene su propia moneda.
+      </span>
+    </dd>
+  </div>
+  @if (presupuesto(); as actual) {
+    <div class="dato">
+      <dt>Presupuesto actual</dt>
+      <dd>{{ actual.nombre }} ({{ actual.moneda }})</dd>
+    </div>
+  }
+</dl>
