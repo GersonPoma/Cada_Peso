@@ -275,6 +275,19 @@ describe('LayoutPresupuestoPage', () => {
     expect(url()).toBe('/login');
   });
 
+  it('en pantalla estrecha Cerrar sesión pasa al menú de gestión', async () => {
+    pantalla.next({ matches: true, breakpoints: {} });
+    await entrar('/presupuestos/3');
+
+    expect(botonCon('Cerrar sesión')).toBeUndefined();
+
+    await (await abrirGestion()).clickItem({ text: /Cerrar sesión/ });
+    await estable();
+
+    expect(TestBed.inject(SesionService).haySesion()).toBe(false);
+    expect(url()).toBe('/login');
+  });
+
   describe('menú lateral', () => {
     it('en pantalla ancha está abierto, en modo side y sin botón de menú', async () => {
       await entrar('/presupuestos/3');

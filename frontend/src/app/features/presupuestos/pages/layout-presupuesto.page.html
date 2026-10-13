@@ -36,8 +36,16 @@
           <mat-icon>edit</mat-icon>
           <span>Renombrar presupuesto</span>
         </button>
+        @if (estrecha()) {
+          <button mat-menu-item type="button" (click)="cerrarSesion()">
+            <mat-icon>logout</mat-icon>
+            <span>Cerrar sesión</span>
+          </button>
+        }
       </mat-menu>
-      <button mat-button type="button" (click)="cerrarSesion()">Cerrar sesión</button>
+      @if (!estrecha()) {
+        <button mat-button type="button" (click)="cerrarSesion()">Cerrar sesión</button>
+      }
     </div>
   </app-cabecera>
 

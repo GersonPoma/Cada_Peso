@@ -4,14 +4,17 @@
   height: 100dvh;
 }
 
+// En pantallas estrechas el selector se encoge para que la cabecera no desborde la página.
 .acciones {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 .selector {
-  width: 200px;
+  flex: 0 1 200px;
+  min-width: 0;
   font: var(--mat-sys-body-medium);
 }
 
