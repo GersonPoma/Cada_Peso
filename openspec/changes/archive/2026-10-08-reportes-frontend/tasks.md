@@ -140,9 +140,13 @@ tocan. Parte A = grupos 1 a 6; parte B = grupos 7 a 9 (se pueden aplicar por sep
       `features/reportes` no importa otra feature, que no hay `parseFloat`, `toISOString` ni
       pipes nativos `number`/`currency`/`percent`/`date` en `features/reportes`, y que
       `git diff --stat` no incluye el layout del menú lateral ni `core/`.
-- [ ] 10.3 Revisión manual con `npx ng serve` y el backend local: cada pestaña con datos, rango
+- [x] 10.3 Revisión manual con `npx ng serve` y el backend local: cada pestaña con datos, rango
       inválido, 360 px de ancho sin desplazamiento horizontal de la página, navegación con
       teclado (foco visible en pestañas, atajos, selectores y enlaces).
+      Hecha el 2026-10-12. A 360 px la página desbordaba hasta 530 px en todas las secciones
+      por la cabecera del layout (selector de 200 px y "Cerrar sesión"); se corrigió en
+      `layout-presupuesto.page` (selector flexible y "Cerrar sesión" en el menú de gestión en
+      pantalla estrecha). El resto pasó sin cambios.
 - [x] 10.4 `npx prettier --check` sobre los archivos tocados, `npx ng build` y
       `npx ng test --watch=false`; anotar el total de tests y compararlo con la línea base.
 
