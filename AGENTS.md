@@ -846,6 +846,7 @@ src/app/
     │   ├── pages/
     │   └── services/
     ├── inicio/
+    │   ├── components/
     │   ├── models/
     │   ├── pages/
     │   └── services/
@@ -1093,6 +1094,43 @@ resultado) que usa los endpoints de `Importación de CSV` (backend).
   `/presupuestos/:id/transacciones?cuentaId=X&sinAprobar=1`.
 - **Datos de otra feature**: `CuentaLecturaService` propio (solo GET) y modelo mínimo, sin importar
   de `cuentas`.
+
+## Inicio (frontend)
+
+`features/inicio` (`/presupuestos/:presupuestoId/inicio`, `InicioPage`) saluda (`Hola, <nombre>`,
+que sigue consultando `GET /usuarios/yo` cada vez que se abre) y resume el **mes actual** del
+presupuesto activo en seis tarjetas: `Listo para asignar`, `Saldo total`, `Categorías
+sobregastadas`, `Transacciones sin aprobar`, `Metas que faltan` e `Ingresos y gastos`.
+
+- **Solo se muestran cifras del backend.** Lo único que el cliente hace es contar (`sobregastada`,
+  metas `FALTA`) y la suma entera del saldo total. Servicios y modelos **propios**
+  (`ResumenLecturaService`, solo GET); de `core/` y `shared/` solo se reutiliza lo común.
+- **Siete `GET` en paralelo al abrir** (el perfil más seis del presupuesto): el mes con
+  `incluirOcultas=true` (alimenta dos tarjetas con una sola petición), cuentas y saldos (la tarjeta
+  de saldo los une con `forkJoin`: si falla uno, falla la tarjeta), las metas del mes, las
+  transacciones con `soloSinAprobar=true&page=0&size=1` (solo se usa `totalElementos`) y
+  `reportes/ingresos-gastos` del mes.
+- **Cada tarjeta es independiente**: `crearCargador` (`services/cargador-tarjeta.ts`) da `estado`
+  (`cargando`, `listo`, `error`), `datos` y `recargar()`. Pide con presupuesto activo, descarta la
+  respuesta de una petición reemplazada con `switchMap` (cambio de presupuesto o `Reintentar`),
+  vacía los datos al cambiar de presupuesto y cancela al destruirse la pantalla.
+  `ResumenInicioStore` se provee en la página y agrupa los cargadores. `app-tarjeta-resumen` pinta
+  el marco (región con nombre, carga, error con `role="alert"` y `Reintentar`).
+- **Las tarjetas solo se pintan con presupuesto activo** (lo fija el layout): sin él no hay
+  peticiones ni botones, que es lo que afirman los tests de siempre de la página.
+- **Saldo total** = suma de `saldo` de las cuentas abiertas que están en el presupuesto (tarjetas
+  con su signo), la misma regla que `Total en el presupuesto` de Cuentas. No se comparte código (una
+  feature no importa a otra): el mismo conjunto de datos (total `1050000`) se prueba en
+  `resumen-inicio.spec.ts` y en `cuentas.page.spec.ts`.
+- **Sobregastadas** cuentan también las categorías ocultas (`listoParaAsignar` ya las incluye), pero
+  el enlace lleva al mes sin `Mostrar ocultas`. **Metas que faltan** muestra solo la cantidad de
+  metas `FALTA`: `totalFaltante` suma también las `SOBREGASTADA`, así que su monto no se usa.
+- **Vacíos**: `Aún no tienes cuentas` (con `Agregar cuenta`) si `GET /cuentas` viene vacío, y `Sin
+  movimientos este mes` (con `Agregar transacción`) si `ingresos`, `gastos` y `neto` son cero; no
+  equivale a "sin transacciones" (saberlo costaría otra petición).
+- **El mes se fija al abrir** con `mesActual()` (fecha local): no se refresca si la pantalla sigue
+  abierta al cambiar de mes. Enlaces a `presupuesto/:mes`, `cuentas`, `transacciones?sinAprobar=1` y
+  `reportes?reporte=ingresos-gastos&desde&hasta`.
 
 ## Estilo de código
 

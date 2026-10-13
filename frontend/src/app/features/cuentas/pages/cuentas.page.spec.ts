@@ -517,4 +517,25 @@ describe('CuentasPage', () => {
       );
     });
   });
+
+  describe('contrato con Inicio', () => {
+    // El mismo conjunto de datos que `resumen-inicio.spec.ts` (features/inicio): si cambia la regla
+    // del total en una pantalla, esa prueba o esta debe avisar. Total esperado: 1050000.
+    it('Total en el presupuesto suma corriente, tarjeta con su signo, sin seguimiento ni cerradas', async () => {
+      const corriente = cuenta({ id: 1, nombre: 'Corriente' });
+      const tarjeta = cuenta({ id: 2, nombre: 'Tarjeta', tipo: 'TARJETA_CREDITO' });
+      const seguimiento = cuenta({ id: 3, nombre: 'Seguimiento', enPresupuesto: false });
+      const cerrada = cuenta({ id: 4, nombre: 'Cerrada', cerrada: true });
+      const saldos: SaldoCuentaResponse[] = [
+        { cuentaId: 1, saldo: 1200000, saldoConciliado: 0 },
+        { cuentaId: 2, saldo: -150000, saldoConciliado: 0 },
+        { cuentaId: 3, saldo: 600000, saldoConciliado: 0 },
+        { cuentaId: 4, saldo: 300000, saldoConciliado: 0 },
+      ];
+
+      await responder([corriente, tarjeta, seguimiento, cerrada], saldos);
+
+      expect(texto()).toContain('Total en el presupuesto: $1,050.00');
+    });
+  });
 });

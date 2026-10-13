@@ -1,9 +1,161 @@
 <main class="pagina">
-  @if (cargando()) {
-    <mat-progress-spinner mode="indeterminate" diameter="48" aria-label="Cargando" />
-  } @else if (usuario(); as actual) {
-    <h1 class="saludo">Hola, {{ actual.nombre }}</h1>
-  } @else if (errorCarga(); as texto) {
-    <p class="error" role="alert">{{ texto }}</p>
+  <header class="encabezado">
+    @if (cargando()) {
+      <mat-progress-spinner mode="indeterminate" diameter="48" aria-label="Cargando" />
+    } @else if (usuario(); as actual) {
+      <h1 class="saludo">Hola, {{ actual.nombre }}</h1>
+      <p class="mes">{{ mesTexto }}</p>
+    } @else if (errorCarga(); as texto) {
+      <p class="error" role="alert">{{ texto }}</p>
+    }
+  </header>
+
+  @if (presupuesto(); as p) {
+    @if (sinCuentas()) {
+      <p class="aviso" role="status">
+        <mat-icon aria-hidden="true">info</mat-icon>
+        {{ avisoSinCuentas }}
+        <a mat-button [routerLink]="['/presupuestos', p.id, 'cuentas']">Agregar cuenta</a>
+      </p>
+    }
+
+    <div class="tarjetas">
+      <app-tarjeta-resumen
+        titulo="Listo para asignar"
+        clave="listo"
+        [estado]="store.mes.estado()"
+        (reintentar)="store.mes.recargar()"
+      >
+        @if (store.mes.datos(); as mes) {
+          <p class="cifra" [class.negativo]="mes.listoParaAsignar < 0">
+            {{ mes.listoParaAsignar | monto: p.moneda }}
+          </p>
+          @if (mes.listoParaAsignar < 0) {
+            <p class="estado negativo">
+              <mat-icon aria-hidden="true">warning</mat-icon>
+              {{ avisoListoNegativo }}
+            </p>
+          } @else if (mes.listoParaAsignar === 0) {
+            <p class="estado">{{ textoTodoAsignado }}</p>
+          }
+          <a mat-button [routerLink]="['/presupuestos', p.id, 'presupuesto', store.periodo]">
+            Ver presupuesto del mes
+          </a>
+        }
+      </app-tarjeta-resumen>
+
+      <app-tarjeta-resumen
+        titulo="Saldo total"
+        clave="saldo"
+        [estado]="store.saldo.estado()"
+        (reintentar)="store.saldo.recargar()"
+      >
+        @if (sinCuentas()) {
+          <p class="estado">{{ avisoSinCuentas }}</p>
+          <a mat-button [routerLink]="['/presupuestos', p.id, 'cuentas']">Agregar cuenta</a>
+        } @else {
+          <p class="cifra" [class.negativo]="saldoTotal() < 0">
+            {{ saldoTotal() | monto: p.moneda }}
+          </p>
+          <p class="detalle">Cuentas del presupuesto</p>
+          <a mat-button [routerLink]="['/presupuestos', p.id, 'cuentas']">Ver cuentas</a>
+        }
+      </app-tarjeta-resumen>
+
+      <app-tarjeta-resumen
+        titulo="Categorías sobregastadas"
+        clave="sobregastadas"
+        [estado]="store.mes.estado()"
+        (reintentar)="store.mes.recargar()"
+      >
+        <p class="estado" [class.negativo]="sobregastadas() > 0">
+          @if (sobregastadas() > 0) {
+            <mat-icon aria-hidden="true">warning</mat-icon>
+          }
+          {{ textoSobregastadas(sobregastadas()) }}
+        </p>
+        <a mat-button [routerLink]="['/presupuestos', p.id, 'presupuesto', store.periodo]">
+          Ver el mes
+        </a>
+      </app-tarjeta-resumen>
+
+      <app-tarjeta-resumen
+        titulo="Transacciones sin aprobar"
+        clave="sin-aprobar"
+        [estado]="store.sinAprobar.estado()"
+        (reintentar)="store.sinAprobar.recargar()"
+      >
+        @if (store.sinAprobar.datos(); as pagina) {
+          <p class="estado">{{ textoSinAprobar(pagina.totalElementos) }}</p>
+          <a
+            mat-button
+            [routerLink]="['/presupuestos', p.id, 'transacciones']"
+            [queryParams]="{ sinAprobar: 1 }"
+          >
+            Ver sin aprobar
+          </a>
+        }
+      </app-tarjeta-resumen>
+
+      <app-tarjeta-resumen
+        titulo="Metas que faltan"
+        clave="metas"
+        [estado]="store.metas.estado()"
+        (reintentar)="store.metas.recargar()"
+      >
+        <p class="estado">{{ textoMetas() }}</p>
+        <a mat-button [routerLink]="['/presupuestos', p.id, 'presupuesto', store.periodo]">
+          Ver metas del mes
+        </a>
+      </app-tarjeta-resumen>
+
+      <app-tarjeta-resumen
+        titulo="Ingresos y gastos"
+        clave="ingresos-gastos"
+        [estado]="store.ingresosGastos.estado()"
+        (reintentar)="store.ingresosGastos.recargar()"
+      >
+        @if (store.ingresosGastos.datos(); as datos) {
+          @if (sinMovimientos()) {
+            <p class="estado">{{ textoSinMovimientos }}</p>
+            <a mat-button [routerLink]="['/presupuestos', p.id, 'transacciones']">
+              Agregar transacción
+            </a>
+          } @else {
+            <dl class="cifras">
+              <div>
+                <dt>Ingresos</dt>
+                <dd>{{ datos.ingresos | monto: p.moneda }}</dd>
+              </div>
+              <div>
+                <dt>Gastos</dt>
+                <dd>{{ datos.gastos | monto: p.moneda }}</dd>
+              </div>
+              <div>
+                <dt>Neto</dt>
+                <dd [class.negativo]="datos.neto < 0">{{ datos.neto | monto: p.moneda }}</dd>
+              </div>
+            </dl>
+            @if (datos.neto < 0) {
+              <p class="estado negativo">
+                <mat-icon aria-hidden="true">warning</mat-icon>
+                {{ avisoNetoNegativo }}
+              </p>
+            }
+            <a
+              mat-button
+              [routerLink]="['/presupuestos', p.id, 'reportes']"
+              [queryParams]="{
+                reporte: 'ingresos-gastos',
+                desde: store.periodo,
+                hasta: store.periodo,
+              }"
+            >
+              Ver reporte
+            </a>
+          }
+        }
+      </app-tarjeta-resumen>
+    </div>
   }
 </main>

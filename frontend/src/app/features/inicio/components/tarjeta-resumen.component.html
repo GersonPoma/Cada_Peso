@@ -1,0 +1,26 @@
+<section class="tarjeta" [attr.aria-labelledby]="idTitulo()">
+  <h2 class="titulo" [id]="idTitulo()">{{ titulo() }}</h2>
+  <div class="cuerpo" aria-live="polite">
+    @switch (estado()) {
+      @case ('cargando') {
+        <mat-progress-spinner
+          mode="indeterminate"
+          diameter="32"
+          [attr.aria-label]="'Cargando ' + titulo()"
+        />
+      }
+      @case ('error') {
+        <p class="error" role="alert">
+          <mat-icon aria-hidden="true">error</mat-icon>
+          {{ mensajeError }}
+        </p>
+        <button mat-stroked-button type="button" class="reintentar" (click)="reintentar.emit()">
+          Reintentar
+        </button>
+      }
+      @default {
+        <ng-content />
+      }
+    }
+  </div>
+</section>
