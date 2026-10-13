@@ -362,4 +362,64 @@ describe('CuentasPage', () => {
       });
     });
   });
+
+  describe('Pagar tarjeta', () => {
+    beforeEach(() => responder([BANCO, TARJETA, INVERSIONES]));
+
+    /** Textos de los enlaces del menú abierto de la cuenta, con su destino. */
+    async function enlaces(nombre: string): Promise<[string, string | null][]> {
+      const menu = await cargador.getHarness(
+        MatMenuHarness.with({ selector: `[aria-label="Acciones de ${nombre}"]` }),
+      );
+      await menu.open();
+      await estable();
+      return Array.from(document.querySelectorAll('.mat-mdc-menu-panel a[mat-menu-item]')).map(
+        (a) => [
+          normalizar(a.querySelector('.mat-mdc-menu-item-text')?.textContent ?? '').trim(),
+          a.getAttribute('href'),
+        ],
+      );
+    }
+
+    it('una tarjeta abierta del presupuesto lleva a sus transacciones para pagarla', async () => {
+      expect(await enlaces('Visa')).toContainEqual([
+        'Pagar tarjeta',
+        '/presupuestos/3/transacciones?cuentaId=6&pagarTarjeta=6',
+      ]);
+    });
+
+    it('una cuenta que no es tarjeta no la ofrece', async () => {
+      const textos = (await enlaces('Banco')).map(([t]) => t);
+
+      expect(textos).not.toContain('Pagar tarjeta');
+    });
+
+    it('una tarjeta de seguimiento no la ofrece', async () => {
+      const seguimiento = cuenta({
+        id: 9,
+        nombre: 'Master',
+        tipo: 'TARJETA_CREDITO',
+        enPresupuesto: false,
+      });
+      await (await cargador.getHarness(MatSlideToggleHarness)).toggle();
+      await estable();
+      await responder([BANCO, seguimiento], SALDOS, true);
+
+      expect((await enlaces('Master')).map(([t]) => t)).not.toContain('Pagar tarjeta');
+    });
+
+    it('una tarjeta cerrada no la ofrece', async () => {
+      const cerrada = cuenta({
+        id: 10,
+        nombre: 'Visa vieja',
+        tipo: 'TARJETA_CREDITO',
+        cerrada: true,
+      });
+      await (await cargador.getHarness(MatSlideToggleHarness)).toggle();
+      await estable();
+      await responder([BANCO, cerrada], SALDOS, true);
+
+      expect((await enlaces('Visa vieja')).map(([t]) => t)).not.toContain('Pagar tarjeta');
+    });
+  });
 });

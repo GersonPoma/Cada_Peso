@@ -101,6 +101,16 @@
           <mat-icon>fact_check</mat-icon>
           <span>Conciliar</span>
         </a>
+        @if (cuenta.tipo === 'TARJETA_CREDITO' && cuenta.enPresupuesto) {
+          <a
+            mat-menu-item
+            [routerLink]="['/presupuestos', presupuestoId(), 'transacciones']"
+            [queryParams]="{ cuentaId: cuenta.id, pagarTarjeta: cuenta.id }"
+          >
+            <mat-icon>credit_card</mat-icon>
+            <span>Pagar tarjeta</span>
+          </a>
+        }
         <button mat-menu-item type="button" (click)="cerrar(cuenta)">
           <mat-icon>lock</mat-icon>
           <span>Cerrar</span>

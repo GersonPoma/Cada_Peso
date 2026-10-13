@@ -27,7 +27,7 @@
           Conciliar
         </a>
       }
-      <button mat-stroked-button type="button" (click)="agregarTransferencia()">
+      <button #botonTransferencia mat-stroked-button type="button" (click)="agregarTransferencia()">
         <mat-icon>swap_horiz</mat-icon>
         Agregar transferencia
       </button>
@@ -41,7 +41,7 @@
   <app-filtros-transacciones
     [filtros]="filtros()"
     [cuentas]="cuentas()"
-    [grupos]="gruposVisibles()"
+    [grupos]="gruposParaFiltro()"
     (cambiar)="cambiarFiltros($event)"
     (limpiar)="limpiarFiltros()"
   />

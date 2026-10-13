@@ -1,8 +1,23 @@
-import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatMenu, MatMenuContent, MatMenuItem, MatMenuTrigger } from '@angular/material/menu';
+import { RouterLink } from '@angular/router';
+import { PresupuestoActivoService } from '../../../core/presupuesto-activo/presupuesto-activo.service';
 import { MontoPipe } from '../../../shared/formato/monto.pipe';
+import { EtiquetaPagoTarjetaComponent } from '../../../shared/pago-tarjeta/etiqueta-pago-tarjeta.component';
+import {
+  ENLACE_MOVIMIENTOS_TARJETA,
+  NOTA_RESERVA_PAGO_TARJETA,
+} from '../../../shared/pago-tarjeta/mensajes-pago-tarjeta';
 import { CategoriaMesResponse } from '../models/categoria-mes-response.model';
 import { GrupoMesResponse } from '../models/grupo-mes-response.model';
 import { MetaMesResponse } from '../models/metas-mes-response.model';
@@ -20,7 +35,9 @@ let siguienteId = 0;
 /**
  * Un grupo del mes: encabezado plegable con la suma de sus categorías y una fila por categoría
  * (asignado editable, actividad y disponible con su indicador de sobregasto) y, si tiene meta, su
- * indicador debajo del nombre. Solo presenta y emite: la página hace las peticiones.
+ * indicador debajo del nombre. La fila de una categoría de pago de tarjeta lleva su etiqueta, la
+ * aclaración de que es una reserva y un enlace a los movimientos de la tarjeta. Solo presenta y
+ * emite: la página hace las peticiones.
  */
 @Component({
   selector: 'app-grupo-mes',
@@ -32,7 +49,9 @@ let siguienteId = 0;
     MatMenuItem,
     MatMenuTrigger,
     MontoPipe,
+    RouterLink,
     CeldaAsignadoComponent,
+    EtiquetaPagoTarjetaComponent,
     IndicadorMetaComponent,
   ],
   templateUrl: './grupo-mes.component.html',
@@ -40,6 +59,11 @@ let siguienteId = 0;
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class GrupoMesComponent {
+  private readonly presupuestoActivo = inject(PresupuestoActivoService);
+  protected readonly presupuestoId = computed(() => this.presupuestoActivo.presupuesto()?.id);
+  protected readonly notaReserva = NOTA_RESERVA_PAGO_TARJETA;
+  protected readonly enlaceMovimientos = ENLACE_MOVIMIENTOS_TARJETA;
+
   readonly grupo = input.required<GrupoMesResponse>();
   readonly moneda = input.required<string>();
   /** Categorías con un guardado de asignado en curso. */

@@ -54,6 +54,10 @@ const LONGITUD_MAXIMA_NOMBRE = 100;
 export const MENSAJE_SALDO_NEGATIVO =
   'El saldo inicial negativo solo se permite en tarjetas de crédito y préstamos';
 
+/** `422` al editar el tipo desde o hacia tarjeta de crédito (el formulario ya lo impide). */
+export const MENSAJE_CAMBIO_TIPO_TARJETA =
+  'No se puede cambiar el tipo de una cuenta desde ni hacia tarjeta de crédito';
+
 const MENSAJE_NOMBRE_REPETIDO = 'Ya tienes una cuenta con ese nombre';
 
 const MENSAJES_NOMBRE: MensajesDeError = {
@@ -65,6 +69,12 @@ const MENSAJES_TIPO: MensajesDeError = {
   required: 'El tipo es obligatorio',
   tipoNoAdmiteSaldoNegativo:
     'Esta cuenta tiene saldo inicial negativo: solo puede ser tarjeta de crédito o préstamo',
+};
+
+/** Reglas del tipo de una tarjeta: van aparte para poder mostrarse junto a la del saldo. */
+const MENSAJES_TIPO_TARJETA: MensajesDeError = {
+  tarjetaNoCambia: 'El tipo de una tarjeta de crédito no se puede cambiar',
+  cuentaNoPasaATarjeta: 'Una cuenta existente no puede pasar a tarjeta de crédito',
 };
 
 const MENSAJES_SALDO: MensajesDeError = {
@@ -94,6 +104,20 @@ function tipoAdmiteSaldoExistente(saldoInicial: number): ValidatorFn {
     return saldoInicial < 0 && tipo !== null && !admiteSaldoNegativo(tipo)
       ? { tipoNoAdmiteSaldoNegativo: true }
       : null;
+  };
+}
+
+/** Al editar: una tarjeta de crédito no cambia de tipo y otra cuenta no pasa a serlo. */
+function tipoTarjetaFijo(tipoGuardado: TipoCuenta): ValidatorFn {
+  return (control: AbstractControl): ValidationErrors | null => {
+    const tipo = control.value as TipoCuenta | null;
+    if (tipo === null || tipo === tipoGuardado) {
+      return null;
+    }
+    if (tipoGuardado === 'TARJETA_CREDITO') {
+      return { tarjetaNoCambia: true };
+    }
+    return tipo === 'TARJETA_CREDITO' ? { cuentaNoPasaATarjeta: true } : null;
   };
 }
 
@@ -151,7 +175,11 @@ export class DialogoCuentaComponent {
   protected readonly tipo = new FormControl<TipoCuenta | null>(
     this.datos.modo === 'editar' ? this.datos.cuenta.tipo : null,
     this.datos.modo === 'editar'
-      ? [Validators.required, tipoAdmiteSaldoExistente(this.datos.cuenta.saldoInicial)]
+      ? [
+          Validators.required,
+          tipoAdmiteSaldoExistente(this.datos.cuenta.saldoInicial),
+          tipoTarjetaFijo(this.datos.cuenta.tipo),
+        ]
       : [Validators.required],
   );
   protected readonly enPresupuesto = new FormControl(true, { nonNullable: true });
@@ -192,7 +220,15 @@ export class DialogoCuentaComponent {
   }
 
   protected mensajeTipo(): string | null {
-    return mensajeDeError(this.tipo.errors, MENSAJES_TIPO);
+    return mensajeDeError(this.tipo.errors, { ...MENSAJES_TIPO, ...MENSAJES_TIPO_TARJETA });
+  }
+
+  /** La regla de la tarjeta, aparte cuando el campo ya muestra la del saldo negativo. */
+  protected mensajeTipoTarjeta(): string | null {
+    const errores = this.tipo.errors;
+    return errores && 'tipoNoAdmiteSaldoNegativo' in errores
+      ? mensajeDeError(errores, MENSAJES_TIPO_TARJETA)
+      : null;
   }
 
   protected mensajeSaldo(): string | null {
@@ -247,7 +283,7 @@ export class DialogoCuentaComponent {
       return;
     }
     if (problema?.codigo === CODIGOS_API.REGLA_NEGOCIO_VIOLADA) {
-      this.errorGeneral.set(MENSAJE_SALDO_NEGATIVO);
+      this.errorGeneral.set(this.mensajeReglaDeNegocio());
       return;
     }
     if (problema?.codigo === CODIGOS_API.DATOS_INVALIDOS && problema.errores) {
@@ -258,6 +294,24 @@ export class DialogoCuentaComponent {
       return;
     }
     this.avisarErrorGenerico();
+  }
+
+  /**
+   * El `422` no dice qué regla fue: se decide por la operación enviada. Editar con otro tipo y
+   * alguno de los dos `TARJETA_CREDITO` es el cambio de tipo; todo lo demás, el saldo negativo.
+   */
+  private mensajeReglaDeNegocio(): string {
+    if (this.datos.modo === 'editar') {
+      const guardado = this.datos.cuenta.tipo;
+      const enviado = this.tipo.value;
+      if (
+        enviado !== guardado &&
+        (guardado === 'TARJETA_CREDITO' || enviado === 'TARJETA_CREDITO')
+      ) {
+        return MENSAJE_CAMBIO_TIPO_TARJETA;
+      }
+    }
+    return MENSAJE_SALDO_NEGATIVO;
   }
 
   private avisarErrorGenerico(): void {

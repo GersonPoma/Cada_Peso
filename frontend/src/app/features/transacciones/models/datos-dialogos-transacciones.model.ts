@@ -18,6 +18,8 @@ export interface DatosDialogoTransferencia {
   transaccionId: number | null;
   /** Cuenta origen preseleccionada al crear. */
   cuentaOrigenId: number | null;
+  /** Si viene, el diálogo es el pago de esa tarjeta: destino fijo y orígenes elegibles. */
+  pagoTarjetaId?: number | null;
   cuentas: CuentaResumen[];
   grupos: GrupoCategoriasResumen[];
 }

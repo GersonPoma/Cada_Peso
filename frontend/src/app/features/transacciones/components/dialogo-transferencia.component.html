@@ -1,4 +1,6 @@
-<h2 mat-dialog-title>{{ esCrear ? 'Nueva transferencia' : 'Editar transferencia' }}</h2>
+<h2 mat-dialog-title>
+  {{ esPago ? 'Pagar tarjeta' : esCrear ? 'Nueva transferencia' : 'Editar transferencia' }}
+</h2>
 <form [formGroup]="formulario" (ngSubmit)="enviar()" novalidate>
   <mat-dialog-content class="contenido">
     @if (cargando()) {
@@ -6,7 +8,7 @@
         <mat-progress-spinner mode="indeterminate" diameter="40" aria-label="Cargando" />
       </div>
     }
-    <div class="cuentas" [class.oculto]="cargando()">
+    <div class="cuentas" [class.oculto]="cargando()" [class.sin-invertir]="esPago">
       <mat-form-field appearance="outline">
         <mat-label>Cuenta origen</mat-label>
         <mat-select formControlName="cuentaOrigenId" [required]="true">
@@ -23,7 +25,7 @@
         }
       </mat-form-field>
 
-      @if (esCrear) {
+      @if (esCrear && !esPago) {
         <button
           mat-icon-button
           type="button"
@@ -71,6 +73,13 @@
         [mensajes]="mensajesMonto"
       />
     </div>
+
+    @if (esPago) {
+      @if (sinOrigenParaPago()) {
+        <p class="error-general" role="alert">{{ mensajeSinOrigen }}</p>
+      }
+      <p class="texto-regla">Este pago rebaja lo reservado para pagar {{ nombreTarjeta() }}</p>
+    }
 
     @switch (regla()) {
       @case ('oculta-presupuesto') {

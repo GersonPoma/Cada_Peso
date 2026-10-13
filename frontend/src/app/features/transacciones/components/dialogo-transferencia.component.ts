@@ -46,7 +46,8 @@ import {
   mensajeDeError,
 } from '../../../shared/formulario/errores-formulario';
 import { sobreTextoRecortado } from '../../../shared/validacion/sobre-texto-recortado.validator';
-import { CuentaResumen } from '../models/cuenta-resumen.model';
+import { sinCategoriasDePago } from '../../../shared/pago-tarjeta/categorias-sin-pago';
+import { CuentaResumen, TIPO_CUENTA_TARJETA } from '../models/cuenta-resumen.model';
 import {
   DatosDialogoTransferencia,
   ResultadoDialogoTransaccion,
@@ -76,6 +77,10 @@ export const TEXTOS_REGLA_CATEGORIA: Readonly<Record<ReglaCategoriaTransferencia
 };
 
 const MENSAJES_MONTO = { noPositivo: 'El monto debe ser mayor que 0' };
+/** Sin una cuenta del presupuesto, que no sea tarjeta, desde la cual pagar. */
+export const MENSAJE_SIN_ORIGEN_PARA_PAGO =
+  'No tienes otra cuenta del presupuesto desde la cual pagar';
+
 const MENSAJES: Readonly<Record<string, MensajesDeError>> = {
   cuentaOrigenId: { required: 'La cuenta origen es obligatoria' },
   cuentaDestinoId: {
@@ -163,6 +168,9 @@ export class DialogoTransferenciaComponent {
   private readonly snackBar = inject(MatSnackBar);
 
   protected readonly esCrear = this.datos.transaccionId === null;
+  /** Pago de una tarjeta: el destino es fijo y el origen sale del presupuesto. */
+  private readonly pagoTarjetaId = this.esCrear ? (this.datos.pagoTarjetaId ?? null) : null;
+  protected readonly esPago = this.pagoTarjetaId !== null;
   protected readonly maximoMemo = MAXIMO_MEMO_TRANSFERENCIA;
   protected readonly mensajesMonto = MENSAJES_MONTO;
   protected readonly textos = TEXTOS_REGLA_CATEGORIA;
@@ -174,7 +182,7 @@ export class DialogoTransferenciaComponent {
         Validators.required,
       ),
       cuentaDestinoId: new FormControl<number | null>(
-        { value: null, disabled: !this.esCrear },
+        { value: this.pagoTarjetaId, disabled: !this.esCrear || this.esPago },
         Validators.required,
       ),
       fecha: new FormControl<Date | null>(hoy(), Validators.required),
@@ -204,11 +212,22 @@ export class DialogoTransferenciaComponent {
 
   /** Cada select excluye la cuenta elegida en el otro. */
   protected readonly opcionesOrigen = computed(() =>
-    agrupar(this.cuentasVisibles().filter((c) => c.id !== this.destinoId())),
+    agrupar(
+      this.cuentasVisibles().filter(
+        (c) => c.id !== this.destinoId() && (!this.esPago || this.puedePagar(c)),
+      ),
+    ),
   );
   protected readonly opcionesDestino = computed(() =>
     agrupar(this.cuentasVisibles().filter((c) => c.id !== this.origenId())),
   );
+
+  /** Nombre de la tarjeta que se paga, para la nota. */
+  protected readonly nombreTarjeta = computed(() => this.cuenta(this.pagoTarjetaId)?.nombre ?? '');
+  protected readonly sinOrigenParaPago = computed(
+    () => this.esPago && this.opcionesOrigen().length === 0,
+  );
+  protected readonly mensajeSinOrigen = MENSAJE_SIN_ORIGEN_PARA_PAGO;
 
   protected readonly regla = computed(() =>
     reglaCategoriaTransferencia(this.cuenta(this.origenId()), this.cuenta(this.destinoId())),
@@ -219,16 +238,19 @@ export class DialogoTransferenciaComponent {
 
   /** Categoría ya elegida al abrir (la única oculta que se ofrece). */
   private readonly categoriaInicial = signal<number | null>(null);
+  /** Sin las categorías de pago de tarjeta: el backend las rechaza con `422`. */
   protected readonly grupos = computed<GrupoCategoriasResumen[]>(() => {
     const elegida = this.categoriaInicial();
-    return this.datos.grupos
-      .map((grupo) => ({
-        ...grupo,
-        categorias: grupo.categorias.filter(
-          (c) => c.id === elegida || (!c.oculta && !grupo.oculto),
-        ),
-      }))
-      .filter((grupo) => grupo.categorias.length > 0);
+    return sinCategoriasDePago(
+      this.datos.grupos
+        .map((grupo) => ({
+          ...grupo,
+          categorias: grupo.categorias.filter(
+            (c) => c.id === elegida || (!c.oculta && !grupo.oculto),
+          ),
+        }))
+        .filter((grupo) => grupo.categorias.length > 0),
+    );
   });
 
   protected readonly largoMemo = computed(() => this.memoActual().trim().length);
@@ -281,6 +303,11 @@ export class DialogoTransferenciaComponent {
   private origenInicial(): number | null {
     const id = this.datos.cuentaOrigenId;
     return this.datos.cuentas.some((c) => c.id === id && !c.cerrada) ? id : null;
+  }
+
+  /** Para pagar una tarjeta se sale de una cuenta del presupuesto que no sea otra tarjeta. */
+  private puedePagar(cuenta: CuentaResumen): boolean {
+    return cuenta.enPresupuesto && cuenta.tipo !== TIPO_CUENTA_TARJETA;
   }
 
   private cuenta(id: number | null): CuentaResumen | null {

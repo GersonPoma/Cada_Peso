@@ -1,10 +1,13 @@
 import { CdkDrag, CdkDragDrop, CdkDragHandle, CdkDropList } from '@angular/cdk/drag-drop';
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatMenu, MatMenuContent, MatMenuItem, MatMenuTrigger } from '@angular/material/menu';
+import { EtiquetaPagoTarjetaComponent } from '../../../shared/pago-tarjeta/etiqueta-pago-tarjeta.component';
+import { NOTA_CATEGORIA_PAGO_TARJETA } from '../../../shared/pago-tarjeta/mensajes-pago-tarjeta';
 import { CategoriaResponse } from '../models/categoria-response.model';
 import { GrupoCategoriaConCategoriasResponse } from '../models/grupo-categoria-con-categorias-response.model';
+import { esCategoriaDePago, esGrupoDePagos } from '../services/pago-tarjeta';
 
 /** Lo que lleva cada elemento arrastrable: un grupo o una categoría. */
 export type DatoArrastre =
@@ -21,7 +24,8 @@ export type SoltarCategoria = CdkDragDrop<
 /**
  * Un grupo de categorías: cabecera con su asa de arrastre, nombre, "Agregar categoría" y menú, y
  * la lista de categorías, que recibe categorías arrastradas desde cualquier grupo. Solo presenta:
- * emite cada acción y la página decide qué hacer.
+ * emite cada acción y la página decide qué hacer. El grupo de pagos de tarjetas y sus categorías
+ * están protegidos (el backend rechaza tocarlos): se muestran con su etiqueta y sin acciones.
  */
 @Component({
   selector: 'app-grupo-categorias',
@@ -29,6 +33,7 @@ export type SoltarCategoria = CdkDragDrop<
     CdkDrag,
     CdkDragHandle,
     CdkDropList,
+    EtiquetaPagoTarjetaComponent,
     MatButton,
     MatIcon,
     MatIconButton,
@@ -54,9 +59,17 @@ export class GrupoCategoriasComponent {
   readonly moverCategoriaA = output<CategoriaResponse>();
   readonly soltarCategoria = output<SoltarCategoria>();
 
-  /** La lista de categorías solo acepta categorías, nunca un grupo. */
+  /** El grupo de pagos de tarjetas: no se renombra, oculta, mueve ni recibe categorías. */
+  protected readonly esDePagos = computed(() => esGrupoDePagos(this.grupo()));
+  protected readonly notaPago = NOTA_CATEGORIA_PAGO_TARJETA;
+
+  /** La lista solo acepta categorías, nunca un grupo, y el grupo de pagos no acepta ninguna. */
   protected readonly soloCategorias = (arrastre: CdkDrag<DatoArrastre>): boolean =>
-    arrastre.data?.tipo === 'categoria';
+    arrastre.data?.tipo === 'categoria' && !this.esDePagos();
+
+  protected esPago(categoria: CategoriaResponse): boolean {
+    return esCategoriaDePago(categoria);
+  }
 
   protected datoCategoria(categoria: CategoriaResponse): DatoArrastre {
     return { tipo: 'categoria', categoria };

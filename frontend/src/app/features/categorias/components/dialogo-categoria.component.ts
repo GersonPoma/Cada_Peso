@@ -20,6 +20,7 @@ import {
   MENSAJE_ERROR_GENERICO,
   leerProblemaApi,
 } from '../../../shared/api/problema-api';
+import { MENSAJE_PAGO_TARJETA_PROTEGIDO } from '../../../shared/pago-tarjeta/mensajes-pago-tarjeta';
 import {
   CLAVE_ERROR_SERVIDOR,
   MensajesDeError,
@@ -153,6 +154,10 @@ export class DialogoCategoriaComponent {
       const nombre = this.formulario.controls.nombre;
       nombre.setErrors({ ...nombre.errors, [CLAVE_ERROR_SERVIDOR]: MENSAJE_CATEGORIA_REPETIDA });
       nombre.markAsTouched();
+      return;
+    }
+    if (problema?.codigo === CODIGOS_API.REGLA_NEGOCIO_VIOLADA) {
+      this.snackBar.open(MENSAJE_PAGO_TARJETA_PROTEGIDO, 'Cerrar', { duration: 6000 });
       return;
     }
     if (problema?.codigo === CODIGOS_API.DATOS_INVALIDOS && problema.errores) {

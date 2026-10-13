@@ -486,4 +486,101 @@ describe('DialogoTransferenciaComponent', () => {
       expect(resultado).toBe('abierto');
     });
   });
+
+  describe('categorías de pago de tarjeta', () => {
+    it('del presupuesto a seguimiento no ofrece la de pago ni su grupo', async () => {
+      await abrir({
+        grupos: [
+          ...GRUPOS,
+          {
+            id: 2,
+            nombre: 'Pagos de tarjetas de crédito',
+            oculto: false,
+            tipo: 'PAGOS_TARJETA',
+            categorias: [
+              { id: 30, nombre: 'Pago: Visa', oculta: false, esPagoTarjeta: true, cuentaId: 4 },
+            ],
+          },
+        ],
+      });
+      await cuentas('Banco', 'Inversiones');
+
+      const categoria = await selector('Categoría');
+      await categoria.open();
+      const grupos = await Promise.all(
+        (await categoria.getOptionGroups()).map((g) => g.getLabelText()),
+      );
+
+      expect(grupos).toEqual(['Metas']);
+      expect(await Promise.all((await categoria.getOptions()).map((o) => o.getText()))).toEqual([
+        'Ahorro largo plazo',
+        'Comida',
+      ]);
+    });
+  });
+
+  describe('pago de una tarjeta', () => {
+    const CUENTAS_PAGO = [
+      { id: 1, nombre: 'Banco', enPresupuesto: true, cerrada: false, tipo: 'CORRIENTE' },
+      { id: 2, nombre: 'Efectivo', enPresupuesto: true, cerrada: false, tipo: 'EFECTIVO' },
+      { id: 4, nombre: 'Visa', enPresupuesto: true, cerrada: false, tipo: 'TARJETA_CREDITO' },
+      { id: 5, nombre: 'Hipoteca', enPresupuesto: false, cerrada: false, tipo: 'PRESTAMO' },
+      { id: 6, nombre: 'Master', enPresupuesto: true, cerrada: false, tipo: 'TARJETA_CREDITO' },
+    ];
+
+    it('fija la tarjeta como destino y ofrece solo orígenes del presupuesto que no son tarjeta', async () => {
+      await abrir({ cuentas: CUENTAS_PAGO, pagoTarjetaId: 4 });
+
+      expect(textoDialogo()).toContain('Pagar tarjeta');
+      const destino = await selector('Cuenta destino');
+      expect(await destino.isDisabled()).toBe(true);
+      expect(await destino.getValueText()).toBe('Visa');
+      expect(await invertir()).toHaveLength(0);
+      expect(await opciones('Cuenta origen')).toEqual(['Banco', 'Efectivo']);
+      expect(textoDialogo()).toContain('Este pago rebaja lo reservado para pagar Visa');
+    });
+
+    it('envía el pago como una transferencia normal, sin categoría', async () => {
+      await abrir({ cuentas: CUENTAS_PAGO, pagoTarjetaId: 4 });
+      await elegir('Cuenta origen', 'Banco');
+      await monto('30');
+
+      const peticion = await crear();
+      expect(peticion.request.body).toEqual({
+        cuentaOrigenId: 1,
+        cuentaDestinoId: 4,
+        fecha: '2026-10-08',
+        monto: 30000,
+        memo: null,
+      });
+      peticion.flush({ salida: SALIDA, entrada: ENTRADA });
+      await estable();
+      expect(resultado).toEqual({ tipo: 'guardada' });
+    });
+
+    it('sin cuentas desde las que pagar lo dice y deshabilita el botón', async () => {
+      await abrir({
+        cuentas: CUENTAS_PAGO.filter((c) => c.id !== 1 && c.id !== 2),
+        pagoTarjetaId: 4,
+      });
+
+      expect(textoDialogo()).toContain('No tienes otra cuenta del presupuesto desde la cual pagar');
+      expect(await (await boton('Crear')).isDisabled()).toBe(true);
+    });
+
+    it('la transferencia normal conserva su título, Invertir y sus cuentas', async () => {
+      await abrir({ cuentas: CUENTAS_PAGO });
+
+      expect(textoDialogo()).toContain('Nueva transferencia');
+      expect(textoDialogo()).not.toContain('Pagar tarjeta');
+      expect(await invertir()).toHaveLength(1);
+      expect(await opciones('Cuenta origen')).toEqual([
+        'Banco',
+        'Efectivo',
+        'Visa',
+        'Master',
+        'Hipoteca',
+      ]);
+    });
+  });
 });

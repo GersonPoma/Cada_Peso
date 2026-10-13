@@ -27,6 +27,7 @@ import {
   MatDialogTitle,
 } from '@angular/material/dialog';
 import { MatError, MatFormField, MatHint, MatLabel, MatSuffix } from '@angular/material/form-field';
+import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
 import { MatSelect } from '@angular/material/select';
 import { MatSlideToggle } from '@angular/material/slide-toggle';
@@ -47,6 +48,8 @@ import {
   mensajeDeError,
 } from '../../../shared/formulario/errores-formulario';
 import { sobreTextoRecortado } from '../../../shared/validacion/sobre-texto-recortado.validator';
+import { sinCategoriasDePago } from '../../../shared/pago-tarjeta/categorias-sin-pago';
+import { TIPO_CUENTA_TARJETA } from '../models/cuenta-resumen.model';
 import { BeneficiarioSugerido } from '../models/beneficiario-sugerido.model';
 import {
   DatosDialogoTransaccion,
@@ -73,6 +76,11 @@ export const MENSAJE_REFERENCIA_INEXISTENTE =
   'Una cuenta o categoría ya no existe. Actualizamos las listas.';
 export const MENSAJE_BENEFICIARIO_DUPLICADO = 'Ya existe un beneficiario con ese nombre';
 export const PISTA_CATEGORIA_SUGERIDA = 'Sugerida por el beneficiario';
+
+/** Una entrada sin categoría en una tarjeta no es ingreso ni pago: el backend no la cuenta. */
+export const AVISO_ENTRADA_EN_TARJETA =
+  'Una entrada sin categoría en una tarjeta de crédito no cuenta como ingreso ni como pago ' +
+  'de la tarjeta. Para pagarla, usa Pagar tarjeta en Cuentas';
 
 type Tipo = 'salida' | 'entrada';
 
@@ -117,6 +125,7 @@ function hoy(): Date {
     MatError,
     MatFormField,
     MatHint,
+    MatIcon,
     MatInput,
     MatLabel,
     MatOptgroup,
@@ -168,7 +177,10 @@ export class DialogoTransaccionComponent {
   protected readonly hayCategoriaSugerida = computed(() => this.categoriaSugerida() !== null);
   protected readonly pistaCategoriaSugerida = PISTA_CATEGORIA_SUGERIDA;
 
-  /** Categorías visibles, más las ocultas que la transacción ya usa o sugirió el beneficiario. */
+  /**
+   * Categorías visibles, más las ocultas que la transacción ya usa o sugirió el beneficiario, sin
+   * las de pago de tarjeta (el backend las rechaza con `422`).
+   */
   protected readonly grupos = computed<GrupoCategoriasResumen[]>(() => {
     const usadas = new Set<number>();
     if (this.original?.categoriaId != null) {
@@ -183,14 +195,16 @@ export class DialogoTransaccionComponent {
     if (sugerida !== null) {
       usadas.add(sugerida);
     }
-    return this.datos.grupos
-      .map((grupo) => ({
-        ...grupo,
-        categorias: grupo.categorias.filter(
-          (c) => usadas.has(c.id) || (!c.oculta && !grupo.oculto),
-        ),
-      }))
-      .filter((grupo) => grupo.categorias.length > 0);
+    return sinCategoriasDePago(
+      this.datos.grupos
+        .map((grupo) => ({
+          ...grupo,
+          categorias: grupo.categorias.filter(
+            (c) => usadas.has(c.id) || (!c.oculta && !grupo.oculto),
+          ),
+        }))
+        .filter((grupo) => grupo.categorias.length > 0),
+    );
   });
 
   private readonly signo = this.original && this.original.monto > 0 ? 1 : -1;
@@ -244,6 +258,26 @@ export class DialogoTransaccionComponent {
   protected readonly dividida = toSignal(this.formulario.controls.dividir.valueChanges, {
     initialValue: this.formulario.controls.dividir.value,
   });
+  private readonly cuentaElegida = toSignal(this.formulario.controls.cuentaId.valueChanges, {
+    initialValue: this.formulario.controls.cuentaId.value,
+  });
+  private readonly tipoElegido = toSignal(this.formulario.controls.tipo.valueChanges, {
+    initialValue: this.formulario.controls.tipo.value,
+  });
+  private readonly categoriaElegida = toSignal(this.formulario.controls.categoriaId.valueChanges, {
+    initialValue: this.formulario.controls.categoriaId.value,
+  });
+  protected readonly avisoEntradaEnTarjeta = computed(() => {
+    const cuenta = this.datos.cuentas.find((c) => c.id === this.cuentaElegida());
+    return (
+      cuenta?.tipo === TIPO_CUENTA_TARJETA &&
+      cuenta.enPresupuesto &&
+      this.tipoElegido() === 'entrada' &&
+      !this.dividida() &&
+      this.categoriaElegida() === null
+    );
+  });
+  protected readonly textoAvisoEntrada = AVISO_ENTRADA_EN_TARJETA;
   protected readonly montoActual = toSignal(this.formulario.controls.monto.valueChanges, {
     initialValue: this.formulario.controls.monto.value,
   });

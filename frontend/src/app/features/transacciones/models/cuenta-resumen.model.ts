@@ -7,4 +7,9 @@ export interface CuentaResumen {
   nombre: string;
   enPresupuesto: boolean;
   cerrada: boolean;
+  /** Tipo de la cuenta (`TIPO_CUENTA_TARJETA` para una tarjeta); el backend lo envía siempre. */
+  tipo?: string;
 }
+
+/** Valor de `CuentaResumen.tipo` de una tarjeta de crédito. */
+export const TIPO_CUENTA_TARJETA = 'TARJETA_CREDITO';

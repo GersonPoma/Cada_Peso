@@ -19,6 +19,9 @@
       @if (mensajeTipo(); as texto) {
         <mat-error>{{ texto }}</mat-error>
       }
+      @if (mensajeTipoTarjeta(); as texto) {
+        <mat-error>{{ texto }}</mat-error>
+      }
     </mat-form-field>
 
     @if (esCrear) {

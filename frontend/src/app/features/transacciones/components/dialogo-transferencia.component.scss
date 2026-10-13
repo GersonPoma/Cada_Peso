@@ -16,6 +16,11 @@
   margin-top: 8px;
 }
 
+/* El pago de una tarjeta no tiene el botón Invertir: solo origen y destino. */
+.cuentas.sin-invertir {
+  grid-template-columns: 1fr 1fr;
+}
+
 .fila-doble {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -51,6 +56,7 @@
 
 @media (max-width: 599.98px) {
   .cuentas,
+  .cuentas.sin-invertir,
   .fila-doble {
     grid-template-columns: 1fr;
   }

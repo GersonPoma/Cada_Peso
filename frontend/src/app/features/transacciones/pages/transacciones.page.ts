@@ -3,10 +3,12 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  ElementRef,
   effect,
   inject,
   signal,
   untracked,
+  viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { MatButton } from '@angular/material/button';
@@ -24,6 +26,7 @@ import {
   leerProblemaApi,
 } from '../../../shared/api/problema-api';
 import { MontoPipe } from '../../../shared/formato/monto.pipe';
+import { sinCategoriasDePago } from '../../../shared/pago-tarjeta/categorias-sin-pago';
 import { BarraLoteComponent } from '../components/barra-lote.component';
 import { DialogoConfirmacionComponent } from '../components/dialogo-confirmacion.component';
 import { DialogoMoverCuentaComponent } from '../components/dialogo-mover-cuenta.component';
@@ -35,7 +38,7 @@ import {
   TablaTransaccionesComponent,
 } from '../components/tabla-transacciones.component';
 import { BeneficiarioSugerido } from '../models/beneficiario-sugerido.model';
-import { CuentaResumen } from '../models/cuenta-resumen.model';
+import { CuentaResumen, TIPO_CUENTA_TARJETA } from '../models/cuenta-resumen.model';
 import {
   DatosDialogoConfirmacion,
   DatosDialogoMoverCuenta,
@@ -62,6 +65,12 @@ import {
 } from '../services/filtros-url';
 import { TransaccionService } from '../services/transaccion.service';
 import { TransferenciaService } from '../services/transferencia.service';
+
+/** Id de la tarjeta de `?pagarTarjeta=` (lo pone `Pagar tarjeta` en Cuentas); `null` si no es válido. */
+function leerPagarTarjeta(texto: string | null): number | null {
+  const id = Number(texto);
+  return texto !== null && Number.isInteger(id) && id > 0 ? id : null;
+}
 
 type Estado = 'cargando' | 'listo' | 'error';
 
@@ -134,6 +143,16 @@ export class TransaccionesPage {
   protected readonly seleccion = signal<ReadonlySet<number>>(new Set());
   private readonly recargas = signal(0);
   private readonly recargasListas = signal(0);
+  /** Tarjeta cuyo pago pide la URL (`?pagarTarjeta=`), hasta que se atiende y se quita. */
+  private readonly pagarTarjetaId = toSignal(
+    this.ruta.queryParamMap.pipe(map((params) => leerPagarTarjeta(params.get('pagarTarjeta')))),
+    { initialValue: leerPagarTarjeta(this.ruta.snapshot.queryParamMap.get('pagarTarjeta')) },
+  );
+  /** Las cuentas y las categorías ya llegaron: el diálogo de pago las necesita. */
+  private readonly listasCargadas = signal(false);
+  private pagoAtendido: number | null = null;
+  /** El pago de una tarjeta se abre por URL, sin botón de origen: el foco vuelve a este. */
+  private readonly botonTransferencia = viewChild('botonTransferencia', { read: ElementRef });
   private readonly recargasBeneficiarios = signal(0);
 
   protected readonly nombresCuenta = computed(
@@ -157,12 +176,19 @@ export class TransaccionesPage {
   protected readonly nombresBeneficiario = computed(
     () => new Map(this.beneficiarios().map((b) => [b.id, b.nombre] as const)),
   );
-  /** Grupos y categorías visibles, para elegir en filtros y en lote. */
-  protected readonly gruposVisibles = computed(() =>
+  private readonly gruposVisiblesConPago = computed(() =>
     this.gruposTodos()
       .filter((g) => !g.oculto)
       .map((g) => ({ ...g, categorias: g.categorias.filter((c) => !c.oculta) }))
       .filter((g) => g.categorias.length > 0),
+  );
+  /** Grupos y categorías visibles, para elegir en lote: sin las de pago de tarjeta. */
+  protected readonly gruposVisibles = computed(() =>
+    sinCategoriasDePago(this.gruposVisiblesConPago()),
+  );
+  /** Para el filtro: sin las de pago, salvo la que ya trae la URL (para que se vea elegida). */
+  protected readonly gruposParaFiltro = computed(() =>
+    sinCategoriasDePago(this.gruposVisiblesConPago(), this.filtros().categoriaId),
   );
   protected readonly hayFiltros = computed(() => hayFiltros(this.filtros()));
 
@@ -202,8 +228,32 @@ export class TransaccionesPage {
       ([cuentas, grupos]) => {
         this.cuentas.set(cuentas);
         this.gruposTodos.set(grupos);
+        this.listasCargadas.set(true);
       },
     );
+    // `Pagar tarjeta` de Cuentas llega con `?pagarTarjeta=`: se abre el diálogo de pago una vez
+    // y el parámetro se quita para que recargar no lo reabra.
+    effect(() => {
+      const id = this.pagarTarjetaId();
+      if (id === null) {
+        this.pagoAtendido = null;
+        return;
+      }
+      if (!this.listasCargadas() || id === this.pagoAtendido) {
+        return;
+      }
+      const cuentas = this.cuentas();
+      untracked(() => {
+        this.pagoAtendido = id;
+        this.quitarPagarTarjeta();
+        const tarjeta = cuentas.find(
+          (c) => c.id === id && !c.cerrada && c.enPresupuesto && c.tipo === TIPO_CUENTA_TARJETA,
+        );
+        if (tarjeta) {
+          this.abrirDialogoTransferencia(null, null, tarjeta.id);
+        }
+      });
+    });
     // Beneficiarios (nombre actual en la tabla): al entrar y tras guardar desde el diálogo. Si
     // fallan, la columna muestra el texto de cada transacción.
     this.cargar(
@@ -433,12 +483,26 @@ export class TransaccionesPage {
     });
   }
 
-  /** Crear (`transaccionId` nulo) o editar una transferencia por el id de una de sus patas. */
-  private abrirDialogoTransferencia(transaccionId: number | null, cuentaOrigenId: number | null) {
+  /**
+   * Crear (`transaccionId` nulo) o editar una transferencia por el id de una de sus patas. Con
+   * `pagoTarjetaId` es el pago de esa tarjeta.
+   */
+  private abrirDialogoTransferencia(
+    transaccionId: number | null,
+    cuentaOrigenId: number | null,
+    pagoTarjetaId?: number,
+  ) {
     this.abrir<DatosDialogoTransferencia, ResultadoDialogoTransaccion>(
       DialogoTransferenciaComponent,
-      { transaccionId, cuentaOrigenId, cuentas: this.cuentas(), grupos: this.gruposTodos() },
+      {
+        transaccionId,
+        cuentaOrigenId,
+        cuentas: this.cuentas(),
+        grupos: this.gruposTodos(),
+        ...(pagoTarjetaId === undefined ? {} : { pagoTarjetaId }),
+      },
       '640px',
+      pagoTarjetaId === undefined ? undefined : this.botonTransferencia()?.nativeElement,
     ).subscribe((resultado) => {
       if (resultado?.tipo === 'recargar') {
         this.recargasListas.update((v) => v + 1);
@@ -457,8 +521,15 @@ export class TransaccionesPage {
     componente: ComponentType<unknown>,
     datos: D,
     ancho = '440px',
+    restaurarFoco?: HTMLElement,
   ): Observable<R | undefined> {
-    return this.dialog.open<unknown, D, R>(componente, { data: datos, width: ancho }).afterClosed();
+    return this.dialog
+      .open<unknown, D, R>(componente, {
+        data: datos,
+        width: ancho,
+        ...(restaurarFoco ? { restoreFocus: restaurarFoco } : {}),
+      })
+      .afterClosed();
   }
 
   private ejecutar(peticion: Observable<unknown>, exito?: string): void {
@@ -499,6 +570,16 @@ export class TransaccionesPage {
       .open(MENSAJE_ERROR_GENERICO, 'Reintentar', { duration: 6000 })
       .onAction()
       .subscribe(() => this.recargar());
+  }
+
+  /** Quita `pagarTarjeta` de la URL sin añadir una entrada al historial; conserva los filtros. */
+  private quitarPagarTarjeta(): void {
+    void this.router.navigate([], {
+      relativeTo: this.ruta,
+      queryParams: { pagarTarjeta: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   private navegar(filtros: FiltrosTransacciones): void {

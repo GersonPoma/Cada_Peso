@@ -19,7 +19,11 @@ import { PresupuestoActivoService } from '../../../core/presupuesto-activo/presu
 import { MENSAJE_ERROR_GENERICO } from '../../../shared/api/problema-api';
 import { CuentaResponse } from '../models/cuenta-response.model';
 import { DatosDialogoCuenta } from '../models/datos-dialogo-cuenta.model';
-import { DialogoCuentaComponent, MENSAJE_SALDO_NEGATIVO } from './dialogo-cuenta.component';
+import {
+  DialogoCuentaComponent,
+  MENSAJE_CAMBIO_TIPO_TARJETA,
+  MENSAJE_SALDO_NEGATIVO,
+} from './dialogo-cuenta.component';
 
 const URL_CUENTAS = '/api/v1/presupuestos/3/cuentas';
 
@@ -391,7 +395,9 @@ describe('DialogoCuentaComponent', () => {
 
       await (await tipo()).clickOptions({ text: 'Préstamo' });
       await estable();
-      expect(await (await boton('Guardar')).isDisabled()).toBe(false);
+      // El backend ya no admite que una tarjeta cambie de tipo (tarjetas-credito-backend).
+      expect(errores()).toContain('El tipo de una tarjeta de crédito no se puede cambiar');
+      expect(await (await boton('Guardar')).isDisabled()).toBe(true);
     });
 
     it('422 al guardar se muestra como mensaje del diálogo', async () => {
@@ -407,6 +413,124 @@ describe('DialogoCuentaComponent', () => {
 
       expect(textoDialogo()).toContain(MENSAJE_SALDO_NEGATIVO);
       expect(resultado).toBe('abierto');
+    });
+  });
+
+  describe('tipo de una tarjeta de crédito', () => {
+    const MENSAJE_TARJETA_FIJA = 'El tipo de una tarjeta de crédito no se puede cambiar';
+    const MENSAJE_A_TARJETA = 'Una cuenta existente no puede pasar a tarjeta de crédito';
+    const VISA = () => cuenta({ id: 8, nombre: 'Visa', tipo: 'TARJETA_CREDITO' });
+
+    it('cambiar el tipo de una tarjeta marca el tipo y deshabilita Guardar', async () => {
+      await abrir({ modo: 'editar', cuenta: VISA() });
+      await (await tipo()).clickOptions({ text: 'Ahorro' });
+      await estable();
+
+      expect(errores()).toEqual([MENSAJE_TARJETA_FIJA]);
+      expect(await (await boton('Guardar')).isDisabled()).toBe(true);
+    });
+
+    it('pasar una cuenta a tarjeta marca el tipo y deshabilita Guardar', async () => {
+      await abrir({ modo: 'editar', cuenta: cuenta() });
+      await (await tipo()).clickOptions({ text: 'Tarjeta de crédito' });
+      await estable();
+
+      expect(errores()).toEqual([MENSAJE_A_TARJETA]);
+      expect(await (await boton('Guardar')).isDisabled()).toBe(true);
+    });
+
+    it('volver al tipo guardado quita el error y habilita Guardar', async () => {
+      await abrir({ modo: 'editar', cuenta: VISA() });
+      await (await tipo()).clickOptions({ text: 'Ahorro' });
+      await (await tipo()).clickOptions({ text: 'Tarjeta de crédito' });
+      await estable();
+
+      expect(errores()).toEqual([]);
+      expect(await (await boton('Guardar')).isDisabled()).toBe(false);
+    });
+
+    it('renombrar una tarjeta envía el mismo tipo', async () => {
+      await abrir({ modo: 'editar', cuenta: VISA() });
+      await (await nombre()).setValue('Visa Oro');
+      await (await boton('Guardar')).click();
+
+      const peticion = backend.expectOne(`${URL_CUENTAS}/8`);
+      expect(peticion.request.method).toBe('PUT');
+      expect(peticion.request.body).toEqual({ nombre: 'Visa Oro', tipo: 'TARJETA_CREDITO' });
+      peticion.flush(VISA());
+      await estable();
+    });
+
+    it('crear una tarjeta no muestra ningún error de tipo', async () => {
+      await abrir({ modo: 'crear' });
+      await (await tipo()).clickOptions({ text: 'Tarjeta de crédito' });
+      await estable();
+
+      expect(errores()).toEqual([]);
+    });
+
+    it('con saldo negativo, cambiar la tarjeta a Ahorro muestra las dos reglas', async () => {
+      await abrir({ modo: 'editar', cuenta: cuenta({ ...VISA(), saldoInicial: -250000 }) });
+      await (await tipo()).clickOptions({ text: 'Ahorro' });
+      await estable();
+
+      expect(errores()).toEqual([
+        'Esta cuenta tiene saldo inicial negativo: solo puede ser tarjeta de crédito o préstamo',
+        MENSAJE_TARJETA_FIJA,
+      ]);
+    });
+
+    describe('422 según la operación enviada', () => {
+      /** Salta la validación del formulario para simular una petición con datos desactualizados. */
+      async function enviarSinValidar(nuevoTipo: string): Promise<void> {
+        await (await tipo()).clickOptions({ text: nuevoTipo });
+        const dialogo = TestBed.inject(MatDialog).openDialogs[0].componentInstance as {
+          tipo: { clearValidators(): void; updateValueAndValidity(): void };
+        };
+        dialogo.tipo.clearValidators();
+        dialogo.tipo.updateValueAndValidity();
+        await estable();
+        await (await boton('Guardar')).click();
+      }
+
+      const rechazar = (url: string) =>
+        backend
+          .expectOne(url)
+          .flush(
+            { codigo: 'REGLA_NEGOCIO_VIOLADA', detail: 'texto interno' },
+            { status: 422, statusText: 'Unprocessable Entity' },
+          );
+
+      it('cambiar el tipo de una tarjeta muestra el mensaje del cambio de tipo', async () => {
+        await abrir({ modo: 'editar', cuenta: VISA() });
+        await enviarSinValidar('Ahorro');
+        rechazar(`${URL_CUENTAS}/8`);
+        await estable();
+
+        expect(textoDialogo()).toContain(MENSAJE_CAMBIO_TIPO_TARJETA);
+        expect(textoDialogo()).not.toContain(MENSAJE_SALDO_NEGATIVO);
+        expect(textoDialogo()).not.toContain('texto interno');
+        expect(resultado).toBe('abierto');
+      });
+
+      it('pasar una cuenta a tarjeta muestra el mensaje del cambio de tipo', async () => {
+        await abrir({ modo: 'editar', cuenta: cuenta() });
+        await enviarSinValidar('Tarjeta de crédito');
+        rechazar(`${URL_CUENTAS}/5`);
+        await estable();
+
+        expect(textoDialogo()).toContain(MENSAJE_CAMBIO_TIPO_TARJETA);
+      });
+
+      it('editar sin cambiar el tipo conserva el mensaje del saldo negativo', async () => {
+        await abrir({ modo: 'editar', cuenta: VISA() });
+        await (await boton('Guardar')).click();
+        rechazar(`${URL_CUENTAS}/8`);
+        await estable();
+
+        expect(textoDialogo()).toContain(MENSAJE_SALDO_NEGATIVO);
+        expect(textoDialogo()).not.toContain(MENSAJE_CAMBIO_TIPO_TARJETA);
+      });
     });
   });
 });

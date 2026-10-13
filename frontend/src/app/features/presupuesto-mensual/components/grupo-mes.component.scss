@@ -46,6 +46,19 @@
   min-width: 0;
 }
 
+.pago-tarjeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-small);
+}
+
+.enlace-movimientos {
+  color: var(--mat-sys-primary);
+}
+
 .nombre-categoria {
   overflow: hidden;
   font: var(--mat-sys-body-large);

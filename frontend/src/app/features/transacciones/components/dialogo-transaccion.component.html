@@ -77,6 +77,13 @@
       </mat-form-field>
     }
 
+    @if (avisoEntradaEnTarjeta()) {
+      <p class="aviso-info" role="status">
+        <mat-icon aria-hidden="true">info</mat-icon>
+        <span>{{ textoAvisoEntrada }}</span>
+      </p>
+    }
+
     <mat-form-field appearance="outline">
       <mat-label>Memo</mat-label>
       <textarea matInput rows="2" formControlName="memo"></textarea>

@@ -19,9 +19,11 @@ import {
   MENSAJE_ERROR_GENERICO,
   leerProblemaApi,
 } from '../../../shared/api/problema-api';
+import { MENSAJE_PAGO_TARJETA_PROTEGIDO } from '../../../shared/pago-tarjeta/mensajes-pago-tarjeta';
 import { CategoriaResponse } from '../models/categoria-response.model';
 import { DatosDialogoMoverCategoria } from '../models/datos-dialogos-categorias.model';
 import { CategoriaService } from '../services/categoria.service';
+import { esGrupoDePagos } from '../services/pago-tarjeta';
 import { posicionCategoria } from '../services/reordenamiento';
 
 /** Texto del 409 `CATEGORIA_YA_EXISTE` al mover una categoría a otro grupo. */
@@ -66,7 +68,8 @@ export class DialogoMoverCategoriaComponent {
   private readonly snackBar = inject(MatSnackBar);
 
   protected readonly categoria = this.datos.categoria;
-  protected readonly grupos = this.datos.arbol;
+  /** Los destinos posibles: el grupo de pagos de tarjetas no recibe categorías. */
+  protected readonly grupos = this.datos.arbol.filter((grupo) => !esGrupoDePagos(grupo));
 
   protected readonly formulario = new FormGroup({
     grupoId: new FormControl(this.categoria.grupoId, { nonNullable: true }),
@@ -131,6 +134,10 @@ export class DialogoMoverCategoriaComponent {
     }
     if (problema?.codigo === CODIGOS_API.CATEGORIA_YA_EXISTE) {
       this.errorGeneral.set(MENSAJE_CATEGORIA_REPETIDA_DESTINO);
+      return;
+    }
+    if (problema?.codigo === CODIGOS_API.REGLA_NEGOCIO_VIOLADA) {
+      this.errorGeneral.set(MENSAJE_PAGO_TARJETA_PROTEGIDO);
       return;
     }
     this.snackBar.open(MENSAJE_ERROR_GENERICO, 'Cerrar', { duration: 6000 });

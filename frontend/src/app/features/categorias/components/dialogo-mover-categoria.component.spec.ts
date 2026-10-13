@@ -14,6 +14,7 @@ import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { proveerMaterial } from '../../../core/material/proveer-material';
 import { PresupuestoActivoService } from '../../../core/presupuesto-activo/presupuesto-activo.service';
+import { MENSAJE_PAGO_TARJETA_PROTEGIDO } from '../../../shared/pago-tarjeta/mensajes-pago-tarjeta';
 import { ArbolCategorias } from '../models/arbol-categorias.model';
 import { CategoriaResponse } from '../models/categoria-response.model';
 import { DatosDialogoMoverCategoria } from '../models/datos-dialogos-categorias.model';
@@ -173,6 +174,50 @@ describe('DialogoMoverCategoriaComponent', () => {
     expect(document.querySelector('mat-dialog-container [role="alert"]')?.textContent).toContain(
       'Ya hay una categoría con ese nombre en el grupo destino',
     );
+    expect(resultado).toBe('abierto');
+  });
+
+  it('no ofrece el grupo de pagos de tarjetas como destino', async () => {
+    TestBed.inject(MatDialog).closeAll();
+    await estable();
+    const arbolConPagos: ArbolCategorias = [
+      ...ARBOL,
+      {
+        id: 6,
+        nombre: 'Pagos de tarjetas de crédito',
+        orden: 3,
+        oculto: false,
+        tipo: 'PAGOS_TARJETA',
+        categorias: [{ ...categoria(30, 6, 'Pago: Visa', 0), esPagoTarjeta: true, cuentaId: 4 }],
+      },
+    ];
+    TestBed.inject(MatDialog).open<
+      DialogoMoverCategoriaComponent,
+      DatosDialogoMoverCategoria,
+      CategoriaResponse
+    >(DialogoMoverCategoriaComponent, { data: { arbol: arbolConPagos, categoria: OCIO } });
+    await estable();
+
+    const grupo = await selector('Grupo');
+    await grupo.open();
+    const opciones = await Promise.all((await grupo.getOptions()).map((o) => o.getText()));
+
+    expect(opciones).toEqual(['Deseos', 'Ahorro', 'Mascotas']);
+  });
+
+  it('422 REGLA_NEGOCIO_VIOLADA se muestra en el diálogo con el mensaje fijo', async () => {
+    await elegir('Ahorro', 'Al principio');
+    backend
+      .expectOne('/api/v1/presupuestos/3/categorias/11/mover')
+      .flush(
+        { codigo: 'REGLA_NEGOCIO_VIOLADA', detail: 'texto interno' },
+        { status: 422, statusText: 'Unprocessable Entity' },
+      );
+    await estable();
+
+    const alerta = document.querySelector('mat-dialog-container [role="alert"]');
+    expect(alerta?.textContent).toContain(MENSAJE_PAGO_TARJETA_PROTEGIDO);
+    expect(alerta?.textContent).not.toContain('texto interno');
     expect(resultado).toBe('abierto');
   });
 });

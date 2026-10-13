@@ -1,3 +1,4 @@
+import { CdkDrag } from '@angular/cdk/drag-drop';
 import { HarnessLoader } from '@angular/cdk/testing';
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { provideHttpClient } from '@angular/common/http';
@@ -15,9 +16,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { proveerMaterial } from '../../../core/material/proveer-material';
 import { PresupuestoActivoService } from '../../../core/presupuesto-activo/presupuesto-activo.service';
 import { MENSAJE_ERROR_GENERICO } from '../../../shared/api/problema-api';
+import { MENSAJE_PAGO_TARJETA_PROTEGIDO } from '../../../shared/pago-tarjeta/mensajes-pago-tarjeta';
 import { DialogoCategoriaComponent } from '../components/dialogo-categoria.component';
 import { DialogoGrupoComponent } from '../components/dialogo-grupo.component';
 import { DialogoMoverCategoriaComponent } from '../components/dialogo-mover-categoria.component';
+import { GrupoCategoriasComponent } from '../components/grupo-categorias.component';
 import { ArbolCategorias } from '../models/arbol-categorias.model';
 import { CategoriaResponse } from '../models/categoria-response.model';
 import { GrupoCategoriaConCategoriasResponse } from '../models/grupo-categoria-con-categorias-response.model';
@@ -495,6 +498,99 @@ describe('CategoriasPage', () => {
       backend.expectOne(`${BASE}/grupos-categorias/1/mover`).flush({});
       await estable();
       await responder();
+    });
+  });
+  describe('grupo y categorías de pago de tarjeta', () => {
+    function arbolConPagos(): ArbolCategorias {
+      return [
+        ...arbolInicial(),
+        {
+          ...grupo(6, 'Pagos de tarjetas de crédito', 4, [
+            categoria(30, 6, 'Pago: Visa', 0, { esPagoTarjeta: true, cuentaId: 4 }),
+          ]),
+          tipo: 'PAGOS_TARJETA',
+        },
+      ];
+    }
+
+    const hostGrupo = (nombre: string) =>
+      Array.from(elemento().querySelectorAll('app-grupo-categorias')).find(
+        (g) => g.querySelector('.nombre-grupo')?.textContent?.trim() === nombre,
+      ) as HTMLElement;
+
+    beforeEach(() => responder(arbolConPagos()));
+
+    it('el grupo de pagos lleva la etiqueta y no ofrece acciones; los demás las conservan', () => {
+      const pagos = hostGrupo('Pagos de tarjetas de crédito');
+
+      expect(pagos.querySelectorAll('app-etiqueta-pago-tarjeta').length).toBe(2);
+      expect(pagos.querySelector('[aria-label^="Acciones"]')).toBeNull();
+      expect(pagos.textContent).not.toContain('Agregar categoría');
+      expect(
+        hostGrupo('Facturas').querySelector('[aria-label="Acciones del grupo Facturas"]'),
+      ).not.toBeNull();
+      expect(hostGrupo('Facturas').querySelector('app-etiqueta-pago-tarjeta')).toBeNull();
+    });
+
+    it('el grupo de pagos no se arrastra y los demás sí', () => {
+      const arrastre = (nombre: string) =>
+        fixture.debugElement
+          .queryAll(By.directive(GrupoCategoriasComponent))
+          .find((d) => d.nativeElement === hostGrupo(nombre))
+          ?.injector.get(CdkDrag);
+
+      expect(arrastre('Pagos de tarjetas de crédito')?.disabled).toBe(true);
+      expect(arrastre('Facturas')?.disabled).toBe(false);
+    });
+
+    it('un 422 al ocultar con el árbol desactualizado muestra el mensaje fijo y recarga', async () => {
+      await accion('Acciones de Ropa', 'Ocultar');
+
+      backend
+        .expectOne(`${BASE}/categorias/12/ocultar`)
+        .flush(
+          { codigo: 'REGLA_NEGOCIO_VIOLADA', detail: 'texto interno' },
+          { status: 422, statusText: 'Unprocessable Entity' },
+        );
+      await estable();
+
+      expect(abrirAviso).toHaveBeenCalledWith(MENSAJE_PAGO_TARJETA_PROTEGIDO, 'Cerrar', {
+        duration: 6000,
+      });
+      expect(abrirAviso).not.toHaveBeenCalledWith(MENSAJE_ERROR_GENERICO, 'Cerrar', {
+        duration: 6000,
+      });
+      await responder(arbolConPagos());
+    });
+
+    it('un 422 al arrastrar revierte la vista, muestra el mensaje fijo y recarga', async () => {
+      await soltarCategoria(11, 4, 0);
+      expect(nombresCategorias('Ahorro')).toContain('Ocio');
+
+      backend
+        .expectOne(`${BASE}/categorias/11/mover`)
+        .flush(
+          { codigo: 'REGLA_NEGOCIO_VIOLADA', detail: 'texto interno' },
+          { status: 422, statusText: 'Unprocessable Entity' },
+        );
+      await estable();
+
+      expect(nombresCategorias('Deseos')).toEqual(['Restaurantes', 'Ocio', 'Ropa']);
+      expect(nombresCategorias('Ahorro')).toEqual(['Fondo de emergencia', 'Vacaciones']);
+      expect(abrirAviso).toHaveBeenCalledWith(MENSAJE_PAGO_TARJETA_PROTEGIDO, 'Cerrar', {
+        duration: 6000,
+      });
+      await responder(arbolConPagos());
+    });
+
+    it('reordenar otro grupo con el de pagos al final sigue llamando a mover', async () => {
+      await soltarGrupo(0, 2);
+
+      const peticion = backend.expectOne(`${BASE}/grupos-categorias/1/mover`);
+      expect(peticion.request.body).toEqual({ posicion: 2 });
+      peticion.flush({});
+      await estable();
+      await responder(arbolConPagos());
     });
   });
 });

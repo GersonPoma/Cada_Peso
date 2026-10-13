@@ -1,3 +1,6 @@
+/** Tipo de un grupo: el de pagos de tarjetas de crédito o uno normal. */
+export type TipoGrupoCategoria = 'NORMAL' | 'PAGOS_TARJETA';
+
 /** Grupo de categorías sin sus categorías (`GrupoCategoriaResponse` del backend). */
 export interface GrupoCategoriaResponse {
   id: number;
@@ -5,6 +8,8 @@ export interface GrupoCategoriaResponse {
   /** Posición entre los grupos del presupuesto, desde 0, contando también los ocultos. */
   orden: number;
   oculto: boolean;
+  /** El backend lo envía siempre (aditivo). */
+  tipo?: TipoGrupoCategoria;
   /** `Instant` del backend, ISO-8601 en UTC. */
   fechaCreacion: string;
   /** `Instant` del backend, ISO-8601 en UTC. */

@@ -691,4 +691,182 @@ describe('TransaccionesPage', () => {
       await responder();
     });
   });
+
+  describe('categorías de pago de tarjeta', () => {
+    const PAGO = { id: 30, nombre: 'Pago: Visa', oculta: false, esPagoTarjeta: true, cuentaId: 4 };
+
+    async function entrarConPagos(query = ''): Promise<void> {
+      await harness.navigateByUrl(`/presupuestos/3/transacciones${query}`);
+      responderBeneficiarios();
+      backend
+        .expectOne((p) => p.url === `${BASE}/cuentas`)
+        .flush([{ id: 5, nombre: 'Banco', enPresupuesto: true, cerrada: false }]);
+      backend
+        .expectOne((p) => p.url === `${BASE}/categorias`)
+        .flush([
+          {
+            id: 1,
+            nombre: 'Necesidades',
+            oculto: false,
+            categorias: [{ id: 7, nombre: 'Comida', oculta: false }],
+          },
+          {
+            id: 2,
+            nombre: 'Pagos de tarjetas de crédito',
+            oculto: false,
+            tipo: 'PAGOS_TARJETA',
+            categorias: [PAGO],
+          },
+        ]);
+      await responder([transaccion(1)]);
+    }
+
+    const nombres = (selector: string) =>
+      (
+        componente(selector).componentInstance.grupos() as {
+          nombre: string;
+          categorias: { nombre: string }[];
+        }[]
+      ).map((g) => [g.nombre, g.categorias.map((c) => c.nombre)]);
+
+    it('la barra de lote no ofrece la de pago ni su grupo', async () => {
+      await entrarConPagos();
+      componente('app-tabla-transacciones').triggerEventHandler('alternarSeleccion', 1);
+      await estable();
+
+      expect(nombres('app-barra-lote')).toEqual([['Necesidades', ['Comida']]]);
+    });
+
+    it('el filtro por categoría no ofrece la de pago ni su grupo', async () => {
+      await entrarConPagos();
+
+      expect(nombres('app-filtros-transacciones')).toEqual([['Necesidades', ['Comida']]]);
+    });
+
+    it('un enlace con categoriaId de pago la muestra elegida y la lista vacía no da error', async () => {
+      await harness.navigateByUrl('/presupuestos/3/transacciones?categoriaId=30');
+      responderBeneficiarios();
+      backend
+        .expectOne((p) => p.url === `${BASE}/cuentas`)
+        .flush([{ id: 5, nombre: 'Banco', enPresupuesto: true, cerrada: false }]);
+      backend
+        .expectOne((p) => p.url === `${BASE}/categorias`)
+        .flush([
+          {
+            id: 2,
+            nombre: 'Pagos de tarjetas de crédito',
+            oculto: false,
+            tipo: 'PAGOS_TARJETA',
+            categorias: [PAGO],
+          },
+        ]);
+      const lista = peticionLista();
+      expect(lista.request.params.get('categoriaId')).toBe('30');
+      lista.flush(pagina([]));
+      backend.expectOne(`${URL_TX}/saldos`).flush(SALDOS);
+      await estable();
+
+      expect(nombres('app-filtros-transacciones')).toEqual([
+        ['Pagos de tarjetas de crédito', ['Pago: Visa']],
+      ]);
+      expect(abrirAviso).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('pagar tarjeta desde la URL', () => {
+    const CUENTAS = [
+      { id: 4, nombre: 'Visa', enPresupuesto: true, cerrada: false, tipo: 'TARJETA_CREDITO' },
+      { id: 5, nombre: 'Banco', enPresupuesto: true, cerrada: false, tipo: 'CORRIENTE' },
+      { id: 7, nombre: 'Vieja', enPresupuesto: true, cerrada: true, tipo: 'TARJETA_CREDITO' },
+    ];
+
+    /** Entra con la URL y responde las listas; al quitarse `pagarTarjeta` la lista se pide otra vez. */
+    async function entrarPagando(query: string): Promise<void> {
+      await harness.navigateByUrl(`/presupuestos/3/transacciones${query}`);
+      responderBeneficiarios();
+      backend.expectOne((p) => p.url === `${BASE}/cuentas`).flush(CUENTAS);
+      backend.expectOne((p) => p.url === `${BASE}/categorias`).flush([]);
+      await estable();
+      await new Promise((listo) => setTimeout(listo));
+      await estable();
+      for (const lista of backend.match((p) => p.url === URL_TX)) {
+        if (!lista.cancelled) {
+          lista.flush(pagina([]));
+        }
+      }
+      for (const saldos of backend.match(`${URL_TX}/saldos`)) {
+        saldos.flush(SALDOS);
+      }
+      await estable();
+    }
+
+    const botonDe = (contenido: string) =>
+      Array.from(elemento().querySelectorAll('button')).find((b) =>
+        b.textContent?.includes(contenido),
+      ) as HTMLButtonElement;
+
+    const aperturasDelPago = (): unknown[][] =>
+      (abrirDialogo.mock.calls as unknown[][]).filter(
+        (llamada) => llamada[0] === DialogoTransferenciaComponent,
+      );
+
+    it('abre el pago de la tarjeta y deja solo el filtro por cuenta en la URL', async () => {
+      await entrarPagando('?cuentaId=4&pagarTarjeta=4');
+
+      expect(aperturasDelPago()).toHaveLength(1);
+      expect(aperturasDelPago()[0][1]).toEqual(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            transaccionId: null,
+            cuentaOrigenId: null,
+            pagoTarjetaId: 4,
+          }),
+        }),
+      );
+      expect(url()).toBe('/presupuestos/3/transacciones?cuentaId=4');
+    });
+
+    it('el diálogo de pago devuelve el foco a Agregar transferencia al cerrarse', async () => {
+      await entrarPagando('?cuentaId=4&pagarTarjeta=4');
+
+      const opciones = aperturasDelPago()[0][1] as { restoreFocus?: unknown };
+      expect(opciones.restoreFocus).toBe(botonDe('Agregar transferencia'));
+    });
+
+    it('sin pagarTarjeta no abre nada y la transferencia normal no lleva pagoTarjetaId', async () => {
+      await entrarPagando('?cuentaId=4');
+      botonDe('Agregar transferencia').click();
+      await estable();
+
+      expect(aperturasDelPago()).toHaveLength(1);
+      expect(aperturasDelPago()[0][1]).not.toHaveProperty('restoreFocus');
+      expect((aperturasDelPago()[0][1] as { data: object }).data).not.toHaveProperty(
+        'pagoTarjetaId',
+      );
+    });
+
+    it('un id que no es una tarjeta se ignora sin aviso y se quita de la URL', async () => {
+      await entrarPagando('?pagarTarjeta=5');
+
+      expect(aperturasDelPago()).toHaveLength(0);
+      expect(abrirAviso).not.toHaveBeenCalled();
+      expect(url()).toBe('/presupuestos/3/transacciones');
+    });
+
+    it('una tarjeta cerrada se ignora sin aviso', async () => {
+      await entrarPagando('?pagarTarjeta=7');
+
+      expect(aperturasDelPago()).toHaveLength(0);
+      expect(abrirAviso).not.toHaveBeenCalled();
+      expect(url()).toBe('/presupuestos/3/transacciones');
+    });
+
+    it('una tarjeta inexistente se ignora sin aviso', async () => {
+      await entrarPagando('?pagarTarjeta=99');
+
+      expect(aperturasDelPago()).toHaveLength(0);
+      expect(abrirAviso).not.toHaveBeenCalled();
+      expect(url()).toBe('/presupuestos/3/transacciones');
+    });
+  });
 });

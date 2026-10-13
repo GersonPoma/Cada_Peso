@@ -1,0 +1,17 @@
+:host {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 4px;
+  border-radius: 8px;
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+  font: var(--mat-sys-label-medium);
+  white-space: nowrap;
+}
+
+.icono {
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
+}

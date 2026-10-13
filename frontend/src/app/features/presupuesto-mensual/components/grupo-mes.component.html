@@ -34,6 +34,20 @@
               @if (metas().get(categoria.categoriaId); as meta) {
                 <app-indicador-meta [meta]="meta" [moneda]="moneda()" [mesPasado]="mesPasado()" />
               }
+              @if (categoria.esPagoTarjeta) {
+                <span class="pago-tarjeta">
+                  <app-etiqueta-pago-tarjeta />
+                  <span class="reserva">{{ notaReserva }}</span>
+                  @if (categoria.cuentaId != null) {
+                    <a
+                      class="enlace-movimientos"
+                      [routerLink]="['/presupuestos', presupuestoId(), 'transacciones']"
+                      [queryParams]="{ cuentaId: categoria.cuentaId }"
+                      >{{ enlaceMovimientos }}</a
+                    >
+                  }
+                </span>
+              }
             </div>
             <button
               mat-icon-button

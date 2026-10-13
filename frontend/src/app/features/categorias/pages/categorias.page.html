@@ -48,7 +48,7 @@
               <app-grupo-categorias
                 cdkDrag
                 [cdkDragData]="{ tipo: 'grupo', grupo }"
-                [cdkDragDisabled]="moviendo()"
+                [cdkDragDisabled]="moviendo() || esGrupoDePagos(grupo)"
                 [grupo]="grupo"
                 [moviendo]="moviendo()"
                 (renombrar)="renombrarGrupo(grupo)"

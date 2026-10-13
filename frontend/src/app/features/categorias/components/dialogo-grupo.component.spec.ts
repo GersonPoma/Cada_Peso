@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { proveerMaterial } from '../../../core/material/proveer-material';
 import { PresupuestoActivoService } from '../../../core/presupuesto-activo/presupuesto-activo.service';
 import { MENSAJE_ERROR_GENERICO } from '../../../shared/api/problema-api';
+import { MENSAJE_PAGO_TARJETA_PROTEGIDO } from '../../../shared/pago-tarjeta/mensajes-pago-tarjeta';
 import { DatosDialogoGrupo } from '../models/datos-dialogos-categorias.model';
 import { GrupoCategoriaResponse } from '../models/grupo-categoria-response.model';
 import { DialogoGrupoComponent } from './dialogo-grupo.component';
@@ -174,6 +175,27 @@ describe('DialogoGrupoComponent', () => {
     await estable();
 
     expect(abrirAviso).toHaveBeenCalledWith(MENSAJE_ERROR_GENERICO, 'Cerrar', { duration: 6000 });
+    expect(resultado).toBe('abierto');
+  });
+
+  it('422 REGLA_NEGOCIO_VIOLADA muestra el mensaje fijo y el diálogo sigue abierto', async () => {
+    await abrir({ modo: 'renombrar', grupo: { id: 4, nombre: 'Deseos' } });
+    await (await nombre()).setValue('Deseos 2');
+    await (await boton('Guardar')).click();
+    backend
+      .expectOne(`${URL_GRUPOS}/4`)
+      .flush(
+        { codigo: 'REGLA_NEGOCIO_VIOLADA', detail: 'texto interno' },
+        { status: 422, statusText: 'Unprocessable Entity' },
+      );
+    await estable();
+
+    expect(abrirAviso).toHaveBeenCalledWith(MENSAJE_PAGO_TARJETA_PROTEGIDO, 'Cerrar', {
+      duration: 6000,
+    });
+    expect(abrirAviso).not.toHaveBeenCalledWith(MENSAJE_ERROR_GENERICO, 'Cerrar', {
+      duration: 6000,
+    });
     expect(resultado).toBe('abierto');
   });
 });

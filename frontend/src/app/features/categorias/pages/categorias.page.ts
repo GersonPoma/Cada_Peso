@@ -15,6 +15,7 @@ import {
   MENSAJE_ERROR_GENERICO,
   leerProblemaApi,
 } from '../../../shared/api/problema-api';
+import { MENSAJE_PAGO_TARJETA_PROTEGIDO } from '../../../shared/pago-tarjeta/mensajes-pago-tarjeta';
 import { DialogoCategoriaComponent } from '../components/dialogo-categoria.component';
 import { DialogoGrupoComponent } from '../components/dialogo-grupo.component';
 import {
@@ -35,6 +36,7 @@ import {
 } from '../models/datos-dialogos-categorias.model';
 import { GrupoCategoriaConCategoriasResponse } from '../models/grupo-categoria-con-categorias-response.model';
 import { CategoriaService } from '../services/categoria.service';
+import { esGrupoDePagos } from '../services/pago-tarjeta';
 import {
   moverCategoria,
   moverGrupo,
@@ -77,6 +79,9 @@ export class CategoriasPage {
   /** Hay un `/mover` en curso (o la recarga que lo sigue): se ignoran los arrastres nuevos. */
   protected readonly moviendo = signal(false);
   private readonly recargas = signal(0);
+
+  /** El grupo de pagos de tarjetas no se arrastra: el backend no deja moverlo. */
+  protected readonly esGrupoDePagos = esGrupoDePagos;
 
   /** La lista de grupos solo acepta grupos, nunca una categoría. */
   protected readonly soloGrupos = (arrastre: CdkDrag<DatoArrastre>): boolean =>
@@ -221,7 +226,9 @@ export class CategoriasPage {
         const mensaje =
           problema?.codigo === CODIGOS_API.CATEGORIA_YA_EXISTE
             ? MENSAJE_CATEGORIA_REPETIDA_DESTINO
-            : MENSAJE_ERROR_GENERICO;
+            : problema?.codigo === CODIGOS_API.REGLA_NEGOCIO_VIOLADA
+              ? MENSAJE_PAGO_TARJETA_PROTEGIDO
+              : MENSAJE_ERROR_GENERICO;
         this.snackBar.open(mensaje, 'Cerrar', { duration: 6000 });
         this.recargar();
       },
@@ -236,9 +243,17 @@ export class CategoriasPage {
     operacion(presupuestoId).subscribe({
       next: () => this.recargar(),
       error: (error: unknown) => {
-        if (leerProblemaApi(error)?.status !== 401) {
-          this.snackBar.open(MENSAJE_ERROR_GENERICO, 'Cerrar', { duration: 6000 });
+        const problema = leerProblemaApi(error);
+        if (problema?.status === 401) {
+          return;
         }
+        if (problema?.codigo === CODIGOS_API.REGLA_NEGOCIO_VIOLADA) {
+          // El árbol estaba desactualizado (otra sesión creó o cerró una tarjeta): se actualiza.
+          this.snackBar.open(MENSAJE_PAGO_TARJETA_PROTEGIDO, 'Cerrar', { duration: 6000 });
+          this.recargar();
+          return;
+        }
+        this.snackBar.open(MENSAJE_ERROR_GENERICO, 'Cerrar', { duration: 6000 });
       },
     });
   }

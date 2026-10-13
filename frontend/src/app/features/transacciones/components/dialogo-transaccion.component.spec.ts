@@ -31,6 +31,7 @@ import {
   MENSAJE_BENEFICIARIO_DUPLICADO,
   MENSAJE_REFERENCIA_INEXISTENTE,
   MENSAJE_REGLA_TRANSACCION,
+  AVISO_ENTRADA_EN_TARJETA,
   PISTA_CATEGORIA_SUGERIDA,
 } from './dialogo-transaccion.component';
 
@@ -505,6 +506,142 @@ describe('DialogoTransaccionComponent', () => {
       expect(peticion.request.body.monto).toBe(-30000);
       peticion.flush(transaccion());
       await estable();
+    });
+  });
+
+  describe('categorías de pago de tarjeta', () => {
+    const GRUPOS_CON_PAGOS = [
+      ...GRUPOS,
+      {
+        id: 2,
+        nombre: 'Pagos de tarjetas de crédito',
+        oculto: false,
+        tipo: 'PAGOS_TARJETA' as const,
+        categorias: [
+          { id: 30, nombre: 'Pago: Visa', oculta: false, esPagoTarjeta: true, cuentaId: 4 },
+        ],
+      },
+    ];
+
+    async function abrirConPagos(): Promise<void> {
+      const dialogo = TestBed.inject(MatDialog).open<
+        DialogoTransaccionComponent,
+        DatosDialogoTransaccion,
+        ResultadoDialogoTransaccion
+      >(DialogoTransaccionComponent, {
+        data: { transaccion: null, cuentas: CUENTAS, grupos: GRUPOS_CON_PAGOS },
+      });
+      resultado = 'abierto';
+      dialogo.afterClosed().subscribe((valor) => (resultado = valor));
+      await estable();
+    }
+
+    const textos = async (select: MatSelectHarness) =>
+      Promise.all((await select.getOptions()).map((o) => o.getText()));
+    const grupos = async (select: MatSelectHarness) =>
+      Promise.all((await select.getOptionGroups()).map((g) => g.getLabelText()));
+
+    it('el selector de categoría no ofrece la de pago ni su grupo', async () => {
+      await abrirConPagos();
+      await (await selector('Cuenta')).clickOptions({ text: 'Banco' });
+
+      const categoria = await selector('Categoría');
+      await categoria.open();
+
+      expect(await textos(categoria)).toEqual(['Sin categoría', 'Comida', 'Ropa']);
+      expect(await grupos(categoria)).toEqual(['Necesidades']);
+    });
+
+    it('las partes de una división tampoco la ofrecen', async () => {
+      await abrirConPagos();
+      await (await selector('Cuenta')).clickOptions({ text: 'Banco' });
+      await monto('Monto', '30');
+      await (await cargador.getHarness(MatSlideToggleHarness)).check();
+      await estable();
+
+      const parte = await selector('Categoría 1');
+      await parte.open();
+
+      expect(await textos(parte)).toEqual(['Sin categoría', 'Comida', 'Ropa']);
+      expect(await grupos(parte)).toEqual(['Necesidades']);
+    });
+  });
+
+  describe('aviso de una entrada sin categoría en una tarjeta', () => {
+    const CUENTAS_TARJETA = [
+      { id: 5, nombre: 'Banco', enPresupuesto: true, cerrada: false, tipo: 'CORRIENTE' },
+      { id: 8, nombre: 'Visa', enPresupuesto: true, cerrada: false, tipo: 'TARJETA_CREDITO' },
+    ];
+
+    beforeEach(async () => {
+      const dialogo = TestBed.inject(MatDialog).open<
+        DialogoTransaccionComponent,
+        DatosDialogoTransaccion,
+        ResultadoDialogoTransaccion
+      >(DialogoTransaccionComponent, {
+        data: { transaccion: null, cuentas: CUENTAS_TARJETA, grupos: GRUPOS },
+      });
+      resultado = 'abierto';
+      dialogo.afterClosed().subscribe((valor) => (resultado = valor));
+      await estable();
+    });
+
+    const elegirCuenta = async (nombreCuenta: string) =>
+      (await selector('Cuenta')).clickOptions({ text: nombreCuenta });
+    const elegirTipo = async (tipo: string) =>
+      (await cargador.getHarness(MatButtonToggleHarness.with({ text: tipo }))).check();
+    const aviso = () => document.querySelector('mat-dialog-container .aviso-info');
+
+    it('se ve con el ícono info y no bloquea el guardado', async () => {
+      await elegirCuenta('Visa');
+      await elegirTipo('Entrada');
+      await monto('Monto', '10');
+
+      expect(textoDialogo()).toContain(AVISO_ENTRADA_EN_TARJETA);
+      expect(aviso()?.querySelector('mat-icon')?.textContent?.trim()).toBe('info');
+      expect(await (await boton('Crear')).isDisabled()).toBe(false);
+    });
+
+    it('un reembolso con categoría no lo muestra', async () => {
+      await elegirCuenta('Visa');
+      await elegirTipo('Entrada');
+      await (await selector('Categoría')).clickOptions({ text: 'Comida' });
+      await estable();
+
+      expect(aviso()).toBeNull();
+    });
+
+    it('desaparece al elegir una categoría y vuelve al quitarla', async () => {
+      await elegirCuenta('Visa');
+      await elegirTipo('Entrada');
+      expect(aviso()).not.toBeNull();
+
+      await (await selector('Categoría')).clickOptions({ text: 'Comida' });
+      await estable();
+      expect(aviso()).toBeNull();
+
+      await (await selector('Categoría')).clickOptions({ text: 'Sin categoría' });
+      await estable();
+      expect(aviso()).not.toBeNull();
+    });
+
+    it('no se muestra en otra cuenta ni en una salida', async () => {
+      await elegirCuenta('Banco');
+      await elegirTipo('Entrada');
+      expect(aviso()).toBeNull();
+
+      await elegirCuenta('Visa');
+      await elegirTipo('Salida');
+      expect(aviso()).toBeNull();
+    });
+
+    it('no se muestra si la transacción está dividida', async () => {
+      await elegirCuenta('Visa');
+      await elegirTipo('Entrada');
+      await (await cargador.getHarness(MatSlideToggleHarness)).check();
+      await estable();
+
+      expect(aviso()).toBeNull();
     });
   });
 });

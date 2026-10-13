@@ -812,6 +812,7 @@ src/app/
 │   ├── fecha/
 │   ├── formato/
 │   ├── formulario/
+│   ├── pago-tarjeta/
 │   └── validacion/
 └── features/
     ├── auth/
@@ -890,7 +891,9 @@ src/app/
   funciones de meses `yyyy-MM` (`mesActual()`, `sumarMeses()`, `esMesValido()`, `textoMes()`),
   `api/` con la lectura de errores del API, `cabecera/`, `calculadora/` con `evaluarMonto()` y el
   campo `app-campo-monto`, `campo-contrasena/` con `app-campo-contrasena` (mostrar y ocultar),
-  `formulario/` con los mensajes de error y `validacion/` con los validadores, entre ellos
+  `pago-tarjeta/` con `sinCategoriasDePago()`, la etiqueta `app-etiqueta-pago-tarjeta` y los
+  textos fijos de las tarjetas de crédito, `formulario/` con los mensajes de error y
+  `validacion/` con los validadores, entre ellos
   `montoValido()`, `validadoresContrasenaNueva()` y `validadoresNombrePersona()`, las reglas
   únicas de contraseña nueva y de nombre que usan el registro y el perfil).
 - `features/<feature>/`: una carpeta por feature de negocio (`cuentas/`, `categorias/`,
@@ -1004,6 +1007,48 @@ persona, cambia su nombre (`PUT /usuarios/yo`) y su contraseña (`POST /usuarios
   token anterior **sigue válido** en el servidor hasta expirar (24 h): el cierre es solo de este
   navegador. `Cerrar sesión` no se repite en la pantalla (está en la cabecera).
 - Solo un `204` o un 401 real cierran la sesión; ningún 400 ni 422 lo hace.
+
+## Tarjetas de crédito (frontend)
+
+El backend crea una categoría `Pago: <tarjeta>` por cada tarjeta del presupuesto, dentro de un
+grupo de tipo `PAGOS_TARJETA`, y protege ambos con `422 REGLA_NEGOCIO_VIOLADA`. El frontend evita
+ofrecer lo que el backend rechaza:
+
+- **Modelos**: `esPagoTarjeta`, `cuentaId` (categoría), `tipo` (grupo) y `tipo` (`CuentaResumen`
+  de Transacciones) son campos opcionales y aditivos; un campo ausente es "no es de pago" /
+  "normal". Se leen solo con `=== true` / `=== 'PAGOS_TARJETA'` (`esCategoriaDePago`,
+  `esGrupoDePagos` en `features/categorias/services/pago-tarjeta.ts`).
+- **Una sola etiqueta y un solo filtro**, en `shared/pago-tarjeta/`: `app-etiqueta-pago-tarjeta`
+  (ícono `credit_card` + `Pago de tarjeta`) y `sinCategoriasDePago(grupos, conservarId?)`, genérico
+  por estructura para que `shared/` no importe modelos de ninguna feature. No se escriben copias.
+- **Categorías**: el grupo de pagos y sus categorías se muestran con la etiqueta y sin menú, asa de
+  arrastre, `Agregar categoría` ni `Mover a...`; el grupo de pagos no es destino al arrastrar ni en
+  `Mover a...`. Un `422 REGLA_NEGOCIO_VIOLADA` en esa pantalla muestra
+  `MENSAJE_PAGO_TARJETA_PROTEGIDO` (por `codigo`, nunca por `detail`); un movimiento fallido ya
+  vuelve al orden anterior.
+- **Selectores de categoría de Transacciones** (diálogo de transacción, partes de una división,
+  `Categorizar` en lote y diálogo de transferencia) excluyen las de pago con `sinCategoriasDePago`.
+  El filtro por categoría de la lista también, salvo la que trae la URL (`?categoriaId=`), que sigue
+  visible como elegida. Programadas, Conciliación y Beneficiarios conservan su filtro propio
+  (deuda conocida: no usan el compartido).
+- **Presupuesto mensual**: la fila de una categoría de pago lleva la etiqueta, `Reserva para pagar
+  la tarjeta` y `Ver movimientos` (`/presupuestos/:id/transacciones?cuentaId=`). Asignar, mover
+  dinero y metas se permiten, igual que en el backend.
+- **Cuentas**: al editar, el tipo no cambia desde ni hacia `TARJETA_CREDITO` (validador del
+  control `tipo`, con su mensaje; `Guardar` queda deshabilitado). El mensaje de un
+  `REGLA_NEGOCIO_VIOLADA` se elige por la operación enviada: editar con otro tipo y alguno de los
+  dos tarjeta es el cambio de tipo; en cualquier otro caso, el del saldo negativo.
+- **Pagar una tarjeta**: `Pagar tarjeta` (menú de una tarjeta abierta del presupuesto) es un
+  `routerLink` a `/presupuestos/:id/transacciones?cuentaId=X&pagarTarjeta=X`, porque una feature no
+  importa el diálogo de otra. `TransaccionesPage` abre el `DialogoTransferenciaComponent`
+  existente con `pagoTarjetaId` cuando las cuentas y el árbol cargaron y quita `pagarTarjeta` de la
+  URL con `replaceUrl`, de modo que recargar no lo reabre. En ese modo el destino es fijo, no hay
+  `Invertir` y el origen solo ofrece cuentas abiertas del presupuesto que no son tarjeta. Una
+  tarjeta de seguimiento no tiene categoría de pago y no ofrece la acción. Como el pago se abre
+  por URL y no hay botón de origen, solo ese diálogo recibe `restoreFocus` (el botón
+  `Agregar transferencia`); los demás diálogos no llevan esa opción.
+- **Aviso**: el diálogo de transacción avisa (sin bloquear) cuando una entrada sin categoría y sin
+  dividir va a una tarjeta del presupuesto: el backend no la cuenta como ingreso ni como pago.
 
 ## Estilo de código
 
