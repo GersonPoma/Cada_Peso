@@ -1,0 +1,105 @@
+.paso {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.titulo-paso {
+  margin: 0;
+  font: var(--mat-sys-title-large);
+}
+
+.titulo-paso:focus-visible {
+  outline: 2px solid var(--mat-sys-primary);
+  outline-offset: 4px;
+}
+
+.totales {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.total {
+  padding: 4px 12px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 16px;
+  font: var(--mat-sys-label-large);
+}
+
+.total.invalidas {
+  border-color: var(--mat-sys-error);
+  color: var(--mat-sys-error);
+}
+
+.filtro {
+  align-self: flex-start;
+  max-width: 100%;
+}
+
+/* La tabla se desplaza dentro de su región: la página no se desborda en pantallas estrechas. */
+.region-tabla {
+  max-width: 100%;
+  overflow: auto;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 8px;
+}
+
+.region-tabla:focus-visible {
+  outline: 2px solid var(--mat-sys-primary);
+  outline-offset: 2px;
+}
+
+.tabla {
+  min-width: 720px;
+}
+
+.numerica {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.texto {
+  max-width: 260px;
+  overflow-wrap: anywhere;
+}
+
+.estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.estado.invalida {
+  color: var(--mat-sys-error);
+}
+
+.estado.duplicada {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.estado.nueva {
+  color: var(--mat-sys-primary);
+}
+
+.vacio {
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 599.98px) {
+  .acciones button {
+    width: 100%;
+  }
+}

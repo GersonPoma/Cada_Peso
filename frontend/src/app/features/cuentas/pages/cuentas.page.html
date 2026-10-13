@@ -101,6 +101,14 @@
           <mat-icon>fact_check</mat-icon>
           <span>Conciliar</span>
         </a>
+        <button
+          mat-menu-item
+          type="button"
+          [routerLink]="['/presupuestos', presupuestoId(), 'cuentas', cuenta.id, 'importacion']"
+        >
+          <mat-icon>upload_file</mat-icon>
+          <span>Importar CSV</span>
+        </button>
         @if (cuenta.tipo === 'TARJETA_CREDITO' && cuenta.enPresupuesto) {
           <a
             mat-menu-item

@@ -840,6 +840,11 @@ src/app/
     │   ├── models/
     │   ├── pages/
     │   └── services/
+    ├── importacion/
+    │   ├── components/
+    │   ├── models/
+    │   ├── pages/
+    │   └── services/
     ├── inicio/
     │   ├── models/
     │   ├── pages/
@@ -1049,6 +1054,45 @@ ofrecer lo que el backend rechaza:
   `Agregar transferencia`); los demás diálogos no llevan esa opción.
 - **Aviso**: el diálogo de transacción avisa (sin bloquear) cuando una entrada sin categoría y sin
   dividir va a una tarjeta del presupuesto: el backend no la cuenta como ingreso ni como pago.
+
+## Importación de CSV (frontend)
+
+`features/importacion` (`/presupuestos/:presupuestoId/cuentas/:cuentaId/importacion`,
+`ImportacionPage`) es un asistente de cinco pasos (archivo, mapeo, vista previa, confirmar y
+resultado) que usa los endpoints de `Importación de CSV` (backend).
+
+- **Entrada**: el ítem `Importar CSV` del menú de cada cuenta **abierta** en Cuentas. La ruta es
+  hija del layout, **sin** `data: seccion(...)`. El ítem es un `<button mat-menu-item>` con
+  `routerLink`, no un `<a>`: el test de Cuentas espera un único enlace (`Conciliar`) en ese menú.
+  Con la cuenta cerrada el asistente no se ofrece y dice que se reabra en Cuentas.
+- **Pasos propios con señales**, sin `MatStepper` (traería textos internos por traducir). El
+  indicador marca el paso con `aria-current="step"` y la página lleva el foco al título del paso.
+- **Cliente más estricto que el servidor**: antes de enviar valida el archivo (2 MiB exactos, no
+  vacío ni solo encabezado, UTF-8 estricto, 5000 filas, comillas cerradas) y el mapeo (miles
+  distinto de decimal, fecha y descripción obligatorias, monto en una columna o débito y crédito;
+  las columnas se eligen entre las detectadas). Si igual llega un `400 DATOS_INVALIDOS`, un solo
+  mensaje fijo. El lector local (`lector-csv.ts`) es un port literal de `LectorCsv.java` con sus
+  casos; si el backend cambia la regla, se actualizan juntos. Se analiza en el hilo principal.
+- **Sugerencias** (separador, encabezado, formato de fecha, separador decimal) solo precargan los
+  controles, marcados `Sugerido` y editables. Las columnas se muestran `Columna 1..n` y viajan
+  desde 0. El mapeo vive en la página y se reenvía en cada llamada: no se guarda.
+- **Vista previa por botón**: cada pedido cancela el anterior (`switchMap`); editar el mapeo con la
+  petición en camino la **cancela**, y editarlo después marca la vista desactualizada. La tabla
+  se pagina en el cliente (10, 25, 50, 100) y el filtro es por estado, con texto e ícono.
+- **Confirmar**: `omitirInvalidas` solo existe con filas inválidas y hay que marcarlo
+  (`Omitir las filas inválidas`); `Importar` se deshabilita con inválidas sin marcar, con 0 filas
+  nuevas y mientras se envía (no hay doble envío). El servidor repite el parseo y recalcula los
+  duplicados.
+- **Errores por `codigo`, nunca por `detail`**, con textos fijos y sin reflejar el archivo: `400`
+  único; `422` por contexto (la página vuelve a leer la cuenta: cerrada, filas inválidas sin
+  omitir, u otra regla); `404` avisa y vuelve a pedir la cuenta; un `401` lo atiende el
+  interceptor.
+- **Resultado**: `importadas`, `duplicadas`, `Inválidas omitidas` (`omitidas`) y `sinCategoria`,
+  anunciadas con `aria-live`, la nota sobre `Listo para asignar` (`notaListoParaAsignar`: cuenta
+  del presupuesto, tarjeta de crédito, o seguimiento; la tarjeta tiene prioridad) y el enlace a
+  `/presupuestos/:id/transacciones?cuentaId=X&sinAprobar=1`.
+- **Datos de otra feature**: `CuentaLecturaService` propio (solo GET) y modelo mínimo, sin importar
+  de `cuentas`.
 
 ## Estilo de código
 

@@ -1,0 +1,141 @@
+.paso {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.titulo-paso {
+  margin: 0;
+  font: var(--mat-sys-title-large);
+}
+
+.titulo-paso:focus-visible {
+  outline: 2px solid var(--mat-sys-primary);
+  outline-offset: 4px;
+}
+
+.explicacion {
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+/* Las primeras filas se desplazan dentro de su contenedor, no desbordan la página. */
+.region-muestra {
+  max-width: 100%;
+  overflow: auto;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 8px;
+}
+
+.region-muestra:focus-visible {
+  outline: 2px solid var(--mat-sys-primary);
+  outline-offset: 2px;
+}
+
+.muestra {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--mat-sys-body-small);
+}
+
+.muestra th,
+.muestra td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.muestra thead th {
+  background: var(--mat-sys-surface-container);
+  font: var(--mat-sys-label-medium);
+}
+
+.muestra tbody th {
+  color: var(--mat-sys-on-surface-variant);
+  font-weight: 400;
+}
+
+.muestra .encabezado td {
+  background: var(--mat-sys-surface-container-low);
+  font-weight: 600;
+}
+
+.campos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  align-items: start;
+  gap: 8px 16px;
+}
+
+.casilla {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+}
+
+.grupo-monto {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  grid-column: 1 / -1;
+}
+
+.etiqueta-grupo {
+  font: var(--mat-sys-label-large);
+}
+
+.sugerido {
+  color: var(--mat-sys-primary);
+  font: var(--mat-sys-label-small);
+}
+
+.error,
+.aviso,
+.estado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.error {
+  color: var(--mat-sys-error);
+}
+
+.aviso {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.solo-lector {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 599.98px) {
+  .campos {
+    grid-template-columns: 1fr;
+  }
+
+  .acciones {
+    flex-direction: column-reverse;
+  }
+
+  .acciones button {
+    width: 100%;
+  }
+}

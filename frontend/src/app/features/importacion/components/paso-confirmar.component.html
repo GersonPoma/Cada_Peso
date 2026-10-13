@@ -1,0 +1,58 @@
+<section class="paso" aria-labelledby="titulo-paso-confirmar">
+  <h2 id="titulo-paso-confirmar" class="titulo-paso" tabindex="-1">4. Confirma la importación</h2>
+
+  <ul class="totales" aria-label="Resumen de la importación">
+    @for (total of textos(); track total.clave) {
+      <li class="total">{{ total.texto }}</li>
+    }
+  </ul>
+
+  @if (hayInvalidas()) {
+    <mat-checkbox
+      class="omitir"
+      [checked]="omitir()"
+      [disabled]="enviando()"
+      (change)="cambiarOmitir($event.checked)"
+    >
+      Omitir las filas inválidas
+    </mat-checkbox>
+    <p class="explicacion">
+      Sin marcarla no se importa nada. Marcada, las filas inválidas se omiten y se importan las
+      demás.
+    </p>
+  }
+
+  @if (sinNuevas()) {
+    <p class="aviso" role="status">
+      <mat-icon aria-hidden="true">info</mat-icon>
+      {{ mensajeSinNuevas }}
+    </p>
+  } @else if (invalidasSinOmitir()) {
+    <p class="aviso" role="status">
+      <mat-icon aria-hidden="true">info</mat-icon>
+      {{ mensajeInvalidas }}
+    </p>
+  }
+
+  @if (error(); as mensaje) {
+    <p class="error" role="alert">
+      <mat-icon aria-hidden="true">error</mat-icon>
+      {{ mensaje }}
+    </p>
+  }
+
+  <div class="acciones">
+    <button mat-button type="button" class="volver" [disabled]="enviando()" (click)="volver.emit()">
+      Volver a la vista previa
+    </button>
+    <button
+      mat-flat-button
+      type="button"
+      class="importar"
+      [disabled]="!puedeImportar()"
+      (click)="confirmar()"
+    >
+      {{ enviando() ? 'Importando…' : 'Importar' }}
+    </button>
+  </div>
+</section>

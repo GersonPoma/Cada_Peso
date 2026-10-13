@@ -247,6 +247,39 @@ describe('rutas', () => {
       ]);
     });
 
+    it('/presupuestos/3/cuentas/5/importacion se muestra sin entrada en el menú', async () => {
+      await harness.navigateByUrl('/presupuestos/3/cuentas/5/importacion');
+      const backend = TestBed.inject(HttpTestingController);
+      backend.expectOne('/api/v1/presupuestos').flush(PRESUPUESTOS);
+      await harness.fixture.whenStable();
+      (await esperarPeticion('/api/v1/presupuestos/3/cuentas/5')).flush({
+        id: 5,
+        nombre: 'Banco',
+        tipo: 'CORRIENTE',
+        enPresupuesto: true,
+        cerrada: false,
+      });
+      await harness.fixture.whenStable();
+      backend.verify();
+
+      expect(url()).toBe('/presupuestos/3/cuentas/5/importacion');
+      expect(texto()).toContain('Importar CSV');
+      expect(texto()).toContain('Banco');
+      expect(texto()).toContain('Elige el archivo');
+      const enlaces = Array.from(
+        (harness.routeNativeElement as HTMLElement).querySelectorAll('mat-sidenav a'),
+      ).map((a) => a.querySelector('[matListItemTitle]')?.textContent?.trim());
+      expect(enlaces).toEqual([
+        'Presupuesto',
+        'Inicio',
+        'Cuentas',
+        'Transacciones',
+        'Programadas',
+        'Categorías',
+        'Beneficiarios',
+        'Reportes',
+      ]);
+    });
     it('el enlace Cuentas del menú lleva a /presupuestos/3/cuentas', async () => {
       await harness.navigateByUrl('/');
       await responderHastaPresupuesto();

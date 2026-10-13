@@ -1,0 +1,22 @@
+<ol class="pasos" aria-label="Pasos de la importación">
+  @for (paso of pasos(); track paso; let i = $index) {
+    <li
+      class="paso"
+      [class.actual]="i === actual()"
+      [class.hecho]="i < actual()"
+      [attr.aria-current]="i === actual() ? 'step' : null"
+    >
+      <span class="numero" aria-hidden="true">
+        @if (i < actual()) {
+          <mat-icon>check</mat-icon>
+        } @else {
+          {{ i + 1 }}
+        }
+      </span>
+      <span class="nombre">{{ paso }}</span>
+      @if (i < actual()) {
+        <span class="solo-lector">(hecho)</span>
+      }
+    </li>
+  }
+</ol>

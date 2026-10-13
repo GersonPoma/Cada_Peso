@@ -1,0 +1,71 @@
+.pasos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.paso {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-label-large);
+}
+
+.numero {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--mat-sys-outline);
+  border-radius: 50%;
+  font: var(--mat-sys-label-medium);
+}
+
+.numero mat-icon {
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
+}
+
+.hecho .numero {
+  border-color: var(--mat-sys-primary);
+  background: var(--mat-sys-primary-container);
+  color: var(--mat-sys-on-primary-container);
+}
+
+.actual {
+  color: var(--mat-sys-on-surface);
+  font-weight: 600;
+}
+
+.actual .numero {
+  border-color: var(--mat-sys-primary);
+  background: var(--mat-sys-primary);
+  color: var(--mat-sys-on-primary);
+}
+
+.solo-lector {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 599.98px) {
+  /* El nombre de los pasos que no son el actual se oculta a la vista, no al lector. */
+  .paso:not(.actual) .nombre {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}

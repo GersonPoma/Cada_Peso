@@ -1,0 +1,100 @@
+<main class="pagina">
+  <header class="encabezado">
+    <a mat-button class="volver" [routerLink]="['/presupuestos', presupuestoId(), 'cuentas']">
+      <mat-icon>arrow_back</mat-icon>
+      Cuentas
+    </a>
+    <h1 class="titulo">
+      Importar CSV
+      @if (cuenta(); as cuenta) {
+        <span class="nombre-cuenta">{{ cuenta.nombre }}</span>
+      }
+    </h1>
+    @if (cuenta(); as cuenta) {
+      <p class="tipo-cuenta">
+        {{ etiquetas[cuenta.tipo] }}{{ cuenta.enPresupuesto ? '' : ' · Seguimiento' }}
+      </p>
+    }
+  </header>
+
+  @switch (estado()) {
+    @case ('cargando') {
+      <div class="centrado">
+        <mat-progress-spinner mode="indeterminate" diameter="48" aria-label="Cargando" />
+      </div>
+    }
+    @case ('error') {
+      <div class="centrado">
+        <p class="error" role="alert">No pudimos cargar la cuenta.</p>
+        <button mat-stroked-button type="button" (click)="recargarCuenta()">Reintentar</button>
+      </div>
+    }
+    @case ('listo') {
+      @if (cuenta()?.cerrada) {
+        <p class="aviso-cerrada" role="status">{{ mensajeCerrada }}</p>
+      } @else {
+        <app-indicador-pasos [pasos]="nombresPasos" [actual]="indicePaso()" />
+
+        @switch (paso()) {
+          @case ('archivo') {
+            <app-paso-archivo
+              [archivo]="archivo()"
+              [leyendo]="leyendo()"
+              [errorCarga]="errorCarga()"
+              [analisis]="analisis()"
+              (elegido)="elegirArchivo($event)"
+              (continuar)="irA('mapeo')"
+            />
+          }
+          @case ('mapeo') {
+            @if (analisis(); as analisis) {
+              <app-paso-mapeo
+                [mapeo]="mapeo()"
+                [analisis]="analisis"
+                [sugerencias]="sugerencias()"
+                [pidiendo]="pidiendo()"
+                [hayVistaVigente]="hayVistaVigente()"
+                [vistaDesactualizada]="vistaDesactualizada()"
+                [errorServidor]="errorServidor()"
+                (cambio)="alCambiarMapeo($event)"
+                (pedirVistaPrevia)="pedirVistaPrevia()"
+                (volverAVistaPrevia)="irA('vista-previa')"
+                (volver)="irA('archivo')"
+              />
+            }
+          }
+          @case ('vista-previa') {
+            @if (vistaPrevia(); as vista) {
+              <app-paso-vista-previa
+                [vistaPrevia]="vista.datos"
+                [moneda]="moneda()"
+                (volver)="irA('mapeo')"
+                (continuar)="irA('confirmar')"
+              />
+            }
+          }
+          @case ('confirmar') {
+            @if (vistaPrevia(); as vista) {
+              <app-paso-confirmar
+                [totales]="vista.datos.totales"
+                [enviando]="importando()"
+                [error]="errorImportacion()"
+                (importar)="importar($event)"
+                (volver)="irA('vista-previa')"
+              />
+            }
+          }
+          @case ('resultado') {
+            @if (resultado(); as resultado) {
+              <app-paso-resultado
+                [resultado]="resultado"
+                [cuenta]="cuenta()!"
+                [presupuestoId]="presupuestoId()!"
+              />
+            }
+          }
+        }
+      }
+    }
+  }
+</main>

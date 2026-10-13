@@ -1,0 +1,67 @@
+.paso {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.titulo-paso {
+  margin: 0;
+  font: var(--mat-sys-title-large);
+}
+
+.titulo-paso:focus-visible {
+  outline: 2px solid var(--mat-sys-primary);
+  outline-offset: 4px;
+}
+
+.explicacion {
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.selector {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.etiqueta {
+  font: var(--mat-sys-label-large);
+}
+
+.entrada-archivo {
+  max-width: 100%;
+  font: var(--mat-sys-body-medium);
+}
+
+.estado,
+.error,
+.resumen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.error {
+  color: var(--mat-sys-error);
+}
+
+.resumen {
+  color: var(--mat-sys-on-surface);
+}
+
+.nombre-archivo {
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+
+.detalle {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.acciones {
+  display: flex;
+  justify-content: flex-end;
+}

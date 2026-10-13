@@ -1,0 +1,35 @@
+<section class="paso" aria-labelledby="titulo-paso-resultado">
+  <h2 id="titulo-paso-resultado" class="titulo-paso" tabindex="-1">5. Importación terminada</h2>
+
+  <div class="resultado" role="status" aria-live="polite">
+    <p class="resumen">
+      <mat-icon aria-hidden="true">check_circle</mat-icon>
+      Importación terminada
+    </p>
+    <ul class="cifras" aria-label="Resultado de la importación">
+      @for (cifra of cifras(); track cifra.clave) {
+        <li class="cifra" [class]="'cifra ' + cifra.clave">
+          <span class="valor">{{ cifra.valor }}</span
+          >{{ ' ' }}
+          <span class="rotulo">{{ cifra.rotulo }}</span>
+        </li>
+      }
+    </ul>
+  </div>
+
+  <p class="nota">
+    <mat-icon aria-hidden="true">info</mat-icon>
+    {{ nota() }}
+  </p>
+
+  <div class="acciones">
+    <a
+      mat-flat-button
+      class="ver-transacciones"
+      [routerLink]="rutaTransacciones()"
+      [queryParams]="parametros()"
+    >
+      Ver transacciones sin aprobar
+    </a>
+  </div>
+</section>

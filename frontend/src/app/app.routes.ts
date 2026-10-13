@@ -64,6 +64,12 @@ export const routes: Routes = [
           import('./features/conciliacion/pages/conciliacion.page').then((m) => m.ConciliacionPage),
       },
       {
+        // Sin `seccion`: se llega desde el menú de cada cuenta abierta en Cuentas, no desde el menú lateral.
+        path: 'cuentas/:cuentaId/importacion',
+        loadComponent: () =>
+          import('./features/importacion/pages/importacion.page').then((m) => m.ImportacionPage),
+      },
+      {
         path: 'transacciones',
         loadComponent: () =>
           import('./features/transacciones/pages/transacciones.page').then(

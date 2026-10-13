@@ -1,0 +1,52 @@
+<section class="paso" aria-labelledby="titulo-paso-archivo" [attr.aria-busy]="leyendo()">
+  <h2 id="titulo-paso-archivo" class="titulo-paso" tabindex="-1">1. Elige el archivo</h2>
+  <p class="explicacion">
+    Elige el CSV de tu banco: en UTF-8, de hasta 2 MB y 5000 filas. El archivo se lee en tu
+    navegador y no se guarda.
+  </p>
+
+  <div class="selector">
+    <label class="etiqueta" for="archivo-csv">Archivo CSV</label>
+    <input
+      id="archivo-csv"
+      class="entrada-archivo"
+      type="file"
+      accept=".csv,text/csv,text/plain"
+      (change)="alElegir($event)"
+    />
+  </div>
+
+  @if (leyendo()) {
+    <p class="estado" role="status">
+      <mat-progress-spinner mode="indeterminate" diameter="20" aria-hidden="true" />
+      {{ textoLeyendo }}
+    </p>
+  }
+
+  @if (mensajeError(); as texto) {
+    <p class="error" role="alert">
+      <mat-icon aria-hidden="true">error</mat-icon>
+      <span>{{ texto }}</span>
+    </p>
+  }
+
+  @if (resumen(); as datos) {
+    <p class="resumen" role="status">
+      <mat-icon aria-hidden="true">description</mat-icon>
+      <span class="nombre-archivo">{{ datos.nombre }}</span>
+      <span class="detalle">{{ datos.tamano }} · {{ datos.filas }}</span>
+    </p>
+  }
+
+  <div class="acciones">
+    <button
+      mat-flat-button
+      type="button"
+      class="continuar"
+      [disabled]="!puedeContinuar()"
+      (click)="continuar.emit()"
+    >
+      Continuar
+    </button>
+  </div>
+</section>

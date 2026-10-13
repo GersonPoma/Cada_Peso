@@ -1,0 +1,253 @@
+<section class="paso" aria-labelledby="titulo-paso-mapeo">
+  <h2 id="titulo-paso-mapeo" class="titulo-paso" tabindex="-1">2. Elige las columnas</h2>
+  <p class="explicacion">{{ aviso }}.</p>
+
+  <div class="region-muestra" role="region" aria-labelledby="titulo-muestra" tabindex="0">
+    <table class="muestra">
+      <caption id="titulo-muestra" class="solo-lector">
+        Primeras
+        {{
+          muestra().length
+        }}
+        filas del archivo
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">Fila</th>
+          @for (i of indices(); track i) {
+            <th scope="col">Columna {{ i + 1 }}</th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (registro of muestra(); track $index; let fila = $index) {
+          <tr [class.encabezado]="mapeo().tieneEncabezado && fila === 0">
+            <th scope="row">{{ fila + 1 }}</th>
+            @for (i of indices(); track i) {
+              <td>{{ registro[i] }}</td>
+            }
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <div class="campos">
+    <mat-form-field appearance="outline">
+      <mat-label>Separador de campos</mat-label>
+      <mat-select
+        [value]="mapeo().separador"
+        (selectionChange)="cambio.emit({ separador: $event.value })"
+      >
+        @for (separador of separadores; track separador) {
+          <mat-option [value]="separador">{{ etiquetasSeparador[separador] }}</mat-option>
+        }
+      </mat-select>
+      @if (esSugerido('separador')) {
+        <mat-hint class="sugerido">Sugerido</mat-hint>
+      }
+    </mat-form-field>
+
+    <div class="casilla">
+      <mat-checkbox
+        [checked]="mapeo().tieneEncabezado"
+        (change)="cambio.emit({ tieneEncabezado: $event.checked })"
+      >
+        La primera fila es un encabezado
+      </mat-checkbox>
+      @if (esSugerido('tieneEncabezado')) {
+        <span class="sugerido">Sugerido</span>
+      }
+    </div>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Columna de la fecha</mat-label>
+      <mat-select
+        required
+        [value]="mapeo().columnaFecha"
+        (selectionChange)="cambio.emit({ columnaFecha: $event.value })"
+      >
+        @for (i of indices(); track i) {
+          <mat-option [value]="i">Columna {{ i + 1 }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Formato de la fecha</mat-label>
+      <mat-select
+        [value]="mapeo().formatoFecha"
+        (selectionChange)="cambio.emit({ formatoFecha: $event.value })"
+      >
+        @for (formato of formatosFecha; track formato) {
+          <mat-option [value]="formato">{{ formato }}</mat-option>
+        }
+      </mat-select>
+      @if (esSugerido('formatoFecha')) {
+        <mat-hint class="sugerido">Sugerido</mat-hint>
+      }
+    </mat-form-field>
+
+    <div class="grupo-monto">
+      <span id="etiqueta-modo-monto" class="etiqueta-grupo">Cómo viene el monto</span>
+      <mat-button-toggle-group
+        aria-labelledby="etiqueta-modo-monto"
+        [value]="mapeo().modoMonto"
+        (change)="cambiarModo($event.value)"
+      >
+        <mat-button-toggle value="UNA_COLUMNA">Una columna con signo</mat-button-toggle>
+        <mat-button-toggle value="DEBITO_CREDITO">Débito y crédito</mat-button-toggle>
+      </mat-button-toggle-group>
+    </div>
+
+    @if (mapeo().modoMonto === 'UNA_COLUMNA') {
+      <mat-form-field appearance="outline">
+        <mat-label>Columna del monto</mat-label>
+        <mat-select
+          required
+          [value]="mapeo().columnaMonto"
+          (selectionChange)="cambio.emit({ columnaMonto: $event.value })"
+        >
+          @for (i of indices(); track i) {
+            <mat-option [value]="i">Columna {{ i + 1 }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    } @else {
+      <mat-form-field appearance="outline">
+        <mat-label>Columna de débito</mat-label>
+        <mat-select
+          required
+          [value]="mapeo().columnaDebito"
+          (selectionChange)="cambio.emit({ columnaDebito: $event.value })"
+        >
+          @for (i of indices(); track i) {
+            <mat-option [value]="i">Columna {{ i + 1 }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Columna de crédito</mat-label>
+        <mat-select
+          required
+          [value]="mapeo().columnaCredito"
+          (selectionChange)="cambio.emit({ columnaCredito: $event.value })"
+        >
+          @for (i of indices(); track i) {
+            <mat-option [value]="i">Columna {{ i + 1 }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
+
+    <mat-form-field appearance="outline">
+      <mat-label>Separador decimal</mat-label>
+      <mat-select
+        [value]="mapeo().separadorDecimal"
+        (selectionChange)="cambio.emit({ separadorDecimal: $event.value })"
+      >
+        @for (decimal of decimales; track decimal) {
+          <mat-option [value]="decimal">{{ etiquetasDecimal[decimal] }}</mat-option>
+        }
+      </mat-select>
+      @if (esSugerido('separadorDecimal')) {
+        <mat-hint class="sugerido">Sugerido</mat-hint>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Separador de miles</mat-label>
+      <mat-select
+        [value]="mapeo().separadorMiles"
+        (selectionChange)="cambio.emit({ separadorMiles: $event.value })"
+      >
+        @for (separador of miles; track separador) {
+          <mat-option [value]="separador">{{ etiquetasMiles[separador] }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Columna de la descripción</mat-label>
+      <mat-select
+        required
+        [value]="mapeo().columnaDescripcion"
+        (selectionChange)="cambio.emit({ columnaDescripcion: $event.value })"
+      >
+        @for (i of indices(); track i) {
+          <mat-option [value]="i">Columna {{ i + 1 }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Columna del memo (opcional)</mat-label>
+      <mat-select
+        [value]="mapeo().columnaMemo"
+        (selectionChange)="cambio.emit({ columnaMemo: $event.value })"
+      >
+        <mat-option [value]="null">Ninguna</mat-option>
+        @for (i of indices(); track i) {
+          <mat-option [value]="i">Columna {{ i + 1 }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  @if (errorArchivo(); as texto) {
+    <p class="error" role="alert">
+      <mat-icon aria-hidden="true">error</mat-icon>
+      <span>{{ texto }}</span>
+    </p>
+  }
+  @for (texto of erroresMapeo(); track texto) {
+    <p class="error" role="alert">
+      <mat-icon aria-hidden="true">error</mat-icon>
+      <span>{{ texto }}</span>
+    </p>
+  }
+  @if (errorServidor(); as texto) {
+    <p class="error" role="alert">
+      <mat-icon aria-hidden="true">error</mat-icon>
+      <span>{{ texto }}</span>
+    </p>
+  }
+  @if (vistaDesactualizada()) {
+    <p class="aviso" role="status">
+      <mat-icon aria-hidden="true">info</mat-icon>
+      <span>{{ textoDesactualizada }}</span>
+    </p>
+  }
+  @if (pidiendo()) {
+    <p class="estado" role="status">
+      <mat-progress-spinner mode="indeterminate" diameter="20" aria-hidden="true" />
+      Pidiendo la vista previa…
+    </p>
+  }
+
+  <div class="acciones">
+    <button mat-button type="button" class="volver" [disabled]="pidiendo()" (click)="volver.emit()">
+      Volver
+    </button>
+    @if (hayVistaVigente()) {
+      <button
+        mat-stroked-button
+        type="button"
+        class="volver-a-vista"
+        [disabled]="pidiendo()"
+        (click)="volverAVistaPrevia.emit()"
+      >
+        Volver a la vista previa
+      </button>
+    }
+    <button
+      mat-flat-button
+      type="button"
+      class="pedir"
+      [disabled]="!puedePedir()"
+      (click)="pedirVistaPrevia.emit()"
+    >
+      Ver vista previa
+    </button>
+  </div>
+</section>

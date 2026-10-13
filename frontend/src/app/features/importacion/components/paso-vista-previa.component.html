@@ -1,0 +1,116 @@
+<section class="paso" aria-labelledby="titulo-paso-vista-previa">
+  <h2 id="titulo-paso-vista-previa" class="titulo-paso" tabindex="-1">3. Revisa la vista previa</h2>
+
+  <ul class="totales" aria-label="Totales de la vista previa">
+    @for (total of totales(); track total.clave) {
+      <li class="total" [class]="'total ' + total.clave">{{ total.texto }}</li>
+    }
+  </ul>
+
+  <mat-button-toggle-group
+    class="filtro"
+    aria-label="Filtrar las filas por estado"
+    [value]="filtro()"
+    (change)="cambiarFiltro($event.value)"
+  >
+    @for (opcion of filtros; track opcion.valor) {
+      <mat-button-toggle [value]="opcion.valor">{{ opcion.texto }}</mat-button-toggle>
+    }
+  </mat-button-toggle-group>
+
+  <div class="region-tabla" role="region" aria-label="Filas de la vista previa" tabindex="0">
+    <table mat-table [dataSource]="visibles()" class="tabla">
+      <ng-container matColumnDef="fila">
+        <th mat-header-cell *matHeaderCellDef>Fila de datos</th>
+        <td mat-cell *matCellDef="let f">{{ f.fila }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="fecha">
+        <th mat-header-cell *matHeaderCellDef>Fecha</th>
+        <td mat-cell *matCellDef="let f">
+          @if (f.fecha) {
+            {{ f.fecha | fecha }}
+          } @else {
+            <span aria-label="sin dato">—</span>
+          }
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="monto">
+        <th mat-header-cell *matHeaderCellDef class="numerica">Monto</th>
+        <td mat-cell *matCellDef="let f" class="numerica">
+          @if (f.monto !== null) {
+            {{ f.monto | monto: moneda() }}
+          } @else {
+            <span aria-label="sin dato">—</span>
+          }
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="beneficiario">
+        <th mat-header-cell *matHeaderCellDef>Beneficiario</th>
+        <td mat-cell *matCellDef="let f" class="texto">
+          @if (f.beneficiario) {
+            {{ f.beneficiario }}
+          } @else {
+            <span aria-label="sin dato">—</span>
+          }
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="memo">
+        <th mat-header-cell *matHeaderCellDef>Memo</th>
+        <td mat-cell *matCellDef="let f" class="texto">
+          @if (f.memo) {
+            {{ f.memo }}
+          } @else {
+            <span aria-label="sin dato">—</span>
+          }
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="estado">
+        <th mat-header-cell *matHeaderCellDef>Estado</th>
+        <td mat-cell *matCellDef="let f">
+          <span class="estado" [class]="'estado ' + presentar(f.estado).clase">
+            <mat-icon aria-hidden="true">{{ presentar(f.estado).icono }}</mat-icon>
+            {{ presentar(f.estado).texto }}
+          </span>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="motivo">
+        <th mat-header-cell *matHeaderCellDef>Motivo</th>
+        <td mat-cell *matCellDef="let f" class="texto">
+          @if (f.motivo) {
+            {{ f.motivo }}
+          } @else {
+            <span aria-label="sin dato">—</span>
+          }
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="columnas"></tr>
+      <tr mat-row *matRowDef="let fila; columns: columnas"></tr>
+    </table>
+  </div>
+
+  @if (filtradas().length === 0) {
+    <p class="vacio" role="status">No hay filas con este estado.</p>
+  }
+
+  <mat-paginator
+    [length]="filtradas().length"
+    [pageIndex]="indicePagina()"
+    [pageSize]="tamanoPagina()"
+    [pageSizeOptions]="tamanos"
+    (page)="paginar($event)"
+  />
+
+  <div class="acciones">
+    <button mat-button type="button" class="volver" (click)="volver.emit()">Volver al mapeo</button>
+    <button mat-flat-button type="button" class="continuar" (click)="continuar.emit()">
+      Continuar
+    </button>
+  </div>
+</section>

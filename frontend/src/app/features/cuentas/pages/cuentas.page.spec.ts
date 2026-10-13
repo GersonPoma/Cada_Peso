@@ -1,4 +1,5 @@
 import { HarnessLoader } from '@angular/cdk/testing';
+import { TestKey } from '@angular/cdk/testing';
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -9,6 +10,7 @@ import { MatMenuHarness } from '@angular/material/menu/testing';
 import { MatSlideToggleHarness } from '@angular/material/slide-toggle/testing';
 import { MatSnackBar, MatSnackBarRef, TextOnlySnackBar } from '@angular/material/snack-bar';
 import { provideRouter } from '@angular/router';
+import { Router, UrlTree } from '@angular/router';
 import { Subject, of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { proveerMaterial } from '../../../core/material/proveer-material';
@@ -420,6 +422,99 @@ describe('CuentasPage', () => {
       await responder([BANCO, cerrada], SALDOS, true);
 
       expect((await enlaces('Visa vieja')).map(([t]) => t)).not.toContain('Pagar tarjeta');
+    });
+  });
+
+  describe('Importar CSV', () => {
+    beforeEach(() => responder([BANCO, TARJETA, INVERSIONES]));
+
+    async function menuDe(nombre: string): Promise<MatMenuHarness> {
+      const menu = await cargador.getHarness(
+        MatMenuHarness.with({ selector: `[aria-label="Acciones de ${nombre}"]` }),
+      );
+      await menu.open();
+      await estable();
+      return menu;
+    }
+
+    /** El texto de cada ítem sin el nombre de su ícono (`upload_fileImportar CSV`). */
+    const textos = async (menu: MatMenuHarness) =>
+      Promise.all(
+        (await menu.getItems()).map(async (i) =>
+          (await i.getText()).replace(/^[a-z_]+(?=[A-Z])/, ''),
+        ),
+      );
+
+    it('una cuenta abierta lo ofrece entre Conciliar y Cerrar', async () => {
+      const menu = await menuDe('Banco');
+
+      expect((await textos(menu)).map((t) => t.trim())).toEqual([
+        'Editar',
+        'Conciliar',
+        'Importar CSV',
+        'Cerrar',
+      ]);
+    });
+
+    it('lo ofrecen también una tarjeta y una cuenta de seguimiento abiertas', async () => {
+      expect(await (await menuDe('Visa')).getItems({ text: /Importar CSV/ })).toHaveLength(1);
+      document.querySelector<HTMLElement>('.cdk-overlay-backdrop')?.click();
+      await estable();
+
+      expect(await (await menuDe('Inversiones')).getItems({ text: /Importar CSV/ })).toHaveLength(
+        1,
+      );
+    });
+
+    it('una cuenta cerrada no lo ofrece', async () => {
+      await (await cargador.getHarness(MatSlideToggleHarness)).toggle();
+      await estable();
+      await responder([BANCO, VIEJA], SALDOS, true);
+
+      const menu = await menuDe('Vieja');
+
+      expect(await menu.getItems({ text: /Importar CSV/ })).toHaveLength(0);
+    });
+
+    it('es un botón con role menuitem, sin href ni role link, y no suma enlaces al menú', async () => {
+      const menu = await menuDe('Banco');
+      const [item] = await menu.getItems({ text: /Importar CSV/ });
+      const anfitrion = await item.host();
+
+      expect(await anfitrion.getProperty<string>('tagName')).toBe('BUTTON');
+      expect(await anfitrion.getAttribute('role')).toBe('menuitem');
+      expect(await anfitrion.getAttribute('href')).toBeNull();
+      const enlaces = document.querySelectorAll('.mat-mdc-menu-panel a[mat-menu-item]');
+      expect(Array.from(enlaces).map((a) => a.getAttribute('href'))).toEqual([
+        '/presupuestos/3/cuentas/5/conciliacion',
+      ]);
+    });
+
+    it('se alcanza con las flechas del menú, en el orden esperado, y el foco queda en él', async () => {
+      const menu = await menuDe('Banco');
+      const items = await menu.getItems();
+      await items[0].focus();
+
+      await (await items[0].host()).sendKeys(TestKey.DOWN_ARROW);
+      expect(await items[1].isFocused()).toBe(true);
+      await (await items[1].host()).sendKeys(TestKey.DOWN_ARROW);
+
+      expect((await items[2].getText()).includes('Importar CSV')).toBe(true);
+      expect(await items[2].isFocused()).toBe(true);
+    });
+
+    it('al activarlo navega a la importación de esa cuenta', async () => {
+      const navegar = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+      const menu = await menuDe('Banco');
+
+      await menu.clickItem({ text: /Importar CSV/ });
+      await estable();
+
+      expect(navegar).toHaveBeenCalledTimes(1);
+      const destino = navegar.mock.calls[0][0];
+      expect(TestBed.inject(Router).serializeUrl(destino as UrlTree)).toBe(
+        '/presupuestos/3/cuentas/5/importacion',
+      );
     });
   });
 });
