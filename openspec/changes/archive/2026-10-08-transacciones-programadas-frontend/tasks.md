@@ -84,9 +84,11 @@ spec); el menú lateral, `core/`, `shared/` y las demás features no se tocan.
       `features/transacciones-programadas` no importa otra feature y no usa `parseFloat`,
       `toISOString` ni pipes nativos de fecha o moneda, y que `git diff --stat` solo toca
       `app.routes.ts` (+ spec) fuera de la feature.
-- [ ] 5.3 Revisión manual con `npx ng serve` y el backend local: crear, editar, pausar, reanudar,
+- [x] 5.3 Revisión manual con `npx ng serve` y el backend local: crear, editar, pausar, reanudar,
       borrar y `Generar ahora`; una plantilla en una cuenta cerrada después muestra su error;
       360 px sin desplazamiento horizontal; navegación con teclado.
+      Hecha el 2026-10-12, sin cambios: los 360 px ya incluyen el arreglo de la cabecera del
+      layout hecho en la revisión de `reportes-frontend`.
 - [x] 5.4 `npx prettier --check` sobre los archivos tocados, `npx ng build` y
       `npx ng test --watch=false`; anotar el total de tests y compararlo con la línea base.
 
